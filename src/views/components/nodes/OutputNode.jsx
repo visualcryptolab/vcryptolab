@@ -126,6 +126,7 @@ const OutputNode = ({ data, nodeKey }) => {
 
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
+      /*
       const numInput = Number(data.input);
       if (isNaN(numInput)) {
         toast.error("Input must be a number.", {
@@ -134,6 +135,18 @@ const OutputNode = ({ data, nodeKey }) => {
         setOutput("");
         data.output = "";
       } else {
+        data.output = numInput;
+        setOutput(numInput);
+        setShiftCount(0);
+      }
+        */
+
+      
+      if (isNaN(data.input)) {
+        data.output = data.input;
+        setOutput(data.input);
+      } else {
+        const numInput = Number(data.input);
         data.output = numInput;
         setOutput(numInput);
         setShiftCount(0);
