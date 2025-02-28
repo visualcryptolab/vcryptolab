@@ -1,8 +1,8 @@
 /* global BigInt */
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useState, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCopy, faArrowRight, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faCopy} from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
@@ -18,41 +18,10 @@ const NodeContainer = styled.div`
   min-width: 120px;
 `;
 
-const ButtonContainer = styled.div`
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 8px;
-`;
-
-const ShiftButton = styled.button`
-  max-width: 40px; // Reduced width for a smaller button
-  border: none;
-  border-radius: 4px;
-  padding: 4px 6px; // Reduced horizontal padding for a smaller button width
-  cursor: pointer;
-  color: #fff;
-  font-size: 0.9rem;
-  transition: transform 0.2s ease;
-  
-  &:hover {
-    transform: scale(1.05);
-  }
-  
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
 const OutputText = styled.p`
   font-size: 1rem;
   color: #333;
   margin: 8px 0;
-`;
-
-const Counter = styled.div`
-  font-size: 0.8rem;
-  color: #555;
-  margin-top: 8px;
 `;
 
 const Icon = styled(FontAwesomeIcon)`
@@ -63,10 +32,69 @@ const Icon = styled(FontAwesomeIcon)`
   right: 5px;
 `;
 
+const determineType = (str) => {
+  // If it's binary
+  if (/^[01]+$/.test(str)) {
+    return "Binary"; // Return the type as "Binary"
+  }
+  // If it's hexadecimal
+  else if (/^[0-9a-fA-F]+$/.test(str)) {
+    return "Hexadecimal"; // Return the type as "Hexadecimal"
+  }
+  // If it's text (only letters and spaces)
+  else if (/^[a-zA-Z\s]+$/.test(str)) {
+    return "Text"; // Return the type as "Text"
+  }
+  // If it's not recognized, return "Unknown"
+  else {
+    return "Unknown"; // Return the type as "Unknown"
+  }
+};
+
+const convertToType = (inputString, type) => {
+  // Step 1: Convert the input string into an array of numbers
+  const asciiCodes = inputString.split(' ')
+    .map(num => parseInt(num, 10));  // Convert each string number to a base-10 integer (ASCII code)
+
+  switch(type) {
+    case "Text":
+      // Convert ASCII codes back to characters (text)
+      return asciiCodes.map(code => String.fromCharCode(code)).join(''); // Convert each ASCII code to the corresponding character
+
+    case "Binary":
+      // Convert ASCII codes to binary
+      return asciiCodes.map(code => code.toString(2).padStart(8, '0')).join(' '); // Convert each to 8-bit binary
+
+    case "Hexadecimal":
+      // Convert ASCII codes to hexadecimal
+      return asciiCodes.map(code => code.toString(16).padStart(2, '0')).join(' '); // Convert each to hex
+
+    case "Decimal":
+      // Return the ASCII codes as decimal values
+      return asciiCodes.join(' '); // Return ASCII codes as space-separated decimals
+
+    default:
+      return "Invalid type"; // Return an error if the type is not recognized
+  }
+};
+
+
+
+
 
 const OutputNode = ({ data, nodeKey }) => {
+  const [selectedType, setSelectedType] = useState("Decimal");
   const [output, setOutput] = useState("");
-  const [shiftCount, setShiftCount] = useState(0);
+
+  const types = useMemo(
+      () => ({
+        "Decimal": "Decimal",
+        "Binary": "Binary",
+        "Hexadecimal": "Hexadecimal",
+        "Text": "Text",
+      }),
+      []
+    );
 
   const handleCopy = () => {
     navigator.clipboard.writeText(output.toString());
@@ -75,88 +103,18 @@ const OutputNode = ({ data, nodeKey }) => {
       autoClose: 2000,
     });
   };
-
-  const handleShiftLeft = (shiftAmount = 1) => {
-    const num = Number(output) || 0;
-    if (isNaN(num)) {
-      toast.error("Invalid number for shifting.", {
-        position: "top-right",
-      });
-      return;
-    }
-
-    let binary = num.toString(2);
-    if (binary.length === 0) binary = "0";
-
-    const paddedBinary = binary.padStart(binary.length, '0');
-    const effectiveShift = shiftAmount % paddedBinary.length || 1;
-
-    const shiftedBinary = (BigInt(`0b${paddedBinary}`) << BigInt(effectiveShift)).toString(2);
-    const newBinary = shiftedBinary.padStart(paddedBinary.length, '0');
-    const newNumber = parseInt(newBinary, 2);
-
-    setOutput(newNumber);
-    setShiftCount(prev => prev - effectiveShift);
-    data.output = newNumber;
-  };
-
-  const handleShiftRight = (shiftAmount = 1) => {
-    const num = Number(output) || 0;
-    if (isNaN(num)) {
-      toast.error("Invalid number for shifting.", {
-        position: "top-right",
-      });
-      return;
-    }
-
-    let binary = num.toString(2);
-    if (binary.length === 0) binary = "0";
-
-    const paddedBinary = binary.padStart(binary.length, '0');
-    const effectiveShift = shiftAmount % paddedBinary.length || 1;
-
-    const shiftedBinary = (BigInt(`0b${paddedBinary}`) >> BigInt(effectiveShift)).toString(2);
-    const newBinary = shiftedBinary.padStart(paddedBinary.length, '0');
-    const newNumber = parseInt(newBinary, 2);
-
-    setOutput(newNumber);
-    setShiftCount(prev => prev + effectiveShift);
-    data.output = newNumber;
-  };
-
+ 
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
-      /*
-      const numInput = Number(data.input);
-      if (isNaN(numInput)) {
-        toast.error("Input must be a number.", {
+        toast.error(data.input + " ||| " + selectedType, {
           position: "top-right",
         });
-        setOutput("");
-        data.output = "";
-      } else {
-        data.output = numInput;
-        setOutput(numInput);
-        setShiftCount(0);
-      }
-        */
-
-      
-      if (isNaN(data.input)) {
-        data.output = data.input;
-        setOutput(data.input);
-      } else {
-        const numInput = Number(data.input);
-        data.output = numInput;
-        setOutput(numInput);
-        setShiftCount(0);
-      }
+        setOutput(convertToType(data.input, selectedType));
     } else {
-      data.output = "";
       setOutput("");
-      setShiftCount(0);
+      setSelectedType("Decimal");
     }
-  }, [data.input]);
+  }, [data.input, selectedType]);
 
   return (
     <NodeContainer>
@@ -164,18 +122,22 @@ const OutputNode = ({ data, nodeKey }) => {
       <Handle type="target" position={Position.Left} id="input-in-left" />
       <Handle type="target" position={Position.Right} id="input-in-right" />
       <Handle type="target" position={Position.Bottom} id="input-in-bottom" />
+      
+      <div>
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+          >
+            {Object.keys(types).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <ButtonContainer>
-        <ShiftButton onClick={() => handleShiftLeft(1)}>
-          <FontAwesomeIcon icon={faArrowLeft} />
-        </ShiftButton>
-        <ShiftButton onClick={() => handleShiftRight(1)}>
-          <FontAwesomeIcon icon={faArrowRight} />
-        </ShiftButton>
-      </ButtonContainer>
       <OutputText>{output}</OutputText>
       <Icon icon={faCopy} style={{color:"ff0072"}} onClick={handleCopy} />
-      <Counter>Shift Count: {shiftCount}</Counter>
       <Handle type="source" position={Position.Top} id="output-out-top" />
       <Handle type="source" position={Position.Left} id="output-out-left" />
       <Handle type="source" position={Position.Right} id="output-out-right" />

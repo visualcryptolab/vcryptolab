@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCopy } from "@fortawesome/free-solid-svg-icons";
 import { Handle, Position } from "@xyflow/react";
-import { memo, useState, useEffect, useMemo } from "react";
+import { memo, useState, useEffect } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import NodeWrapper from "./NodeWrapper";
 import styled from "styled-components";
@@ -48,20 +48,9 @@ const IconContainer = styled.div`
 `;
 
 const InputNode = ({ data }) => {
-  const [selectedType, setSelectedType] = useState("Decimal");
   const [text, setText] = useState("");
   const [forceAscii, setForceAscii] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
-
-  const types = useMemo(
-        () => ({
-          "Decimal": "Decimal",
-          "Binary": "Binary",
-          "Hexadecimal": "Hexadecimal",
-          "Text": "Text",
-        }),
-        []
-      );
 
   const convertText = (input, forceAscii) => {
     if (input === "") return "";
@@ -94,7 +83,7 @@ const InputNode = ({ data }) => {
   useEffect(() => {
     const output = convertText(text, forceAscii);
     data.output = output;
-  }, [forceAscii, selectedType]);
+  }, [forceAscii]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
@@ -160,18 +149,6 @@ const InputNode = ({ data }) => {
         <Handle type="target" position={Position.Left} id="input-left" />
         <Handle type="target" position={Position.Right} id="input-right" />
         <Handle type="target" position={Position.Bottom} id="input-bottom" />
-        <div>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-          >
-            {Object.keys(types).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
   
         <div
           style={{
