@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/vcryptolab/static/css/main.d1f9f625.css",
-    "main.js": "/vcryptolab/static/js/main.ec4452a7.js",
+    "main.js": "/vcryptolab/static/js/main.c1332a03.js",
     "static/js/239.426854a6.chunk.js": "/vcryptolab/static/js/239.426854a6.chunk.js",
     "static/js/213.be6b02c7.chunk.js": "/vcryptolab/static/js/213.be6b02c7.chunk.js",
     "static/js/732.09b79382.chunk.js": "/vcryptolab/static/js/732.09b79382.chunk.js",
@@ -9,7 +9,7 @@
     "index.html": "/vcryptolab/index.html",
     "static/media/logo.svg": "/vcryptolab/static/media/logo.0e59388d6c2ebcd96eeea0f4f78719b8.svg",
     "main.d1f9f625.css.map": "/vcryptolab/static/css/main.d1f9f625.css.map",
-    "main.ec4452a7.js.map": "/vcryptolab/static/js/main.ec4452a7.js.map",
+    "main.c1332a03.js.map": "/vcryptolab/static/js/main.c1332a03.js.map",
     "239.426854a6.chunk.js.map": "/vcryptolab/static/js/239.426854a6.chunk.js.map",
     "213.be6b02c7.chunk.js.map": "/vcryptolab/static/js/213.be6b02c7.chunk.js.map",
     "732.09b79382.chunk.js.map": "/vcryptolab/static/js/732.09b79382.chunk.js.map",
@@ -17,6 +17,6 @@
   },
   "entrypoints": [
     "static/css/main.d1f9f625.css",
-    "static/js/main.ec4452a7.js"
+    "static/js/main.c1332a03.js"
   ]
 }
