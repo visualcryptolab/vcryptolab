@@ -174,6 +174,13 @@ const OutputNode = ({ data, nodeKey }) => {
     }
   }, [data.input, selectedType, typeToConvert]);
 
+  useEffect(() => {
+    if (showConversion) {
+      // Automatically convert to Decimal when toggle button is clicked
+      setOutputConverted(convertToType(data.input, selectedType, "Decimal"));
+    }
+  }, [showConversion, data.input, selectedType]);
+
   return (
     <NodeContainer>
       <Handle type="target" position={Position.Top} id="input-in-top" />
