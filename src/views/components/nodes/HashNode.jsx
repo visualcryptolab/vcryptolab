@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
 import cryptojs from "crypto-js";
+import { toast } from "react-toastify";
 
 const nodeStyle = {
   padding: "15px",
@@ -31,6 +32,10 @@ const HashNode = ({ data }) => {
 
   useEffect(() => {
     if (data.input && algorithms[algorithm]) {
+      toast.success("To hash: " + typeof data.input, {
+            position: "top-right",
+            autoClose: 2000,
+          });
       const hash = algorithms[algorithm](data.input).toString();
       setOutput(hash);
       data.output = hash;

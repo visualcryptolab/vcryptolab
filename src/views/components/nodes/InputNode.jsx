@@ -49,7 +49,7 @@ const IconContainer = styled.div`
 
 const InputNode = ({ data }) => {
   const [selectedType, setSelectedType] = useState("Decimal");
-  const [text, setText] = useState("");
+  const [text, setText] = useState("0");
   const [forceAscii, setForceAscii] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -63,7 +63,7 @@ const InputNode = ({ data }) => {
         []
       );
 
-  const convertText = (input, forceAscii) => {
+  const convertTextOld = (input, forceAscii) => {
     if (input === "") return "";
     if (forceAscii) {
       return Array.from(input)
@@ -81,10 +81,77 @@ const InputNode = ({ data }) => {
     return input;
   };
 
+  const convertToType = (inputString, type) => {
+    switch (type) {
+      case "Text":
+        //No conversion. The input is directly a string.
+        return inputString;
+        /*// Convierte una secuencia de códigos ASCII en texto
+        return inputString
+          .split(" ")
+          .map(code => String.fromCharCode(parseInt(code, 10)))
+          .join("");*/
+  
+      case "Binary":
+        // Convierte un texto a su representación binaria ASCII
+        return Array.from(inputString)
+          .map(char => char.charCodeAt(0).toString(2).padStart(8, "0"))
+          .join(" ");
+  
+      case "Hexadecimal":
+        // Convierte un texto a su representación hexadecimal ASCII
+        return Array.from(inputString)
+          .map(char => char.charCodeAt(0).toString(16).padStart(2, "0"))
+          .join(" ");
+  
+      case "Decimal":
+        return inputString;
+        /*
+        // Convierte un texto en códigos ASCII decimales
+        return Array.from(inputString)
+          .map(char => char.charCodeAt(0).toString(10))
+          .join(" ");*/
+  
+      default:
+        // By default we transfer a 0
+        //input[0] === "0" ? parseInt(input, 2).toString() : input;
+        return "0";
+    }
+  };
+  
+
+  const convertToTypeOld = (inputString, type) => {
+    // Step 1: Convert the input string into an array of numbers
+    const asciiCodes = inputString.split(' ')
+      .map(num => parseInt(num, 10));  // Convert each string number to a base-10 integer (ASCII code)
+  
+    switch(type) {
+      case "Text":
+        // Convert ASCII codes back to characters (text)
+        return asciiCodes.map(code => String.fromCharCode(code)).join(''); // Convert each ASCII code to the corresponding character
+  
+      case "Binary":
+        // Convert ASCII codes to binary
+        return asciiCodes.map(code => code.toString(2).padStart(8, '0')).join(' '); // Convert each to 8-bit binary
+  
+      case "Hexadecimal":
+        // Convert ASCII codes to hexadecimal
+        return asciiCodes.map(code => code.toString(16).padStart(2, '0')).join(' '); // Convert each to hex
+  
+      case "Decimal":
+        // Return the ASCII codes as decimal values
+        return asciiCodes.join(' '); // Return ASCII codes as space-separated decimals
+  
+      default:
+        return "Invalid type"; // Return an error if the type is not recognized
+    }
+  };
+
   const handleChange = (event) => {
     const input = event.target.value;
     setText(input);
-    const output = convertText(input, forceAscii);
+    //const output = convertText(input, forceAscii);
+    const output = convertToType(input, selectedType);
     data.output = output;
     data.rawOutput = input;
     event.target.style.height = "auto";
@@ -92,8 +159,14 @@ const InputNode = ({ data }) => {
   };
 
   useEffect(() => {
-    const output = convertText(text, forceAscii);
+    //const output = convertText(text, forceAscii);    
+    const output = convertToType(text, selectedType);
     data.output = output;
+    toast.success(text + " **** " + selectedType + " **** " + output, {
+      position: "top-right",
+      autoClose: 2000,
+    });
+
   }, [forceAscii, selectedType]);
 
   const handleCopy = () => {

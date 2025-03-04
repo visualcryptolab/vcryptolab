@@ -2,119 +2,177 @@
 import { memo, useEffect, useState, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCopy} from "@fortawesome/free-solid-svg-icons";
+import { faCopy } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 
 const NodeContainer = styled.div`
-  padding: 10px;
+  padding: 20px;
   border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: #fff;
+  border-radius: 8px;
+  background-color: #f9f9f9;
   text-align: center;
   box-sizing: border-box;
   position: relative;
-  min-width: 120px;
+  min-width: 220px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
 const OutputText = styled.p`
   font-size: 1rem;
   color: #333;
-  margin: 8px 0;
+  margin: 12px 0;
+  padding: 8px;
+  background-color: #f1f1f1;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  width: 100%; /* To expand the output to the full width */
 `;
 
 const Icon = styled(FontAwesomeIcon)`
   cursor: pointer;
   color: #ff6600;
-  position: absolute;
-  bottom: 5px;
-  right: 5px;
+  transition: transform 0.2s ease-in-out;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+`;
+
+const Button = styled.button`
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  margin-top: 10px;
+  cursor: pointer;
+  font-size: 14px;
+
+  &:hover {
+    background-color: #0056b3;
+  }
+
+  &:focus {
+    outline: none;
+  }
+`;
+
+const SelectWrapper = styled.div`
+  margin: 10px 0;
+`;
+
+const Label = styled.label`
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: block;
+  text-align: left;
+  font-size: 14px;
+  color: #444;
+`;
+
+const Row = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 15px;
+`;
+
+const RowWithButton = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
 `;
 
 const determineType = (str) => {
-  // If it's binary
-  if (/^[01]+$/.test(str)) {
-    return "Binary"; // Return the type as "Binary"
-  }
-  // If it's hexadecimal
-  else if (/^[0-9a-fA-F]+$/.test(str)) {
-    return "Hexadecimal"; // Return the type as "Hexadecimal"
-  }
-  // If it's text (only letters and spaces)
-  else if (/^[a-zA-Z\s]+$/.test(str)) {
-    return "Text"; // Return the type as "Text"
-  }
-  // If it's not recognized, return "Unknown"
-  else {
-    return "Unknown"; // Return the type as "Unknown"
+  if (/^[0-9]+$/.test(str)) return "Decimal";
+  if (/^[01]+$/.test(str)) return "Binary";
+  if (/^[0-9a-fA-F]+$/.test(str)) return "Hexadecimal";
+  if (/^[a-zA-Z\s]+$/.test(str)) return "Text (UTF-16)";
+  return "Text (UTF-16)"; // Default to Text if not recognized
+};
+
+const isCompatibleType = (str, type) => {
+  switch (type) {
+    case "Binary": return /^[01]+$/.test(str);
+    case "Decimal": return /^(0|[1-9][0-9]*)$/.test(str);
+    case "Hexadecimal": return /^[0-9a-fA-F]+$/.test(str);
+    case "Text (UTF-16)": return /^[a-zA-Z\s]+$/.test(str);
+    default: return false;
   }
 };
 
-const convertToType = (inputString, type) => {
-  // Step 1: Convert the input string into an array of numbers
-  const asciiCodes = inputString.split(' ')
-    .map(num => parseInt(num, 10));  // Convert each string number to a base-10 integer (ASCII code)
+const convertToType = (inputString, originalType, resultType) => {
+  let interpretedString = '';
 
-  switch(type) {
-    case "Text":
-      // Convert ASCII codes back to characters (text)
-      return asciiCodes.map(code => String.fromCharCode(code)).join(''); // Convert each ASCII code to the corresponding character
+  // Step 1: Interpret the inputString according to originalType
+  if (originalType === "Text (UTF-16)") {
+    interpretedString = inputString;
+  } else if (originalType === "Binary") {
+    interpretedString = inputString.split(' ').map(bin => String.fromCharCode(parseInt(bin, 2))).join('');
+  } else if (originalType === "Hexadecimal") {
+    interpretedString = inputString.split(' ').map(hex => String.fromCharCode(parseInt(hex, 16))).join('');
+  } else if (originalType === "Decimal") {
+    interpretedString = inputString.split(' ').map(num => String.fromCharCode(parseInt(num, 10))).join('');
+  }
+
+  // Step 2: Convert interpretedString to the desired resultType
+  switch (resultType) {
+    case "Text (UTF-16)":
+      return interpretedString;
 
     case "Binary":
-      // Convert ASCII codes to binary
-      return asciiCodes.map(code => code.toString(2).padStart(8, '0')).join(' '); // Convert each to 8-bit binary
+      return interpretedString.split('').map(char => char.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
 
     case "Hexadecimal":
-      // Convert ASCII codes to hexadecimal
-      return asciiCodes.map(code => code.toString(16).padStart(2, '0')).join(' '); // Convert each to hex
+      return interpretedString.split('').map(char => char.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
 
     case "Decimal":
-      // Return the ASCII codes as decimal values
-      return asciiCodes.join(' '); // Return ASCII codes as space-separated decimals
+      return interpretedString.split('').map(char => char.charCodeAt(0).toString(10)).join(' ');
 
     default:
-      return "Invalid type"; // Return an error if the type is not recognized
+      return "Invalid result type";
   }
 };
-
-
-
-
 
 const OutputNode = ({ data, nodeKey }) => {
   const [selectedType, setSelectedType] = useState("Decimal");
+  const [typeToConvert, setTypeToConvert] = useState("Decimal");
   const [output, setOutput] = useState("");
+  const [outputConverted, setOutputConverted] = useState("");
+  const [showConversion, setShowConversion] = useState(false);  // State for toggle visibility
 
-  const types = useMemo(
-      () => ({
-        "Decimal": "Decimal",
-        "Binary": "Binary",
-        "Hexadecimal": "Hexadecimal",
-        "Text": "Text",
-      }),
-      []
-    );
+  const types = useMemo(() => ({
+    "Decimal": "Decimal",
+    "Binary": "Binary",
+    "Hexadecimal": "Hexadecimal",
+    "Text (UTF-16)": "Text (UTF-16)",
+  }), []);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(output.toString());
-    toast.success("Text copied to clipboard", {
-      position: "top-right",
-      autoClose: 2000,
-    });
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Text copied to clipboard", { position: "top-right", autoClose: 2000 });
   };
- 
+
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
-        toast.error(data.input + " ||| " + selectedType, {
-          position: "top-right",
-        });
-        setOutput(convertToType(data.input, selectedType));
+      setOutput(data.input);
+
+      // Check if the selected type is compatible with the input value
+      const compatible = isCompatibleType(data.input, selectedType);
+      if (!compatible) {
+        const compatibleType = determineType(data.input);
+        setSelectedType(compatibleType);
+        toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
+      }
+      setTypeToConvert(typeToConvert);
     } else {
       setOutput("");
-      setSelectedType("Decimal");
+      setSelectedType("");
     }
-  }, [data.input, selectedType]);
+  }, [data.input, selectedType, typeToConvert]);
 
   return (
     <NodeContainer>
@@ -122,22 +180,56 @@ const OutputNode = ({ data, nodeKey }) => {
       <Handle type="target" position={Position.Left} id="input-in-left" />
       <Handle type="target" position={Position.Right} id="input-in-right" />
       <Handle type="target" position={Position.Bottom} id="input-in-bottom" />
-      
-      <div>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-          >
+
+      {/* Input Type Selector */}
+      <Row>
+        <div>
+          <Label>Input Type</Label>
+          <select value={selectedType} onChange={(e) => {
+            setSelectedType(e.target.value);
+          }}>
             {Object.keys(types).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+              <option key={name} value={name}>{name}</option>
             ))}
           </select>
         </div>
 
-      <OutputText>{output}</OutputText>
-      <Icon icon={faCopy} style={{color:"ff0072"}} onClick={handleCopy} />
+        {/* Convert Button */}
+        <Button onClick={() => setShowConversion(!showConversion)}>
+          {showConversion ? "Don't Convert" : "Convert Type"}
+        </Button>
+      </Row>
+
+      {/* Output Section */}
+      <RowWithButton>
+        <OutputText>{output}</OutputText>
+        <Icon icon={faCopy} onClick={() => handleCopy(output)} />
+      </RowWithButton>
+
+      {/* Conversion Section */}
+      {showConversion && (
+        <>
+          <Row>
+            <div>
+              <Label>Convert to</Label>
+              <select value={typeToConvert} onChange={(e) => {
+                setTypeToConvert(e.target.value);
+                setOutputConverted(convertToType(data.input, selectedType, e.target.value));
+              }}>
+                {Object.keys(types).map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+          </Row>
+
+          <RowWithButton>
+            <OutputText>{outputConverted}</OutputText>
+            <Icon icon={faCopy} onClick={() => handleCopy(outputConverted)} />
+          </RowWithButton>
+        </>
+      )}
+
       <Handle type="source" position={Position.Top} id="output-out-top" />
       <Handle type="source" position={Position.Left} id="output-out-left" />
       <Handle type="source" position={Position.Right} id="output-out-right" />
