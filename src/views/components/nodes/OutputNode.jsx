@@ -6,6 +6,7 @@ import { faCopy } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
+import data from "../../../models/UserInputData";
 
 const NodeContainer = styled.div`
   padding: 20px;
@@ -158,12 +159,15 @@ const OutputNode = ({ data, nodeKey }) => {
 
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
-      setOutput(data.input);
+      const userInput = data.input;
+
+      setOutput(userInput.inputData);
+      setSelectedType(userInput.inputType);
 
       // Check if the selected type is compatible with the input value
-      const compatible = isCompatibleType(data.input, selectedType);
+      const compatible = isCompatibleType(userInput.inputData, selectedType);
       if (!compatible) {
-        const compatibleType = determineType(data.input);
+        const compatibleType = determineType(userInput.inputData);
         setSelectedType(compatibleType);
         toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
       }
@@ -177,7 +181,7 @@ const OutputNode = ({ data, nodeKey }) => {
   useEffect(() => {
     if (showConversion) {
       // Automatically convert to Decimal when toggle button is clicked
-      setOutputConverted(convertToType(data.input, selectedType, "Decimal"));
+      setOutputConverted(convertToType(output, selectedType, "Decimal"));
     }
   }, [showConversion, data.input, selectedType]);
 
@@ -221,7 +225,7 @@ const OutputNode = ({ data, nodeKey }) => {
               <Label>Convert to</Label>
               <select value={typeToConvert} onChange={(e) => {
                 setTypeToConvert(e.target.value);
-                setOutputConverted(convertToType(data.input, selectedType, e.target.value));
+                setOutputConverted(convertToType(data.input.inputData, selectedType, e.target.value));
               }}>
                 {Object.keys(types).map((name) => (
                   <option key={name} value={name}>{name}</option>

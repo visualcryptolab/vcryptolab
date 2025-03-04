@@ -4,3 +4,6 @@ export const CRYPTOGRAPHY_OPTIONS = [
 ];
 export const PROTOCOL_OPTIONS = []
 export const ATTACK_OPTIONS = []
+export const DATA_TYPE_OPTIONS = [
+  "Decimal", "Binary", "Hexadecimal", "Text (UTF-16)"
+];
