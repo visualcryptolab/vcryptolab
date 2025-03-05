@@ -6,7 +6,7 @@ import { faCopy } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
-import data from "../../../models/UserInputData";
+import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
 
 const NodeContainer = styled.div`
   padding: 20px;
@@ -87,69 +87,18 @@ const RowWithButton = styled.div`
   align-items: center;
 `;
 
-const determineType = (str) => {
-  if (/^[0-9]+$/.test(str)) return "Decimal";
-  if (/^[01]+$/.test(str)) return "Binary";
-  if (/^[0-9a-fA-F]+$/.test(str)) return "Hexadecimal";
-  if (/^[a-zA-Z\s]+$/.test(str)) return "Text (UTF-16)";
-  return "Text (UTF-16)"; // Default to Text if not recognized
-};
-
-const isCompatibleType = (str, type) => {
-  switch (type) {
-    case "Binary": return /^[01]+$/.test(str);
-    case "Decimal": return /^(0|[1-9][0-9]*)$/.test(str);
-    case "Hexadecimal": return /^[0-9a-fA-F]+$/.test(str);
-    case "Text (UTF-16)": return /^[a-zA-Z\s]+$/.test(str);
-    default: return false;
-  }
-};
-
-const convertToType = (inputString, originalType, resultType) => {
-  let interpretedString = '';
-
-  // Step 1: Interpret the inputString according to originalType
-  if (originalType === "Text (UTF-16)") {
-    interpretedString = inputString;
-  } else if (originalType === "Binary") {
-    interpretedString = inputString.split(' ').map(bin => String.fromCharCode(parseInt(bin, 2))).join('');
-  } else if (originalType === "Hexadecimal") {
-    interpretedString = inputString.split(' ').map(hex => String.fromCharCode(parseInt(hex, 16))).join('');
-  } else if (originalType === "Decimal") {
-    interpretedString = inputString.split(' ').map(num => String.fromCharCode(parseInt(num, 10))).join('');
-  }
-
-  // Step 2: Convert interpretedString to the desired resultType
-  switch (resultType) {
-    case "Text (UTF-16)":
-      return interpretedString;
-
-    case "Binary":
-      return interpretedString.split('').map(char => char.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
-
-    case "Hexadecimal":
-      return interpretedString.split('').map(char => char.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
-
-    case "Decimal":
-      return interpretedString.split('').map(char => char.charCodeAt(0).toString(10)).join(' ');
-
-    default:
-      return "Invalid result type";
-  }
-};
-
 const OutputNode = ({ data, nodeKey }) => {
-  const [selectedType, setSelectedType] = useState("Decimal");
-  const [typeToConvert, setTypeToConvert] = useState("Decimal");
+  const [selectedType, setSelectedType] = useState(INPUT_TYPES.DECIMAL);
+  const [typeToConvert, setTypeToConvert] = useState(INPUT_TYPES.DECIMAL);
   const [output, setOutput] = useState("");
   const [outputConverted, setOutputConverted] = useState("");
-  const [showConversion, setShowConversion] = useState(false);  // State for toggle visibility
+  const [showConversion, setShowConversion] = useState(false);
 
   const types = useMemo(() => ({
-    "Decimal": "Decimal",
-    "Binary": "Binary",
-    "Hexadecimal": "Hexadecimal",
-    "Text (UTF-16)": "Text (UTF-16)",
+    [INPUT_TYPES.DECIMAL]: INPUT_TYPES.DECIMAL,
+    [INPUT_TYPES.BINARY]: INPUT_TYPES.BINARY,
+    [INPUT_TYPES.HEXADECIMAL]: INPUT_TYPES.HEXADECIMAL,
+    [INPUT_TYPES.TEXT]: INPUT_TYPES.TEXT,
   }), []);
 
   const handleCopy = (text) => {
@@ -160,30 +109,27 @@ const OutputNode = ({ data, nodeKey }) => {
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
       const userInput = data.input;
-
-      setOutput(userInput.inputData);
-      setSelectedType(userInput.inputType);
-
-      // Check if the selected type is compatible with the input value
-      const compatible = isCompatibleType(userInput.inputData, selectedType);
-      if (!compatible) {
-        const compatibleType = determineType(userInput.inputData);
+      setOutput(userInput.inputValue);
+      setSelectedType(userInput.inputFormat);
+      toast.success("Output:" + userInput.inputValue, { position: "top-right", autoClose: 2000 });
+      // Validate if the selected type is compatible with the input value
+      if (!UserInputData.isCompatibleType(output, selectedType)) {
+        const compatibleType = UserInputData.determineType(output);
         setSelectedType(compatibleType);
         toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
       }
-      setTypeToConvert(typeToConvert);
     } else {
       setOutput("");
       setSelectedType("");
     }
-  }, [data.input, selectedType, typeToConvert]);
+  }, [data.input, selectedType]);
 
   useEffect(() => {
     if (showConversion) {
       // Automatically convert to Decimal when toggle button is clicked
-      setOutputConverted(convertToType(output, selectedType, "Decimal"));
+      setOutputConverted(UserInputData.convertToType(output, selectedType, INPUT_TYPES.DECIMAL));
     }
-  }, [showConversion, data.input, selectedType]);
+  }, [showConversion, output, selectedType]);
 
   return (
     <NodeContainer>
@@ -225,7 +171,7 @@ const OutputNode = ({ data, nodeKey }) => {
               <Label>Convert to</Label>
               <select value={typeToConvert} onChange={(e) => {
                 setTypeToConvert(e.target.value);
-                setOutputConverted(convertToType(data.input.inputData, selectedType, e.target.value));
+                setOutputConverted(UserInputData.convertToType(data.input.inputValue, selectedType, e.target.value));
               }}>
                 {Object.keys(types).map((name) => (
                   <option key={name} value={name}>{name}</option>

@@ -5,8 +5,7 @@ import { memo, useState, useEffect, useMemo } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import { toast } from "react-toastify";
-import data from "../../../models/UserInputData";
-import UserInputData from "../../../models/UserInputData";
+import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
 
 // Styled components for input node
 const NodeContainer = styled.div`
@@ -25,8 +24,8 @@ const NodeContainer = styled.div`
 `;
 
 const StyledInput = styled.textarea`
-  width: 80%; /* Adjusted width to match the output node input size */
-  height: 40px;  // Adjusted height to match output node input size
+  width: 80%;
+  height: 40px;
   background-color: transparent;
   border: none;
   resize: none;
@@ -36,7 +35,7 @@ const StyledInput = styled.textarea`
   color: #333;
   padding: 5px;
   box-sizing: border-box;
-  text-align: center; /* Ensures text inside is centered */
+  text-align: center;
   &::placeholder {
     color: #aaa;
   }
@@ -47,7 +46,7 @@ const IconContainer = styled.div`
   bottom: 3px;
   right: 3px;
   cursor: pointer;
-  color: #ff6f00;  /* Orange color for the copy icon */
+  color: #ff6f00;
 `;
 
 const SelectorContainer = styled.div`
@@ -72,42 +71,26 @@ const ButtonContainer = styled.div`
 `;
 
 const InputNode = ({ data }) => {
-  const [selectedType, setSelectedType] = useState("Decimal");
+  const [selectedType, setSelectedType] = useState(INPUT_TYPES.DECIMAL);
   const [text, setText] = useState("0");
 
   // Types that are available in the selector
-  const types = useMemo(
-    () => ({
-      "Decimal": "Decimal",
-      "Binary": "Binary",
-      "Hexadecimal": "Hexadecimal",
-      "Text (UTF-16)": "Text (UTF-16)",
-    }),
-    []
-  );
-
-  const convertToType = (inputString, type) => {
-    switch (type) {
-      case "Text (UTF-16)":
-        return inputString;
-      case "Binary":
-        return Array.from(inputString)
-          .map(char => char.charCodeAt(0).toString(2).padStart(8, "0"))
-          .join(" ");
-      case "Hexadecimal":
-        return Array.from(inputString)
-          .map(char => char.charCodeAt(0).toString(16).padStart(2, "0"))
-          .join(" ");
-      case "Decimal":
-        return inputString;
-      default:
-        return "0";
-    }
-  };
+  const types = useMemo(() => INPUT_TYPES, []);
 
   const handleChange = (event) => {
     const input = event.target.value;
     setText(input);
+
+    // Validate compatibility
+    if (!UserInputData.isCompatibleType(input, selectedType)) {
+      const compatibleType = Object.values(INPUT_TYPES).find((type) => UserInputData.isCompatibleType(input, type)) || INPUT_TYPES.DECIMAL;
+      setSelectedType(compatibleType);
+      toast.error(`Input is incompatible with ${selectedType}. Switching to ${compatibleType}`, {
+        position: "top-right",
+        autoClose: 5000,
+      });
+    }
+
     const userInputData = new UserInputData(input, selectedType);
     data.output = userInputData;
     event.target.style.height = "auto";
@@ -115,7 +98,6 @@ const InputNode = ({ data }) => {
   };
 
   useEffect(() => {
-    //const output = convertToType(text, selectedType);
     const userInputData = new UserInputData(text, selectedType);
     data.output = userInputData;
   }, [selectedType]);
@@ -142,12 +124,8 @@ const InputNode = ({ data }) => {
 
       <SelectorContainer>
         <Label htmlFor="inputType">Input Type</Label>
-        <select
-          id="inputType"
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-        >
-          {Object.keys(types).map((name) => (
+        <select id="inputType" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+          {Object.values(types).map((name) => (
             <option key={name} value={name}>
               {name}
             </option>
@@ -155,12 +133,7 @@ const InputNode = ({ data }) => {
         </select>
       </SelectorContainer>
 
-      <StyledInput
-        value={text}
-        onChange={handleChange}
-        placeholder="Enter text here"
-        rows={1}
-      />
+      <StyledInput value={text} onChange={handleChange} placeholder="Enter text here" rows={1} />
 
       <ButtonContainer>
         <IconContainer onClick={handleCopy}>
