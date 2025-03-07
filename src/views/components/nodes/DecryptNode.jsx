@@ -2,6 +2,8 @@ import { memo, useState, useEffect, useMemo, useRef } from "react";
 import { Handle, Position } from "@xyflow/react";
 import * as Algorithms from "../algorithms";
 import NodeWrapper from "./NodeWrapper";
+import { toast } from "react-toastify";
+import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
 
 const controlStyle = {
   padding: "15px",
@@ -17,7 +19,8 @@ const DecryptNode = ({ data }) => {
   const [algorithm, setAlgorithm] = useState("RSA");
   const [inputText, setInputText] = useState("");
   const [outputText, setOutputText] = useState("");
-  const [params, setParams] = useState({});
+  //const [params, setParams] = useState({});
+  const [params, setParams] = useState({p:"281", q:"167", e:"39423", n:"46927", d:"26767"});
   const prevParamsRef = useRef(params);
   const prevDataRef = useRef(data);
   const algorithms = useMemo(() => {
@@ -32,19 +35,37 @@ const DecryptNode = ({ data }) => {
   );
 
   useEffect(() => {
-    params.input = data.input;
+    params.input = "";//data.input;
+
+    if (data.input !== undefined && data.input !== null) {
+      const userInput = data.input;
+      const value = userInput.inputValue;
+      const format = userInput.inputFormat;
+      const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
+      toast.error("Change of input "  + valueWithFormat, { position: "top-right", autoClose: 5000 });
+      //params.input = "10";//valueWithFormat
+      params.input = valueWithFormat
+    }
     params.pubKey = data.pubKey;
     params.privKey = data.privKey;
   }, [data.input]);
 
   useEffect(() => {
     const prevParams = prevParamsRef.current;
+    toast.error("prev: "  + JSON.stringify(prevParams), { position: "top-right", autoClose: 5000 });
     if (JSON.stringify(prevParams) !== JSON.stringify(params)) {
+      toast.error("Entra: "  + params, { position: "top-right", autoClose: 5000 });
       if (algorithms[algorithm + "Algorithm"]) {
         console.log("Decrypting with params:", params);
+        toast.error("Decrypting: "  + params, { position: "top-right", autoClose: 5000 });
         const result = algorithms[algorithm + "Algorithm"].decrypt(params);
-        setOutputText(result);
-        data.output = result;
+        //setOutputText(result);
+        //data.output = result;
+        toast.error("Decrypted "  + result, { position: "top-right", autoClose: 5000 });
+
+        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);  
+      
+      data.output = outputData;
       }
       prevParamsRef.current = params;
     }

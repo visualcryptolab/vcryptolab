@@ -13,15 +13,13 @@ const controlStyle = {
   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
   transition: "transform,0.2s, box-shadow 0.2s",
 };
-
-const EncryptNode = ({ data }) => {
+const DecryptNode = ({ data }) => {
   const [algorithm, setAlgorithm] = useState("RSA");
-  const [outputText, setOutputText] = useState("");
   const [inputText, setInputText] = useState("");
+  const [outputText, setOutputText] = useState("");
   const [params, setParams] = useState({});
   const prevParamsRef = useRef(params);
   const prevDataRef = useRef(data);
-
   const algorithms = useMemo(() => {
     const algos = {};
     Object.keys(Algorithms).forEach((key) => {
@@ -29,7 +27,6 @@ const EncryptNode = ({ data }) => {
     });
     return algos;
   }, []);
-
   const algorithmsNames = Object.keys(algorithms).map((name) =>
     name.replace("Algorithm", "")
   );
@@ -38,19 +35,20 @@ const EncryptNode = ({ data }) => {
     params.input = data.input;
     params.pubKey = data.pubKey;
     params.privKey = data.privKey;
-  }, [data.input, data.pubKey, data.privKey]);
+  }, [data.input]);
 
   useEffect(() => {
     const prevParams = prevParamsRef.current;
     if (JSON.stringify(prevParams) !== JSON.stringify(params)) {
       if (algorithms[algorithm + "Algorithm"]) {
-        const result = algorithms[algorithm + "Algorithm"].encrypt(params);
+        console.log("Decrypting with params:", params);
+        const result = algorithms[algorithm + "Algorithm"].decrypt(params);
         setOutputText(result);
         data.output = result;
       }
       prevParamsRef.current = params;
     }
-  }, [algorithm, params, algorithms, data.input, data.pubKey, data.privKey]);
+  }, [algorithm, params, algorithms, data.input]);
 
   const handleAlgorithmChange = (event) => {
     setAlgorithm(event.target.value);
@@ -64,45 +62,47 @@ const EncryptNode = ({ data }) => {
       }
     }
   }, [data]);
-
   return (
-    <NodeWrapper nodeType={"Encrypt"}>
-    <div style={controlStyle}>
-      <Handle type="target" position={Position.Top} id="encrypt-top" />
-      <Handle type="target" position={Position.Left} id="encrypt-left" />
-      <Handle type="target" position={Position.Right} id="encrypt-right" />
-      <Handle type="target" position={Position.Bottom} id="encrypt-bottom" />
-      <div>
-        <label>
-          <select value={algorithm} onChange={handleAlgorithmChange}>
-            {algorithmsNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {algorithms[algorithm + "Algorithm"] ? (
-          algorithms[algorithm + "Algorithm"].getInputs(params)
-        ) : (
-          <div>Error: Algorithm not found</div>
-        )}
+    <NodeWrapper nodeType={"Decrypt"}>
+      <div style={controlStyle}>
+        <Handle type="target" position={Position.Top} id="Decrypt-top" />
+        <Handle type="target" position={Position.Left} id="Decrypt-left" />
+        <Handle type="target" position={Position.Right} id="Decrypt-right" />
+        <Handle type="target" position={Position.Bottom} id="Decrypt-bottom" />
+        <div>
+          <label>
+            <select value={algorithm} onChange={handleAlgorithmChange}>
+              {algorithmsNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {algorithms[algorithm + "Algorithm"] ? (
+            algorithms[algorithm + "Algorithm"].getInputs(params)
+          ) : (
+            <div>Error: Algorithm not found</div>
+          )}
+        </div>
+        <Handle type="source" position={Position.Top} id="Decrypt-output-top" />
+        <Handle
+          type="source"
+          position={Position.Left}
+          id="Decrypt-output-left"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="Decrypt-output-right"
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="Decrypt-output-bottom"
+        />
       </div>
-      <Handle type="source" position={Position.Top} id="encrypt-output-top" />
-      <Handle type="source" position={Position.Left} id="encrypt-output-left" />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="encrypt-output-right"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="encrypt-output-bottom"
-      />
-    </div>
     </NodeWrapper>
   );
 };
-
-export default memo(EncryptNode);
+export default memo(DecryptNode);

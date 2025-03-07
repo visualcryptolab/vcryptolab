@@ -44,22 +44,23 @@ const EncryptNode = ({ data }) => {
       const value = userInput.inputValue;
       const format = userInput.inputFormat;
       const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
-      toast.error("To encrypt "  + valueWithFormat, { position: "top-right", autoClose: 5000 });
+      //toast.error("To encrypt "  + valueWithFormat, { position: "top-right", autoClose: 5000 });
       //params.input = "10";//valueWithFormat
       params.input = valueWithFormat
+      /*
       if (algorithms[algorithm + "Algorithm"]) {
 
-        toast.error("To encrypt "  + params, { position: "top-right", autoClose: 5000 });
+        //toast.error("To encrypt "  + params, { position: "top-right", autoClose: 5000 });
         const result = algorithms[algorithm + "Algorithm"].encrypt(params);
         //setOutputText(result);
         //data.output = result;
 
-        toast.error("Encrypted "  + result, { position: "top-right", autoClose: 5000 });
+        //toast.error("Encrypted "  + result, { position: "top-right", autoClose: 5000 });
 
         const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);  
         
         data.output = outputData;
-      }
+      }*/
     }
     params.pubKey = data.pubKey;
     params.privKey = data.privKey;
@@ -73,7 +74,7 @@ const EncryptNode = ({ data }) => {
         //setOutputText(result);
         //data.output = result;
 
-        toast.error("Encrypted "  + result, { position: "top-right", autoClose: 5000 });
+        //toast.error("Encrypted "  + result, { position: "top-right", autoClose: 5000 });
 
         const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);  
         
