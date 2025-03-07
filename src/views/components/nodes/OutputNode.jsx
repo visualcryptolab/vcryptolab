@@ -111,25 +111,39 @@ const OutputNode = ({ data, nodeKey }) => {
       const userInput = data.input;
       setOutput(userInput.inputValue);
       setSelectedType(userInput.inputFormat);
-      toast.success("Output:" + userInput.inputValue, { position: "top-right", autoClose: 2000 });
       // Validate if the selected type is compatible with the input value
       if (!UserInputData.isCompatibleType(output, selectedType)) {
         const compatibleType = UserInputData.determineType(output);
         setSelectedType(compatibleType);
         toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
       }
+      setOutputConverted(UserInputData.convertToType(userInput.inputValue, userInput.inputFormat, typeToConvert));
     } else {
       setOutput("");
       setSelectedType("");
+      setOutputConverted("");
     }
-  }, [data.input, selectedType]);
+  }, [data.input]);
+
+  useEffect(() => {
+      // Validate if the selected type is compatible with the input value
+      if (!UserInputData.isCompatibleType(output, selectedType)) {
+        const compatibleType = UserInputData.determineType(output);
+        setSelectedType(compatibleType);
+        toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
+      }
+      if (showConversion) {
+        // Automatically convert when toggle button is clicked
+        setOutputConverted(UserInputData.convertToType(output, selectedType, typeToConvert));
+      }
+  }, [selectedType]);
 
   useEffect(() => {
     if (showConversion) {
-      // Automatically convert to Decimal when toggle button is clicked
-      setOutputConverted(UserInputData.convertToType(output, selectedType, INPUT_TYPES.DECIMAL));
+      // Automatically convert when toggle button is clicked
+      setOutputConverted(UserInputData.convertToType(output, selectedType, typeToConvert));
     }
-  }, [showConversion, output, selectedType]);
+  }, [showConversion]);
 
   return (
     <NodeContainer>
@@ -171,7 +185,7 @@ const OutputNode = ({ data, nodeKey }) => {
               <Label>Convert to</Label>
               <select value={typeToConvert} onChange={(e) => {
                 setTypeToConvert(e.target.value);
-                setOutputConverted(UserInputData.convertToType(data.input.inputValue, selectedType, e.target.value));
+                setOutputConverted(UserInputData.convertToType(output, selectedType, e.target.value));
               }}>
                 {Object.keys(types).map((name) => (
                   <option key={name} value={name}>{name}</option>

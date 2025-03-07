@@ -3,7 +3,7 @@ export const INPUT_TYPES = {
   BINARY: "Binary",
   DECIMAL: "Decimal",
   HEXADECIMAL: "Hexadecimal",
-  TEXT: "Text (UTF-16)",
+  TEXT: "Text (UTF-8)",
 };
 
 // Class definition using the INPUT_TYPES constant
@@ -82,6 +82,33 @@ class UserInputData {
         return "Invalid result type";
     }
   }
+
+  /**
+ * Casts the input value to a string and converts it to the specified type.
+ * 
+ * @param {any} value - The value to be casted and converted.
+ * @param {string} targetType - The target type to convert the string value to. 
+ *  Supported types: "Decimal", "Binary", "Hexadecimal", "Text".
+ * @returns {string} - The converted value in the specified type.
+ */
+  static castAndConvert = (value, targetType) => {
+    // Cast the value to a string
+    let stringValue = String(value);
+  
+    // Convert the string value to the desired type
+    switch (targetType) {
+      case INPUT_TYPES.BINARY:
+        return stringValue.split(' ').map(bin => parseInt(bin, 2)); // Convert binary to number
+      case INPUT_TYPES.DECIMAL:
+        return parseInt(stringValue, 10); // Convert decimal string to number
+      case INPUT_TYPES.HEXADECIMAL:
+        return parseInt(stringValue, 16); // Convert hexadecimal string to number
+      case INPUT_TYPES.TEXT:
+        return stringValue; // Return as string
+      default:
+        return stringValue; // Default to original string value if unknown type
+    }
+  };
 }
 
 export default UserInputData;

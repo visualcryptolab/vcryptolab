@@ -1,9 +1,8 @@
 import { memo, useState, useEffect, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
-import CryptoJS from "crypto-js";
+import cryptojs from "crypto-js";
 import { toast } from "react-toastify";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
 
 const nodeStyle = {
   padding: "15px",
@@ -19,37 +18,29 @@ const HashNode = ({ data }) => {
   const [algorithm, setAlgorithm] = useState("MD5");
   const [output, setOutput] = useState("");
 
-  // Memoized object for supported hash algorithms
   const algorithms = useMemo(
     () => ({
-      MD5: CryptoJS.MD5,
-      "SHA-1": CryptoJS.SHA1,
-      "SHA-2": CryptoJS.SHA256,
-      "SHA-3": CryptoJS.SHA3,
-      "SHA-256": CryptoJS.SHA256,
-      "SHA-512": CryptoJS.SHA512,
+      MD5: cryptojs.MD5,
+      "SHA-1": cryptojs.SHA1,
+      "SHA-2": cryptojs.SHA256,
+      "SHA-3": cryptojs.SHA3,
+      "SHA-256": cryptojs.SHA256,
+      "SHA-512": cryptojs.SHA512,
     }),
     []
   );
 
-
   useEffect(() => {
-    if (data.input !== undefined && data.input !== null) {
-      const userInput = data.input;
-      
-      const value = userInput.inputValue;
-      const format = userInput.inputFormat;
-
-      const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.TEXT);
-      
-      const hash = algorithms[algorithm](valueWithFormat).toString();
+    if (data.input && algorithms[algorithm]) {
+      toast.success("To hash: " + typeof data.input, {
+            position: "top-right",
+            autoClose: 2000,
+          });
+      const hash = algorithms[algorithm](data.input).toString();
       setOutput(hash);
-
-      // Create a new instance of UserInputData for the hash output
-      const outputData = new UserInputData(hash, INPUT_TYPES.HEXADECIMAL);  // Using INPUT_TYPES.Text as hash is a string
-      data.output = outputData;  // Assigning the output to data.output
+      data.output = hash;
     }
-  }, [data.input, algorithm]);
+  }, [data.input, algorithm, algorithms]);
 
   return (
     <NodeWrapper nodeType="Hash">
