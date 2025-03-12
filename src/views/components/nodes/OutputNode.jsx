@@ -2,7 +2,7 @@
 import { memo, useEffect, useState, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCopy } from "@fortawesome/free-solid-svg-icons";
+import { faCopy, faInfoCircle } from "@fortawesome/free-solid-svg-icons"; 
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
@@ -34,6 +34,17 @@ const OutputText = styled.p`
 const Icon = styled(FontAwesomeIcon)`
   cursor: pointer;
   color: #ff6600;
+  transition: transform 0.2s ease-in-out;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+`;
+
+const InfoIcon = styled(FontAwesomeIcon)`
+  cursor: pointer;
+  color: #ff6600;
+  margin-left: 5px;
   transition: transform 0.2s ease-in-out;
 
   &:hover {
@@ -88,8 +99,8 @@ const RowWithButton = styled.div`
 `;
 
 const OutputNode = ({ data, nodeKey }) => {
-  const [selectedType, setSelectedType] = useState(INPUT_TYPES.DECIMAL);
-  const [typeToConvert, setTypeToConvert] = useState(INPUT_TYPES.DECIMAL);
+  const [selectedType, setSelectedType] = useState("");
+  const [typeToConvert, setTypeToConvert] = useState("");
   const [output, setOutput] = useState("");
   const [outputConverted, setOutputConverted] = useState("");
   const [showConversion, setShowConversion] = useState(false);
@@ -109,18 +120,35 @@ const OutputNode = ({ data, nodeKey }) => {
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
       const userInput = data.input;
+      toast.error("Output: " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
       setOutput(userInput.inputValue);
       setSelectedType(userInput.inputFormat);
       // Validate if the selected type is compatible with the input value
-      if (!UserInputData.isCompatibleType(output, selectedType)) {
-        const compatibleType = UserInputData.determineType(output);
+      if (!UserInputData.isCompatibleType(userInput.inputValue, selectedType)) {
+        const compatibleType = UserInputData.determineType(userInput.inputValue);
         setSelectedType(compatibleType);
         toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
       }
-      setOutputConverted(UserInputData.convertToType(userInput.inputValue, userInput.inputFormat, typeToConvert));
+      let newTypeToConvert = typeToConvert;
+      if(typeToConvert == "") {
+        newTypeToConvert = userInput.inputFormat; 
+        setTypeToConvert(newTypeToConvert);
+      }
+      toast.error("Type to convert: " + newTypeToConvert + " - " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
+      let newOutputConverted = "";
+      if (userInput.inputValue !== undefined && userInput.inputValue !== null && userInput.inputValue !== ""){
+        newOutputConverted = UserInputData.convertToType(userInput.inputValue, userInput.inputFormat, newTypeToConvert);
+        setOutputConverted(newOutputConverted);
+        const newOutput = new UserInputData(outputConverted, newTypeToConvert);
+        data.output = newOutput;
+      } else {
+        setOutput("");
+        setOutputConverted("");
+      }
     } else {
       setOutput("");
       setSelectedType("");
+      setTypeToConvert("");
       setOutputConverted("");
     }
   }, [data.input]);
@@ -131,17 +159,36 @@ const OutputNode = ({ data, nodeKey }) => {
         const compatibleType = UserInputData.determineType(output);
         setSelectedType(compatibleType);
         toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
-      }
+      } 
+      const newOutputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
+      setOutputConverted(newOutputConverted);
+      const newOutput = new UserInputData(newOutputConverted, typeToConvert);
+      data.output = newOutput;
       if (showConversion) {
         // Automatically convert when toggle button is clicked
-        setOutputConverted(UserInputData.convertToType(output, selectedType, typeToConvert));
+        //const outputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
+        //setOutputConverted(outputConverted);
       }
   }, [selectedType]);
 
   useEffect(() => {
+    const newOutputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
+    setOutputConverted(newOutputConverted);
+    const newOutput = new UserInputData(newOutputConverted, typeToConvert);
+    data.output = newOutput;
+}, [typeToConvert]);
+
+  useEffect(() => {
     if (showConversion) {
       // Automatically convert when toggle button is clicked
-      setOutputConverted(UserInputData.convertToType(output, selectedType, typeToConvert));
+      /*const outputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
+      setOutputConverted(outputConverted);
+      setOutput(outputConverted);*/
+      const newOutputConverted = UserInputData.convertToType(outputConverted, selectedType, typeToConvert);
+      const newOutput = new UserInputData(newOutputConverted, typeToConvert);
+      data.output = newOutput;
+    } else {
+      data.output = data.input;
     }
   }, [showConversion]);
 
@@ -183,14 +230,21 @@ const OutputNode = ({ data, nodeKey }) => {
           <Row>
             <div>
               <Label>Convert to</Label>
-              <select value={typeToConvert} onChange={(e) => {
-                setTypeToConvert(e.target.value);
-                setOutputConverted(UserInputData.convertToType(output, selectedType, e.target.value));
-              }}>
-                {Object.keys(types).map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <select value={typeToConvert} onChange={(e) => {
+                  setTypeToConvert(e.target.value);
+                  //setOutputConverted(UserInputData.convertToType(output, selectedType, e.target.value));
+                }}>
+                  {Object.keys(types).map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+                {/* Information Icon with Tooltip */}
+                <InfoIcon 
+                  icon={faInfoCircle} 
+                  title="The conversion process first involves converting the input to binary and then converting from binary to the desired output type." 
+                />
+              </div>
             </div>
           </Row>
 

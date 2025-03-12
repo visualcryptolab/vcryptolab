@@ -1,7 +1,6 @@
-import { memo, useState, useEffect, useMemo } from "react";
+import { memo, useState, useEffect } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
-import * as Algorithms from "../algorithms";
 
 const nodeStyle = {
   padding: "15px",
@@ -14,26 +13,8 @@ const nodeStyle = {
 };
 
 const PublicKeyNode = ({ data }) => {
-  const [algorithm, setAlgorithm] = useState("RSA");
-  const [params, setParams] = useState({p:"281", q:"167", e:"39423", n:"46927", d:"26767"});
   const [e, setE] = useState("");
   const [n, setN] = useState("");
-
-  const algorithms = useMemo(() => {
-      const algos = {};
-      Object.keys(Algorithms).forEach((key) => {
-        algos[key] = new Algorithms[key](setParams);
-      });
-      return algos;
-    }, []);
-  
-    const algorithmsNames = Object.keys(algorithms).map((name) =>
-      name.replace("Algorithm", "")
-    );
-
-    const handleAlgorithmChange = (event) => {
-      setAlgorithm(event.target.value);
-    };
 
   useEffect(() => {
     if (e && n) {
@@ -49,21 +30,24 @@ const PublicKeyNode = ({ data }) => {
       <Handle type="target" position={Position.Left} id="publicKey-in-l" /> 
       <Handle type="target" position={Position.Right} id="publicKey-in-r" />
       <Handle type="target" position={Position.Bottom} id="publicKey-in-b" />
+
       <div>
-        <label>
-          <select value={algorithm} onChange={handleAlgorithmChange}>
-            {algorithmsNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {algorithms[algorithm + "Algorithm"] ? (
-          algorithms[algorithm + "Algorithm"].getInputs(params)
-        ) : (
-          <div>Error: Algorithm not found</div>
-        )}
+        <div>
+          <label>e: </label>
+          <input 
+            type="number" 
+            value={e}
+            onChange={(evt) => setE(evt.target.value)}
+          />
+        </div>
+        <div>
+          <label>n: </label>
+          <input 
+            type="number" 
+            value={n}
+            onChange={(evt) => setN(evt.target.value)}
+          />
+        </div>
       </div>
 
       <Handle type="source" position={Position.Top} id="publicKey-out-t" />
