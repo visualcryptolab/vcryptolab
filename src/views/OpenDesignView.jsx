@@ -204,7 +204,9 @@ const OpenDesignView = () => {
     const targetNode = nodes.find((node) => node.id === params.target);
 
     if (sourceNode && targetNode) {
-      const updatedTargetNode = {
+
+      
+      /*const updatedTargetNode = {
         ...targetNode,
         data: {
           ...targetNode.data,
@@ -215,7 +217,26 @@ const OpenDesignView = () => {
           ...(sourceNode.data.pubKey && { pubKey: sourceNode.data.pubKey }),
           ...(sourceNode.data.privKey && { privKey: sourceNode.data.privKey }),
         },
+      };*/
+      const updatedTargetNode = {
+        ...targetNode,
+        data: {
+          ...targetNode.data,
+          sources: {
+            ...targetNode.data?.sources, // Mantener datos previos si existen
+            [sourceNode.id]: {
+              ...targetNode.data?.sources?.[sourceNode.id], // Mantener los datos anteriores de este sourceNode si existen
+              ...(sourceNode.data.output && { input: sourceNode.data.output }),
+              ...(sourceNode.data.seed && { seed: sourceNode.data.seed }),
+              ...(sourceNode.data.pubKey && { pubKey: sourceNode.data.pubKey }),
+              ...(sourceNode.data.privKey && { privKey: sourceNode.data.privKey }),
+            },
+          },
+        },
       };
+      
+      
+      
 
       setNodes((nds) =>
         nds.map((n) => (n.id === targetNode.id ? updatedTargetNode : n))

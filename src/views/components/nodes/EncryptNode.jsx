@@ -1,29 +1,62 @@
 import { memo, useState, useEffect, useMemo, useRef } from "react";
 import { Handle, Position } from "@xyflow/react";
 import * as Algorithms from "../algorithms";
+import RSAPublicKey from "../algorithms/RSAPublicKey";
 import NodeWrapper from "./NodeWrapper";
 import { toast } from "react-toastify";
 import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import styled from "styled-components";
 
+// Styles for the control container
 const controlStyle = {
   padding: "15px",
-  border: "1px,solid #e0e0e0",
+  border: "1px solid #e0e0e0",
   borderRadius: "8px",
   backgroundColor: "#ffffff",
   textAlign: "center",
   width: "18vw",
   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-  transition: "transform,0.2s, box-shadow 0.2s",
+  transition: "transform 0.2s, box-shadow 0.2s",
 };
 
+// Styles for missing parameters notification
+const missingParamsStyle = {
+  padding: "10px",
+  border: "2px dashed red",
+  borderRadius: "5px",
+  backgroundColor: "#fff5f5",
+  color: "#d9534f",
+  marginBottom: "10px",
+};
+
+// Styled component for parameter box
+const ParameterBox = styled.div`
+  border: 1px dashed #999;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: #666;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+`;
+
 const EncryptNode = ({ data }) => {
+  // State for algorithm selection
   const [algorithm, setAlgorithm] = useState("RSA");
+  // State for output text
   const [outputText, setOutputText] = useState("");
-  const [inputText, setInputText] = useState("");
-  const [params, setParams] = useState({p:"281", q:"167", e:"39423", n:"46927", d:"26767"});
+  // State for storing parameters
+  const [params, setParams] = useState({});
+  // References to previous state values for comparison
   const prevParamsRef = useRef(params);
   const prevDataRef = useRef(data);
+  // Local state for handling data updates
+  //const [localData, setLocalData] = useState(data);
 
+  // State to track missing parameters
+  const [missingParams, setMissingParams] = useState([]);
+
+  // Create algorithms dynamically from the imported module
   const algorithms = useMemo(() => {
     const algos = {};
     Object.keys(Algorithms).forEach((key) => {
@@ -32,107 +65,135 @@ const EncryptNode = ({ data }) => {
     return algos;
   }, []);
 
+  // List of algorithm names
   const algorithmsNames = Object.keys(algorithms).map((name) =>
     name.replace("Algorithm", "")
   );
 
+  // Effect to update missing parameters when the data changes
   useEffect(() => {
-    params.input = "";//data.input;
+    // Display data in the toast for debugging purposes
+    //toast.error("Data: " + JSON.stringify(data, null, 2), { position: "top-right", autoClose: 5000 });
 
-    if (data.input !== undefined && data.input !== null) {
-      const userInput = data.input;
-      const value = userInput.inputValue;
-      const format = userInput.inputFormat;
-      const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
-      //toast.error("To encrypt "  + valueWithFormat, { position: "top-right", autoClose: 5000 });
-      //params.input = "10";//valueWithFormat
-      params.input = valueWithFormat
-      /*
-      if (algorithms[algorithm + "Algorithm"]) {
+    // Initialize missingParams array
+    let updatedMissingParams = [];
+    
+    // Check if the data has sources
+    if (data?.sources !== undefined && data?.sources !== null) {
+      // Find the first source with input
+      const firstSourceWithInput = Object.values(data?.sources).find(source => source.input);
+      const firstInput = firstSourceWithInput?.input;
+      
+      // Find the first source with a public key
+      const firstSourceWithKey = Object.values(data?.sources).find(source => source.pubKey);
+      const firstKey = firstSourceWithKey?.pubKey;
 
-        //toast.error("To encrypt "  + params, { position: "top-right", autoClose: 5000 });
-        const result = algorithms[algorithm + "Algorithm"].encrypt(params);
-        //setOutputText(result);
-        //data.output = result;
+      // If the input or public key is missing, add them to the list
+      if (!firstInput) updatedMissingParams.push("Message to encrypt");
+      if (!firstKey) updatedMissingParams.push("Public key");
 
-        //toast.error("Encrypted "  + result, { position: "top-right", autoClose: 5000 });
+           
+      
+      // If the selected algorithm is available, run the encryption
+      if (firstInput && firstKey && algorithms[algorithm + "Algorithm"]) {
+        const value = firstInput.inputValue;
+        const format = firstInput.inputFormat;
 
-        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);  
-        
-        data.output = outputData;
-      }*/
-    }
-    params.pubKey = data.pubKey;
-    params.privKey = data.privKey;
-  }, [data.input, data.pubKey, data.privKey]);
+        // Convert the input value to the required type
+        const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
 
-  useEffect(() => {
-    const prevParams = prevParamsRef.current;
-    if (JSON.stringify(prevParams) !== JSON.stringify(params)) {
-      if (algorithms[algorithm + "Algorithm"]) {
-        const result = algorithms[algorithm + "Algorithm"].encrypt(params);
-        //setOutputText(result);
-        //data.output = result;
 
-        //toast.error("Encrypted "  + result, { position: "top-right", autoClose: 5000 });
+        toast.error("Message: " + valueWithFormat, { position: "top-right", autoClose: 50000 });
+        toast.error("Key: " + JSON.stringify(firstKey, null, 2), { position: "top-right", autoClose: 50000 });
 
-        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);  
-        
+        const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, firstKey);
+        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);
         data.output = outputData;
       }
-      prevParamsRef.current = params;
+    } else {
+      // If no sources exist, add both missing parameters
+      updatedMissingParams.push("Message to encrypt");
+      updatedMissingParams.push("Public key");
     }
-  }, [algorithm, params, algorithms, data.input, data.pubKey, data.privKey]);
 
+    // Update the missingParams state with the new values
+    setMissingParams(updatedMissingParams);
+  }, [algorithm, algorithms, data]); // Depend on data so the effect runs when it changes
+
+  /*
+  // Effect to run encryption when the algorithm or localData changes
+  useEffect(() => {
+    // Check if both input and public key are available
+    if (localData.input && localData.pubKey) {
+      const userInput = localData.input;
+      const value = userInput.inputValue;
+      const format = userInput.inputFormat;
+      
+      // Convert the input value to the required type
+      const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
+      
+      // If the selected algorithm is available, run the encryption
+      if (algorithms[algorithm + "Algorithm"]) {
+        const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, localData.pubKey);
+        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);
+        
+        // Update the local data with the output of the encryption
+        setLocalData((prevData) => ({ ...prevData, output: outputData }));
+      }
+    }
+  }, [algorithm, algorithms, localData]); // Depend on algorithm, algorithms, and localData*/
+
+  // Handle change in algorithm selection
   const handleAlgorithmChange = (event) => {
     setAlgorithm(event.target.value);
   };
 
-  useEffect(() => {
-    if (JSON.stringify(prevDataRef.current) !== JSON.stringify(data)) {
-      prevDataRef.current = data;
-      if (data.input) {
-        setInputText(data.input);
-      }
-    }
-  }, [data]);
-
   return (
     <NodeWrapper nodeType={"Encrypt"}>
-    <div style={controlStyle}>
-      <Handle type="target" position={Position.Top} id="encrypt-top" />
-      <Handle type="target" position={Position.Left} id="encrypt-left" />
-      <Handle type="target" position={Position.Right} id="encrypt-right" />
-      <Handle type="target" position={Position.Bottom} id="encrypt-bottom" />
-      <div>
-        <label>
-          <select value={algorithm} onChange={handleAlgorithmChange}>
-            {algorithmsNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {algorithms[algorithm + "Algorithm"] ? (
-          algorithms[algorithm + "Algorithm"].getInputs(params)
-        ) : (
-          <div>Error: Algorithm not found</div>
+      <div style={controlStyle}>
+        {/* Handle connections for inputs and outputs */}
+        <Handle type="target" position={Position.Top} id="encrypt-top" />
+        <Handle type="target" position={Position.Left} id="encrypt-left" />
+        <Handle type="target" position={Position.Right} id="encrypt-right" />
+        <Handle type="target" position={Position.Bottom} id="encrypt-bottom" />
+
+        {/* Display missing parameters if any */}
+        {missingParams.length > 0 && (
+          <ParameterBox>
+            <strong>Missing parameters:</strong>
+            <ul>
+              {missingParams.map((param, index) => (
+                <li key={index}>{param}</li>
+              ))}
+            </ul>
+          </ParameterBox>
         )}
+
+        {/* Dropdown for selecting algorithm */}
+        <div>
+          <label>
+            <select value={algorithm} onChange={handleAlgorithmChange}>
+              {algorithmsNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* Display inputs for the selected algorithm */}
+          {algorithms[algorithm + "Algorithm"] ? (
+            algorithms[algorithm + "Algorithm"].getInputs(params)
+          ) : (
+            <div>Error: Algorithm not found</div>
+          )}
+        </div>
+
+        {/* Handle connections for output */}
+        <Handle type="source" position={Position.Top} id="encrypt-output-top" />
+        <Handle type="source" position={Position.Left} id="encrypt-output-left" />
+        <Handle type="source" position={Position.Right} id="encrypt-output-right" />
+        <Handle type="source" position={Position.Bottom} id="encrypt-output-bottom" />
       </div>
-      <Handle type="source" position={Position.Top} id="encrypt-output-top" />
-      <Handle type="source" position={Position.Left} id="encrypt-output-left" />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="encrypt-output-right"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="encrypt-output-bottom"
-      />
-    </div>
     </NodeWrapper>
   );
 };

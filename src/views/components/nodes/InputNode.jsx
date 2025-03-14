@@ -72,7 +72,7 @@ const ButtonContainer = styled.div`
 
 const InputNode = ({ data }) => {
   const [selectedType, setSelectedType] = useState(INPUT_TYPES.DECIMAL);
-  const [text, setText] = useState("0");
+  const [text, setText] = useState("16346");
 
   // Types that are available in the selector
   const types = useMemo(() => INPUT_TYPES, []);

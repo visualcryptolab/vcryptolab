@@ -2,6 +2,8 @@ import { memo, useState, useEffect, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
 import * as Algorithms from "../algorithms";
+import RSAPublicKey from "../algorithms/RSAPublicKey";
+import { toast } from "react-toastify";
 
 const nodeStyle = {
   padding: "15px",
@@ -16,8 +18,10 @@ const nodeStyle = {
 const PublicKeyNode = ({ data }) => {
   const [algorithm, setAlgorithm] = useState("RSA");
   const [params, setParams] = useState({p:"281", q:"167", e:"39423", n:"46927", d:"26767"});
-  const [e, setE] = useState("");
-  const [n, setN] = useState("");
+  //const [e, setE] = useState("");
+  //const [n, setN] = useState("");
+  //const keyPair2 = [parseInt(-2), parseInt(-2)];
+  //data.pubKey = keyPair2;
 
   const algorithms = useMemo(() => {
       const algos = {};
@@ -36,11 +40,15 @@ const PublicKeyNode = ({ data }) => {
     };
 
   useEffect(() => {
-    if (e && n) {
-      const keyPair = [parseInt(e), parseInt(n)];
-      data.pubKey = keyPair;
-    }
-  }, [e, n]);
+    
+      if (params.e && params.n) {
+        const keyPair = new RSAPublicKey(params.e, params.n);
+        data.pubKey = keyPair;
+      } else {
+        const keyPair = new RSAPublicKey(-1, -1);
+        data.pubKey = keyPair;
+      }
+  }, [params.e, params.n]);
 
   return (
     <NodeWrapper nodeType="Public Key">

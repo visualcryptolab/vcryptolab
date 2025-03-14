@@ -2,6 +2,7 @@
 
 import React from "react";
 import { toast } from "react-toastify";
+import RSAPublicKey from "./RSAPublicKey";
 
 class RSAAlgorithm {
   constructor(setParams) {
@@ -154,6 +155,20 @@ class RSAAlgorithm {
     }
   }
 
+  encrypt(message, encryptionKey) {
+    
+    if (message !== undefined && encryptionKey !== undefined && encryptionKey.e !== undefined && encryptionKey.n !== undefined) {
+      console.log(message);
+      console.log(encryptionKey);
+      const messageBI = BigInt(message);
+      const result = this.modExp(messageBI, BigInt(encryptionKey.e), BigInt(encryptionKey.n));
+      return result.toString();
+    } else {
+      return "Message: " + message + " - Key: " + encryptionKey;
+    }
+  }
+
+  /* Old function when the parameters where listed here and not group. 
   encrypt(params) {
     const { hasKeys, p, q, e, input } = params;
     let newParams = { ...params };
@@ -213,7 +228,7 @@ class RSAAlgorithm {
       const result = this.modExp(message, BigInt(newParams.e), BigInt(newParams.n));
       return result.toString();
     }
-  }
+  }*/
 
   decrypt(params) {
     const { p, q, e, input } = params;

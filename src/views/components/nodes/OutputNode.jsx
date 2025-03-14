@@ -120,7 +120,7 @@ const OutputNode = ({ data, nodeKey }) => {
   useEffect(() => {
     if (data.input !== undefined && data.input !== null) {
       const userInput = data.input;
-      toast.error("Output: " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
+      //toast.error("Output: " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
       setOutput(userInput.inputValue);
       setSelectedType(userInput.inputFormat);
       // Validate if the selected type is compatible with the input value
@@ -134,7 +134,7 @@ const OutputNode = ({ data, nodeKey }) => {
         newTypeToConvert = userInput.inputFormat; 
         setTypeToConvert(newTypeToConvert);
       }
-      toast.error("Type to convert: " + newTypeToConvert + " - " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
+      //toast.error("Type to convert: " + newTypeToConvert + " - " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
       let newOutputConverted = "";
       if (userInput.inputValue !== undefined && userInput.inputValue !== null && userInput.inputValue !== ""){
         newOutputConverted = UserInputData.convertToType(userInput.inputValue, userInput.inputFormat, newTypeToConvert);
