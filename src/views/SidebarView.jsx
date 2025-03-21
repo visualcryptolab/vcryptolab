@@ -102,7 +102,8 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
             </MenuItem>
             <MenuItem
               icon={<VpnKeyIcon />}
-              onClick={() => handleSelectItem("Seed")}
+              onClick={() => handleSelectItem("Key Generator")}
+              //onClick={() => handleSelectItem("Seed")}
             >
               Seed
             </MenuItem>

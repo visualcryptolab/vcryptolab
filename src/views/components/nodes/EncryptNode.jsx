@@ -103,8 +103,8 @@ const EncryptNode = ({ data }) => {
         const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
 
 
-        toast.error("Message: " + valueWithFormat, { position: "top-right", autoClose: 50000 });
-        toast.error("Key: " + JSON.stringify(firstKey, null, 2), { position: "top-right", autoClose: 50000 });
+        //toast.error("Message: " + valueWithFormat, { position: "top-right", autoClose: 50000 });
+        //toast.error("Key: " + JSON.stringify(firstKey, null, 2), { position: "top-right", autoClose: 50000 });
 
         const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, firstKey);
         const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);
@@ -119,29 +119,6 @@ const EncryptNode = ({ data }) => {
     // Update the missingParams state with the new values
     setMissingParams(updatedMissingParams);
   }, [algorithm, algorithms, data]); // Depend on data so the effect runs when it changes
-
-  /*
-  // Effect to run encryption when the algorithm or localData changes
-  useEffect(() => {
-    // Check if both input and public key are available
-    if (localData.input && localData.pubKey) {
-      const userInput = localData.input;
-      const value = userInput.inputValue;
-      const format = userInput.inputFormat;
-      
-      // Convert the input value to the required type
-      const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
-      
-      // If the selected algorithm is available, run the encryption
-      if (algorithms[algorithm + "Algorithm"]) {
-        const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, localData.pubKey);
-        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);
-        
-        // Update the local data with the output of the encryption
-        setLocalData((prevData) => ({ ...prevData, output: outputData }));
-      }
-    }
-  }, [algorithm, algorithms, localData]); // Depend on algorithm, algorithms, and localData*/
 
   // Handle change in algorithm selection
   const handleAlgorithmChange = (event) => {
@@ -180,12 +157,6 @@ const EncryptNode = ({ data }) => {
               ))}
             </select>
           </label>
-          {/* Display inputs for the selected algorithm */}
-          {algorithms[algorithm + "Algorithm"] ? (
-            algorithms[algorithm + "Algorithm"].getInputs(params)
-          ) : (
-            <div>Error: Algorithm not found</div>
-          )}
         </div>
 
         {/* Handle connections for output */}

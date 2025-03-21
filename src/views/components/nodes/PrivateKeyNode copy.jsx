@@ -12,19 +12,19 @@ const nodeStyle = {
   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
 };
 
-const PublicKeyNode = ({ data }) => {
-  const [e, setE] = useState("");
+const PrivateKeyNode = ({ data }) => {
+  const [d, setD] = useState("");
   const [n, setN] = useState("");
 
   useEffect(() => {
-    if (e && n) {
-      const keyPair = [parseInt(e), parseInt(n)];
-      data.pubKey = keyPair;
+    if (d && n) {
+      const keyPair = [parseInt(d), parseInt(n)];
+      data.privKey = keyPair;
     }
-  }, [e, n]);
+  }, [d, n]);
 
   return (
-    <NodeWrapper nodeType="Public Key">
+    <NodeWrapper nodeType="Private Key">
     <div style={nodeStyle}>
       <Handle type="target" position={Position.Top} id="publicKey-in-t" />
       <Handle type="target" position={Position.Left} id="publicKey-in-l" /> 
@@ -33,11 +33,11 @@ const PublicKeyNode = ({ data }) => {
 
       <div>
         <div>
-          <label>e: </label>
+          <label>d: </label>
           <input 
             type="number" 
-            value={e}
-            onChange={(evt) => setE(evt.target.value)}
+            value={d}
+            onChange={(evt) => setD(evt.target.value)}
           />
         </div>
         <div>
@@ -59,4 +59,4 @@ const PublicKeyNode = ({ data }) => {
   );
 };
 
-export default memo(PublicKeyNode);
+export default memo(PrivateKeyNode);

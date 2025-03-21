@@ -5,6 +5,7 @@ export { default as EncryptNode } from './EncryptNode';
 export { default as HashNode } from './HashNode';
 export { default as InputNode } from './InputNode';
 export { default as OutputNode } from './OutputNode';
+export { default as KeyGeneratorNode } from './KeyGeneratorNode';
 export { default as PrivateKeyNode } from './PrivateKeyNode';
 export { default as PublicKeyNode } from './PublicKeyNode';
 export { default as ResizableNode } from './ResizableNode';

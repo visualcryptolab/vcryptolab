@@ -168,6 +168,18 @@ class RSAAlgorithm {
     }
   }
 
+  decrypt(cyphertext, decryptionKey) {
+    if (cyphertext !== undefined && decryptionKey !== undefined && decryptionKey.d !== undefined && decryptionKey.n !== undefined) {
+      console.log(cyphertext);
+      console.log(decryptionKey);
+      const messageBI = BigInt(cyphertext);
+      const result = this.modExp(messageBI, BigInt(decryptionKey.d), BigInt(decryptionKey.n));
+      return result.toString();
+    } else {
+      return "Message: " + cyphertext + " - Key: " + decryptionKey;
+    }
+  }
+
   /* Old function when the parameters where listed here and not group. 
   encrypt(params) {
     const { hasKeys, p, q, e, input } = params;
@@ -228,7 +240,7 @@ class RSAAlgorithm {
       const result = this.modExp(message, BigInt(newParams.e), BigInt(newParams.n));
       return result.toString();
     }
-  }*/
+  }
 
   decrypt(params) {
     const { p, q, e, input } = params;
@@ -278,7 +290,7 @@ class RSAAlgorithm {
       );
       return result.toString();
     }
-  }
+  }*/
 
   modExp(base, exp, mod) {
     let result = BigInt(1);

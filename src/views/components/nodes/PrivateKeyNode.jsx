@@ -1,6 +1,7 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
+import RSAPrivateKey from "../algorithms/RSAPrivateKey";
 
 const nodeStyle = {
   padding: "15px",
@@ -17,44 +18,39 @@ const PrivateKeyNode = ({ data }) => {
   const [n, setN] = useState("");
 
   useEffect(() => {
-    if (d && n) {
-      const keyPair = [parseInt(d), parseInt(n)];
-      data.privKey = keyPair;
+    if (data?.privKey) {
+      setD(data.privKey.d);
+      setN(data.privKey.n);
+    } else {
+      data.privKey = new RSAPrivateKey(d, n);
     }
-  }, [d, n]);
+  }, [data, d, n]);
 
   return (
     <NodeWrapper nodeType="Private Key">
-    <div style={nodeStyle}>
-      <Handle type="target" position={Position.Top} id="publicKey-in-t" />
-      <Handle type="target" position={Position.Left} id="publicKey-in-l" /> 
-      <Handle type="target" position={Position.Right} id="publicKey-in-r" />
-      <Handle type="target" position={Position.Bottom} id="publicKey-in-b" />
+      <div style={nodeStyle}>
+        <Handle type="target" position={Position.Top} id="privateKey-in-t" />
+        <Handle type="target" position={Position.Left} id="privateKey-in-l" />
+        <Handle type="target" position={Position.Right} id="privateKey-in-r" />
+        <Handle type="target" position={Position.Bottom} id="privateKey-in-b" />
 
-      <div>
         <div>
-          <label>d: </label>
-          <input 
-            type="number" 
-            value={d}
-            onChange={(evt) => setD(evt.target.value)}
-          />
+          <label>
+            Private Exponent (d):
+            <input type="text" value={d} onChange={(e) => setD(e.target.value)} />
+          </label>
+          <br />
+          <label>
+            Modulus (n):
+            <input type="text" value={n} onChange={(e) => setN(e.target.value)} />
+          </label>
         </div>
-        <div>
-          <label>n: </label>
-          <input 
-            type="number" 
-            value={n}
-            onChange={(evt) => setN(evt.target.value)}
-          />
-        </div>
+
+        <Handle type="source" position={Position.Top} id="privateKey-out-t" />
+        <Handle type="source" position={Position.Left} id="privateKey-out-l" />
+        <Handle type="source" position={Position.Right} id="privateKey-out-r" />
+        <Handle type="source" position={Position.Bottom} id="privateKey-out-b" />
       </div>
-
-      <Handle type="source" position={Position.Top} id="publicKey-out-t" />
-      <Handle type="source" position={Position.Left} id="publicKey-out-l" />
-      <Handle type="source" position={Position.Right} id="publicKey-out-r" />
-      <Handle type="source" position={Position.Bottom} id="publicKey-out-b" />
-    </div>
     </NodeWrapper>
   );
 };

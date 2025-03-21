@@ -29,11 +29,7 @@ const PublicKeyNode = ({ data }) => {
   return (
     <NodeWrapper nodeType="Public Key">
       <div style={nodeStyle}>
-        
-      <Handle type="target" position={Position.Top} id="publicKey-in-t" />
-        <Handle type="target" position={Position.Left} id="publicKey-in-l" />
-        <Handle type="target" position={Position.Right} id="publicKey-in-r" />
-        <Handle type="target" position={Position.Bottom} id="publicKey-in-b" />
+        <Handle type="target" position={Position.Top} id="publicKey-in" />
 
         <div>
           <label>
@@ -47,10 +43,7 @@ const PublicKeyNode = ({ data }) => {
           </label>
         </div>
 
-        <Handle type="source" position={Position.Top} id="publicKey-out-t" />
-        <Handle type="source" position={Position.Left} id="publicKey-out-l" />
-        <Handle type="source" position={Position.Right} id="publicKey-out-r" />
-        <Handle type="source" position={Position.Bottom} id="publicKey-out-b" />
+        <Handle type="source" position={Position.Bottom} id="publicKey-out" />
       </div>
     </NodeWrapper>
   );
