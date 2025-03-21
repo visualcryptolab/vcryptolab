@@ -5,8 +5,8 @@ import LockIcon from "@mui/icons-material/Lock";
 import { useNavigate } from "react-router-dom";
 import InputIcon from "@mui/icons-material/Input";
 import OutputIcon from "@mui/icons-material/Output";
-import VpnKeyIcon from "@mui/icons-material/VpnKey";
-import PublicIcon from "@mui/icons-material/Public";
+import BuildIcon from "@mui/icons-material/Build"; // Rueda de engranaje
+import PublicIcon from "@mui/icons-material/Public"; // Bola del mundo
 import styles from "../styles/SidebarView.module.css";
 import SecurityIcon from "@mui/icons-material/Security";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
@@ -17,7 +17,7 @@ import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SidebarController from "../controllers/SidebarController";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
-import { colors } from "@mui/material";
+import { Key as KeyIcon, Shield as ShieldIcon } from "@mui/icons-material"; // Icono de la llave normal y escudo
 
 const SidebarView = ({ onNewNode, handleDelete }) => {
   const [collapsed, setCollapsed] = useState(SidebarController.getCollapsed());
@@ -50,7 +50,7 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
       }`}
     >
       <button className={styles.toggleButton} onClick={handleToggle}>
-        {collapsed ? <ChevronRightIcon style={{color:"black"}} /> : <ChevronLeftIcon style={{color:"black"}} />}
+        {collapsed ? <ChevronRightIcon style={{ color: "black" }} /> : <ChevronLeftIcon style={{ color: "black" }} />}
       </button>
       <Sidebar
         className={styles.sidebar}
@@ -101,20 +101,34 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
               Hash
             </MenuItem>
             <MenuItem
-              icon={<VpnKeyIcon />}
+              icon={
+                <div style={{ display: "flex", alignItems: "center", fontSize: "24px" }}>
+                  <BuildIcon style={{ marginRight: -6 }} /> {/* Rueda de engranaje */}
+                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Llave inclinada */}
+                </div>
+              }
               onClick={() => handleSelectItem("Key Generator")}
-              //onClick={() => handleSelectItem("Seed")}
             >
-              Seed
+              Key Generator
             </MenuItem>
             <MenuItem
-              icon={<PublicIcon />}
+              icon={
+                <div style={{ display: "flex", alignItems: "center", fontSize: "24px" }}>
+                  <PublicIcon style={{ marginRight: -6 }} /> {/* Bola del mundo */}
+                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Llave inclinada */}
+                </div>
+              }
               onClick={() => handleSelectItem("Public Key")}
             >
               Public Key
             </MenuItem>
             <MenuItem
-              icon={<SecurityIcon />}
+              icon={
+                <div style={{ display: "flex", alignItems: "center", fontSize: "24px" }}>
+                  <ShieldIcon style={{ marginRight: -6 }} /> {/* Escudo */}
+                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Llave inclinada */}
+                </div>
+              }
               onClick={() => handleSelectItem("Private Key")}
             >
               Private Key
