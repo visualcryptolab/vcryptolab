@@ -5,8 +5,8 @@ import LockIcon from "@mui/icons-material/Lock";
 import { useNavigate } from "react-router-dom";
 import InputIcon from "@mui/icons-material/Input";
 import OutputIcon from "@mui/icons-material/Output";
-import BuildIcon from "@mui/icons-material/Build"; // Rueda de engranaje
-import PublicIcon from "@mui/icons-material/Public"; // Bola del mundo
+import BuildIcon from "@mui/icons-material/Build"; // Gear icon
+import PublicIcon from "@mui/icons-material/Public"; // Globe icon
 import styles from "../styles/SidebarView.module.css";
 import SecurityIcon from "@mui/icons-material/Security";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
@@ -17,7 +17,7 @@ import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SidebarController from "../controllers/SidebarController";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
-import { Key as KeyIcon, Shield as ShieldIcon } from "@mui/icons-material"; // Icono de la llave normal y escudo
+import { Key as KeyIcon, Shield as ShieldIcon } from "@mui/icons-material"; // Normal key and shield icon
 
 const SidebarView = ({ onNewNode, handleDelete }) => {
   const [collapsed, setCollapsed] = useState(SidebarController.getCollapsed());
@@ -35,10 +35,12 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
     }
   }, [collapsed]);
 
+  // Handle sidebar toggle
   const handleToggle = () => {
     setCollapsed(!collapsed);
   };
 
+  // Handle item selection
   const handleSelectItem = (item) => {
     onNewNode(item);
   };
@@ -70,6 +72,7 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
         <hr className={styles.separator} />
         <Menu height="100vh">
           <div className={styles.menuItems}>
+            {/* Menu items with their respective icons */}
             <MenuItem
               icon={<InputIcon />}
               onClick={() => handleSelectItem("Input")}
@@ -103,8 +106,8 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
             <MenuItem
               icon={
                 <div style={{ display: "flex", alignItems: "center", fontSize: "24px" }}>
-                  <BuildIcon style={{ marginRight: -6 }} /> {/* Rueda de engranaje */}
-                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Llave inclinada */}
+                  <BuildIcon style={{ marginRight: -6 }} /> {/* Gear icon */}
+                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Key icon tilted */}
                 </div>
               }
               onClick={() => handleSelectItem("Key Generator")}
@@ -114,8 +117,8 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
             <MenuItem
               icon={
                 <div style={{ display: "flex", alignItems: "center", fontSize: "24px" }}>
-                  <PublicIcon style={{ marginRight: -6 }} /> {/* Bola del mundo */}
-                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Llave inclinada */}
+                  <PublicIcon style={{ marginRight: -6 }} /> {/* Globe icon */}
+                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Key icon tilted */}
                 </div>
               }
               onClick={() => handleSelectItem("Public Key")}
@@ -125,8 +128,8 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
             <MenuItem
               icon={
                 <div style={{ display: "flex", alignItems: "center", fontSize: "24px" }}>
-                  <ShieldIcon style={{ marginRight: -6 }} /> {/* Escudo */}
-                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Llave inclinada */}
+                  <ShieldIcon style={{ marginRight: -6 }} /> {/* Shield icon */}
+                  <KeyIcon style={{ fontSize: "24px", transform: "rotate(-20deg)" }} /> {/* Key icon tilted */}
                 </div>
               }
               onClick={() => handleSelectItem("Private Key")}
@@ -146,6 +149,7 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
               Concatenate
             </MenuItem>
           </div>
+          {/* Delete button */}
           <div className={styles.deleteButtonContainer}>
             <MenuItem
               className={styles.deleteButton}
