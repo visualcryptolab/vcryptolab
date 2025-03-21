@@ -137,7 +137,7 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
               Private Key
             </MenuItem>
             <MenuItem
-              icon={<SwapHorizIcon />}
+              icon={<span style={{ fontSize: "24px" }}>⊕</span>} // XOR symbol
               onClick={() => handleSelectItem("Xor")}
             >
               Xor
