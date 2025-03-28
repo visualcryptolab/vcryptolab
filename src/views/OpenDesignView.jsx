@@ -220,14 +220,18 @@ const OpenDesignView = () => {
           ...(sourceNode.data.privKey && { privKey: sourceNode.data.privKey }),
         },
       };*/
+
+
+      console.log("input id: " + sourceNode.id);
+
       const updatedTargetNode = {
         ...targetNode,
         data: {
           ...targetNode.data,
           sources: {
-            ...targetNode.data?.sources, // Mantener datos previos si existen
+            ...targetNode.data?.sources, 
             [sourceNode.id]: {
-              ...targetNode.data?.sources?.[sourceNode.id], // Mantener los datos anteriores de este sourceNode si existen
+              ...targetNode.data?.sources?.[sourceNode.id], 
               ...(sourceNode.data.output && { input: sourceNode.data.output }),
               ...(sourceNode.data.seed && { seed: sourceNode.data.seed }),
               ...(sourceNode.data.pubKey && { pubKey: sourceNode.data.pubKey }),

@@ -1,7 +1,20 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { toast, ToastContainer } from "react-toastify";
 import NodeWrapper from "./NodeWrapper";
+import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import styled from "styled-components";
+import { toast } from "react-toastify";
+
+// Styled component for missing parameters notification
+const ParameterBox = styled.div`
+  border: 1px dashed #999;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: #666;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+`;
 
 const nodeStyle = {
   padding: "15px",
@@ -14,93 +27,65 @@ const nodeStyle = {
 };
 
 const XorNode = ({ data }) => {
-  const [input1, setInput1] = useState("");
-  const [input2, setInput2] = useState("");
-  const [sourceIDinput1, setSourceIDinput1] = useState("");
-  const [sourceIDinput2, setSourceIDinput2] = useState("");
   const [output, setOutput] = useState("");
+  const [missingParams, setMissingParams] = useState([]);
 
   useEffect(() => {
-    console.log("Data received:", data);
-    const inputValue = data.input || "";
+    //console.log("Data: " + data); 
+    console.log("Data: " + JSON.stringify(data, null, 2)); 
 
-    if (data.sourceId) {
-      console.log("Source ID:", data.sourceId);
+    //console.log("Sources:", JSON.stringify(data.sources, null, 2));
+  //onsole.log("Output:", JSON.stringify(data.output, null, 2));
 
-      // Check if the sourceId matches input1
-      if (sourceIDinput1 && data.sourceId === sourceIDinput1) {
-        console.log("Updating input1 with:", inputValue);
-        setInput1(inputValue);
-      }
-      // Check if the sourceId matches input2
-      else if (sourceIDinput2 && data.sourceId === sourceIDinput2) {
-        console.log("Updating input2 with:", inputValue);
-        setInput2(inputValue);
-      }
-      // If neither input is assigned, assign to input1 if it's empty
-      else if (!sourceIDinput1) {
-        console.log(
-          "Assigning input1 with:",
-          inputValue,
-          "Source ID:",
-          data.sourceId
-        );
-        setSourceIDinput1(data.sourceId);
-        setInput1(inputValue);
-      }
-      // If input1 is assigned and input2 is not, assign to input2
-      else if (!sourceIDinput2) {
-        console.log(
-          "Assigning input2 with:",
-          inputValue,
-          "Source ID:",
-          data.sourceId
-        );
-        setSourceIDinput2(data.sourceId);
-        setInput2(inputValue);
-      }
-      // If both are assigned, ignore the new input
-      else {
-        console.log(
-          "Both inputs are assigned, ignoring:",
-          inputValue,
-          "Source ID:",
-          data.sourceId
-        );
+    let updatedMissingParams = [];
+    let firstInput;
+    let secondInput;
+    let inputValue;
+
+    if(data?.sources!=null && data?.sources!=undefined){
+      //console.log(data.sources);
+      for (const key in data.sources) {
+        //console.log("Key: " + key);
+        if (data.sources.hasOwnProperty(key)) {
+          if(data.sources[key]?.input?.inputValue!==null && data.sources[key]?.input?.inputValue!==undefined){
+            inputValue = data.sources[key].input.inputValue;
+            if(!firstInput) {
+              firstInput = inputValue;
+              //console.log("Input 1: " + inputValue); 
+            } else {
+              secondInput = inputValue;
+              //console.log("Input 2: " + inputValue); 
+              break;  
+            }            
+          } 
+        }
       }
     }
-  }, [data, sourceIDinput1, sourceIDinput2]);
 
-  useEffect(() => {
-    if (input1 && input2) {
-      const xorResult = input1
+
+    if (!firstInput) updatedMissingParams.push("First input");
+    if (!secondInput) updatedMissingParams.push("Second input");
+
+    if (firstInput && secondInput) {
+      // Ensure both inputs are binary strings
+      const binary1 = firstInput.padStart(Math.max(firstInput.length, secondInput.length), "0");
+      const binary2 = secondInput.padStart(Math.max(firstInput.length, secondInput.length), "0");
+      
+      // Perform bitwise XOR
+      const xorResult = binary1
         .split("")
-        .map((char, index) => {
-          const xorValue =
-            char.charCodeAt(0) ^ input2.charCodeAt(index % input2.length);
-          // Convert the XOR result to a hexadecimal string
-          const hexString = xorValue.toString(16).padStart(2, "0");
-          return hexString;
-        })
+        .map((bit, index) => (bit === binary2[index] ? "0" : "1"))
         .join("");
+      
+      //console.log("xor: " + firstInput + " + " + secondInput + " = " + xorResult); 
+      // Store result in UserInputData format
+      const outputData = new UserInputData(xorResult, INPUT_TYPES.BINARY);
+      data.output = outputData;
       setOutput(xorResult);
-      data.output = xorResult;
     }
-  }, [input1, input2, data]);
 
-  const swapInputs = () => {
-    // Swap input values
-    const tempInput = input1;
-    setInput1(input2);
-    setInput2(tempInput);
-
-    // Also swap the corresponding source IDs
-    const tempSourceID = sourceIDinput1;
-    setSourceIDinput1(sourceIDinput2);
-    setSourceIDinput2(tempSourceID);
-
-    // Show a toast informing the user
-  };
+    setMissingParams(updatedMissingParams);
+  }, [JSON.stringify(data)]);//data]);
 
   return (
     <NodeWrapper nodeType="XOR">
@@ -110,46 +95,18 @@ const XorNode = ({ data }) => {
         <Handle type="target" position={Position.Right} id="xor-in-r" />
         <Handle type="target" position={Position.Bottom} id="xor-in-b" />
 
-        <div>
-          <label>Input 1:</label>
-          <input
-            type="text"
-            value={input1}
-            onChange={(e) => setInput1(e.target.value)}
-          />
-        </div>
-        <div>
-          <label>Input 2:</label>
-          <input
-            type="text"
-            value={input2}
-            onChange={(e) => setInput2(e.target.value)}
-          />
-        </div>
-        <div>
-          {/* Swap icon button */}
-          <button
-            onClick={swapInputs}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
-              margin: "10px 0",
-            }}
-            title="Swap Inputs"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              height="24"
-              width="24"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M16 18l4-4-4-4v3H4v2h12zM8 6l-4 4 4 4V11h12V9H8z" />
-            </svg>
-          </button>
-        </div>
+        {/* Show missing parameters notification if needed */}
+        {missingParams.length > 0 && (
+          <ParameterBox>
+            <strong>Missing parameters:</strong>
+            <ul>
+              {missingParams.map((param, index) => (
+                <li key={index}>{param}</li>
+              ))}
+            </ul>
+          </ParameterBox>
+        )}
+
         <div>
           <label>Output:</label>
           <input type="text" value={output} readOnly />
