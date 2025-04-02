@@ -3,7 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import * as Algorithms from "../algorithms";
 import NodeWrapper from "./NodeWrapper";
 import { toast } from "react-toastify";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
 import styled from "styled-components";
 
 const controlStyle = {
@@ -60,10 +60,10 @@ const DecryptNode = ({ data }) => {
         const value = firstInput.inputValue;
         const format = firstInput.inputFormat;
         
-        const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
+        const valueWithFormat = DataWrapper.convertToType(value, format, FORMAT_TYPES.DECIMAL).toString();
         
         const result = algorithms[algorithm + "Algorithm"].decrypt(valueWithFormat, firstKey);
-        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);
+        const outputData = new DataWrapper(result, FORMAT_TYPES.DECIMAL);
         data.output = outputData;
         //toast.error("output: " + result , { position: "top-right", autoClose: 5000 });
       }

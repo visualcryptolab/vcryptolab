@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
 import styled from "styled-components";
 import { toast } from "react-toastify";
 
@@ -78,14 +78,14 @@ const XorNode = ({ data }) => {
         .join("");
       
       //console.log("xor: " + firstInput + " + " + secondInput + " = " + xorResult); 
-      // Store result in UserInputData format
-      const outputData = new UserInputData(xorResult, INPUT_TYPES.BINARY);
+      // Store result in DataWrapper format
+      const outputData = new DataWrapper(xorResult, FORMAT_TYPES.BINARY);
       data.output = outputData;
       setOutput(xorResult);
     }
 
     setMissingParams(updatedMissingParams);
-  }, [JSON.stringify(data)]);//data]);
+  }, [data.input]);//data]);[JSON.stringify(data)]);//data]);
 
   return (
     <NodeWrapper nodeType="XOR">

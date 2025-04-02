@@ -6,7 +6,7 @@ import { faCopy, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
 
 const NodeContainer = styled.div`
   padding: 20px;
@@ -106,10 +106,10 @@ const OutputNode = ({ data, nodeKey }) => {
   const [showConversion, setShowConversion] = useState(false);
 
   const types = useMemo(() => ({
-    [INPUT_TYPES.DECIMAL]: INPUT_TYPES.DECIMAL,
-    [INPUT_TYPES.BINARY]: INPUT_TYPES.BINARY,
-    [INPUT_TYPES.HEXADECIMAL]: INPUT_TYPES.HEXADECIMAL,
-    [INPUT_TYPES.TEXT]: INPUT_TYPES.TEXT,
+    [FORMAT_TYPES.DECIMAL]: FORMAT_TYPES.DECIMAL,
+    [FORMAT_TYPES.BINARY]: FORMAT_TYPES.BINARY,
+    [FORMAT_TYPES.HEXADECIMAL]: FORMAT_TYPES.HEXADECIMAL,
+    [FORMAT_TYPES.TEXT]: FORMAT_TYPES.TEXT,
   }), []);
 
   const handleCopy = (text) => {
@@ -118,32 +118,41 @@ const OutputNode = ({ data, nodeKey }) => {
   };
 
   useEffect(() => {
-    if (data.input !== undefined && data.input !== null) {
-      const userInput = data.input;
-      //toast.error("Output: " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
-      setOutput(userInput.inputValue);
-      setSelectedType(userInput.inputFormat);
+    //console.log("data.input: " + JSON.stringify(data.input, null, 2));
+
+    console.log("data.model: " + JSON.stringify(data.model, null, 2));
+    //console.log("inputs: " + JSON.stringify(data.model.inputs, null, 2));
+    if (data?.model?.inputs.length >0) {
+      const sourceInput = data.model.inputs[0]; //If there is more than 1 input, we just use the first one.
+      console.log("1st input: " + JSON.stringify(sourceInput, null, 2));
+      setOutput(sourceInput.data.value);
+      setSelectedType(sourceInput.data.format);
+      
       // Validate if the selected type is compatible with the input value
-      if (!UserInputData.isCompatibleType(userInput.inputValue, selectedType)) {
-        const compatibleType = UserInputData.determineType(userInput.inputValue);
+      if (!DataWrapper.isCompatibleType(sourceInput.data.value, selectedType)) {
+        const compatibleType = DataWrapper.determineType(sourceInput.data.value);
         setSelectedType(compatibleType);
         toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
       }
       let newTypeToConvert = typeToConvert;
       if(typeToConvert == "") {
-        newTypeToConvert = userInput.inputFormat; 
+        newTypeToConvert = sourceInput.data.format; 
         setTypeToConvert(newTypeToConvert);
       }
-      //toast.error("Type to convert: " + newTypeToConvert + " - " + userInput.inputValue, { position: "top-right", autoClose: 5000 });
+
       let newOutputConverted = "";
-      if (userInput.inputValue !== undefined && userInput.inputValue !== null && userInput.inputValue !== ""){
-        newOutputConverted = UserInputData.convertToType(userInput.inputValue, userInput.inputFormat, newTypeToConvert);
+      if (sourceInput.data.value !== undefined && sourceInput.data.value !== null && sourceInput.data.value !== ""){
+        newOutputConverted = DataWrapper.convertToType(sourceInput.data.value, sourceInput.data.format, newTypeToConvert);
         setOutputConverted(newOutputConverted);
-        const newOutput = new UserInputData(outputConverted, newTypeToConvert);
-        data.output = newOutput;
+        const newOutput = new DataWrapper(outputConverted, newTypeToConvert);
+        //data.output = newOutput;
+        data.model.data.value = newOutput.value;
+        data.model.data.format = newOutput.format;
       } else {
         setOutput("");
         setOutputConverted("");
+        data.model.data.value = sourceInput.data.value;
+        data.model.data.format = sourceInput.data.format;
       }
     } else {
       setOutput("");
@@ -151,41 +160,45 @@ const OutputNode = ({ data, nodeKey }) => {
       setTypeToConvert("");
       setOutputConverted("");
     }
-  }, [data.input]);
+  }, [data]);
 
   useEffect(() => {
-      // Validate if the selected type is compatible with the input value
-      if (!UserInputData.isCompatibleType(output, selectedType)) {
-        const compatibleType = UserInputData.determineType(output);
-        setSelectedType(compatibleType);
-        toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
-      } 
-      const newOutputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
-      setOutputConverted(newOutputConverted);
-      const newOutput = new UserInputData(newOutputConverted, typeToConvert);
-      data.output = newOutput;
-      if (showConversion) {
-        // Automatically convert when toggle button is clicked
-        //const outputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
-        //setOutputConverted(outputConverted);
-      }
-  }, [selectedType]);
-
-  useEffect(() => {
-    const newOutputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
+    // Validate if the selected type is compatible with the input value
+    if (!DataWrapper.isCompatibleType(output, selectedType)) {
+      const compatibleType = DataWrapper.determineType(output);
+      setSelectedType(compatibleType);
+      toast.error(`Input type is incompatible. Switching to "${compatibleType}"`, { position: "top-right", autoClose: 5000 });
+    } 
+    const newOutputConverted = DataWrapper.convertToType(output, selectedType, typeToConvert);
     setOutputConverted(newOutputConverted);
-    const newOutput = new UserInputData(newOutputConverted, typeToConvert);
+    const newOutput = new DataWrapper(newOutputConverted, typeToConvert);
+    //data.output = newOutput;
+
+    data.model.data.value = newOutput.value;
+    data.model.data.format = newOutput.format;
+    if (showConversion) {
+      // Automatically convert when toggle button is clicked
+      //const outputConverted = DataWrapper.convertToType(output, selectedType, typeToConvert);
+      //setOutputConverted(outputConverted);
+    }
+}, [selectedType]);
+
+
+  useEffect(() => {
+    const newOutputConverted = DataWrapper.convertToType(output, selectedType, typeToConvert);
+    setOutputConverted(newOutputConverted);
+    const newOutput = new DataWrapper(newOutputConverted, typeToConvert);
     data.output = newOutput;
 }, [typeToConvert]);
 
   useEffect(() => {
     if (showConversion) {
       // Automatically convert when toggle button is clicked
-      /*const outputConverted = UserInputData.convertToType(output, selectedType, typeToConvert);
+      /*const outputConverted = DataWrapper.convertToType(output, selectedType, typeToConvert);
       setOutputConverted(outputConverted);
       setOutput(outputConverted);*/
-      const newOutputConverted = UserInputData.convertToType(outputConverted, selectedType, typeToConvert);
-      const newOutput = new UserInputData(newOutputConverted, typeToConvert);
+      const newOutputConverted = DataWrapper.convertToType(outputConverted, selectedType, typeToConvert);
+      const newOutput = new DataWrapper(newOutputConverted, typeToConvert);
       data.output = newOutput;
     } else {
       data.output = data.input;
@@ -203,7 +216,7 @@ const OutputNode = ({ data, nodeKey }) => {
       <Row>
         <div>
           <Label>Input Type</Label>
-          <select value={selectedType} onChange={(e) => {
+          <select disabled value={selectedType} onChange={(e) => {
             setSelectedType(e.target.value);
           }}>
             {Object.keys(types).map((name) => (
@@ -233,7 +246,7 @@ const OutputNode = ({ data, nodeKey }) => {
               <div style={{ display: "flex", alignItems: "center" }}>
                 <select value={typeToConvert} onChange={(e) => {
                   setTypeToConvert(e.target.value);
-                  //setOutputConverted(UserInputData.convertToType(output, selectedType, e.target.value));
+                  //setOutputConverted(DataWrapper.convertToType(output, selectedType, e.target.value));
                 }}>
                   {Object.keys(types).map((name) => (
                     <option key={name} value={name}>{name}</option>

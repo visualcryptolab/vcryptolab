@@ -3,7 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
 import CryptoJS from "crypto-js";
 import styled from "styled-components";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
 import { toast } from "react-toastify";
 
 const NodeContainer = styled.div`
@@ -54,22 +54,28 @@ const HashNode = ({ data }) => {
 
  
   useEffect(() => {
-    if (data.input !== undefined && data.input !== null) {
-      const userInput = data.input;
-      const value = userInput.inputValue;
-      const format = userInput.inputFormat;
+    //if (data.input !== undefined && data.input !== null) {
+    if (data?.model?.inputs.length >0) {
+      //console.log("data.model: " + JSON.stringify(data.model, null, 2));
+      const sourceInput = data.model.inputs[0]; //If there is more than 1 input, we just use the first one.
+
+      const value = sourceInput.data.value;
+      const format = sourceInput.data.format;
       
       if (value) {
         setInputProvided(true);
-        const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.TEXT);
+        const valueWithFormat = DataWrapper.convertToType(value, format, FORMAT_TYPES.TEXT);
         const hash = algorithms[algorithm](valueWithFormat).toString();
         setOutput(hash);
-        data.output = new UserInputData(hash, INPUT_TYPES.HEXADECIMAL);
+        //data.output = new DataWrapper(hash, FORMAT_TYPES.HEXADECIMAL);
+        
+        data.model.data.value = hash;
+        data.model.data.format = FORMAT_TYPES.HEXADECIMAL;
       } else {
         setInputProvided(false);
       }
     }
-  }, [data.input, algorithm]);
+  }, [data, algorithm]);
 
   return (
     <NodeWrapper nodeType="Hash">

@@ -2,8 +2,12 @@ import { memo, useState, useMemo, useEffect } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
 import * as Algorithms from "../algorithms";
-import RSAPublicKey from "../algorithms/RSAPublicKey";
-import RSAPrivateKey from "../algorithms/RSAPrivateKey";
+//import RSAPublicKey from "../algorithms/RSAPublicKey";
+//import RSAPrivateKey from "../algorithms/RSAPrivateKey";
+import { ALGORITHM_TYPES } from "../../../models/KeyNodeModel";
+import KeyNodeModel from "../../../models/KeyNodeModel";
+import RSAPublicKey from "../../../models/RSAPublicKey";
+import RSAPrivateKey from "../../../models/RSAPrivateKey";
 
 const nodeStyle = {
   padding: "15px",
@@ -32,9 +36,13 @@ const KeyGeneratorNode = ({ data }) => {
   );
 
   useEffect(() => {
-    if (params.e && params.n && params.d) {
-      data.pubKey = new RSAPublicKey(params.e, params.n);
-      data.privKey = new RSAPrivateKey(params.d, params.n);
+    if (data?.model !== null && data?.model !== undefined && params.e && params.n && params.d) {
+      //data.pubKey = new RSAPublicKey(params.e, params.n);
+      //data.privKey = new RSAPrivateKey(params.d, params.n);
+      console.log("kgn: " + JSON.stringify(data.model, null, 2));
+      data.model.algorithm = ALGORITHM_TYPES.RSA;
+      data.model.publicKey = new RSAPublicKey(params.e, params.n);
+      data.model.privateKey = new RSAPrivateKey(params.d, params.n);
     }
   }, [params]);
 

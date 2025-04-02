@@ -1,7 +1,9 @@
 import { memo, useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
-import RSAPublicKey from "../algorithms/RSAPublicKey";
+//import RSAPublicKey from "../algorithms/RSAPublicKey";
+import RSAPublicKey from "../../../models/RSAPublicKey";
+import KeyNodeModel from "../../../models/KeyNodeModel";
 
 const nodeStyle = {
   padding: "15px",
@@ -18,11 +20,14 @@ const PublicKeyNode = ({ data }) => {
   const [n, setN] = useState("");
 
   useEffect(() => {
-    if (data?.pubKey) {
-      setE(data.pubKey.e);
-      setN(data.pubKey.n);
-    } else {
-      data.pubKey = new RSAPublicKey(e, n);
+    if (data?.model?.inputs?.length > 0) {      
+      const sourcePubKey = data.model.inputs[0]; //If there is more than 1 input, we just use the first one.
+      setE(sourcePubKey.publicKey.e);
+      setN(sourcePubKey.publicKey.n);
+      data.model.publicKey = sourcePubKey;
+    } else {    
+      console.log("public key: " + JSON.stringify(data.model, null, 2));
+      data.model.publicKey = new RSAPublicKey(e, n);
     }
   }, [data, e, n]);
 

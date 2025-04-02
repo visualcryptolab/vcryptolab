@@ -1,10 +1,10 @@
 import { memo, useState, useEffect, useMemo, useRef } from "react";
 import { Handle, Position } from "@xyflow/react";
 import * as Algorithms from "../algorithms";
-import RSAPublicKey from "../algorithms/RSAPublicKey";
+//import RSAPublicKey from "../algorithms/RSAPublicKey";
 import NodeWrapper from "./NodeWrapper";
 import { toast } from "react-toastify";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
 import styled from "styled-components";
 
 // Styles for the control container
@@ -100,14 +100,14 @@ const EncryptNode = ({ data }) => {
         const format = firstInput.inputFormat;
 
         // Convert the input value to the required type
-        const valueWithFormat = UserInputData.convertToType(value, format, INPUT_TYPES.DECIMAL).toString();
+        const valueWithFormat = DataWrapper.convertToType(value, format, FORMAT_TYPES.DECIMAL).toString();
 
 
         //toast.error("Message: " + valueWithFormat, { position: "top-right", autoClose: 50000 });
         //toast.error("Key: " + JSON.stringify(firstKey, null, 2), { position: "top-right", autoClose: 50000 });
 
         const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, firstKey);
-        const outputData = new UserInputData(result, INPUT_TYPES.DECIMAL);
+        const outputData = new DataWrapper(result, FORMAT_TYPES.DECIMAL);
         data.output = outputData;
       }
     } else {

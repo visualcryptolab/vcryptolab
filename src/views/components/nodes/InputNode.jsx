@@ -5,7 +5,8 @@ import { memo, useState, useEffect, useMemo } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import { toast } from "react-toastify";
-import UserInputData, { INPUT_TYPES } from "../../../models/UserInputData";
+import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
+import InputNodeModel from "../../../models/KeyNodeModel";
 
 // Styled components for input node
 const NodeContainer = styled.div`
@@ -70,36 +71,44 @@ const ButtonContainer = styled.div`
   margin-top: 10px;
 `;
 
-const InputNode = ({ data }) => {
-  const [selectedType, setSelectedType] = useState(INPUT_TYPES.BINARY);
+const InputNode = ({ id, data }) => {
+  const [selectedType, setSelectedType] = useState(FORMAT_TYPES.BINARY);
   const [text, setText] = useState("10011");//useState("16346");
 
   // Types that are available in the selector
-  const types = useMemo(() => INPUT_TYPES, []);
+  const types = useMemo(() => FORMAT_TYPES, []);
 
   const handleChange = (event) => {
     const input = event.target.value;
     setText(input);
 
     // Validate compatibility
-    if (!UserInputData.isCompatibleType(input, selectedType)) {
-      const compatibleType = Object.values(INPUT_TYPES).find((type) => UserInputData.isCompatibleType(input, type)) || INPUT_TYPES.DECIMAL;
+    if (!DataWrapper.isCompatibleType(input, selectedType)) {
+      const compatibleType = Object.values(FORMAT_TYPES).find((type) => DataWrapper.isCompatibleType(input, type)) || FORMAT_TYPES.DECIMAL;
       setSelectedType(compatibleType);
       toast.error(`Input is incompatible with ${selectedType}. Switching to ${compatibleType}`, {
         position: "top-right",
         autoClose: 5000,
       });
     }
-
-    const userInputData = new UserInputData(input, selectedType);
-    data.output = userInputData;
+    data.model.data.value = input;
+    data.model.data.format = selectedType;
     event.target.style.height = "auto";
     event.target.style.height = `${event.target.scrollHeight}px`;
   };
 
   useEffect(() => {
-    const userInputData = new UserInputData(text, selectedType);
-    data.output = userInputData;
+    // Validate compatibility
+    if (!DataWrapper.isCompatibleType(text, selectedType)) {
+      const compatibleType = Object.values(FORMAT_TYPES).find((type) => DataWrapper.isCompatibleType(text, type)) || FORMAT_TYPES.DECIMAL;
+      setSelectedType(compatibleType);
+      toast.error(`Input is incompatible with ${selectedType}. Switching to ${compatibleType}`, {
+        position: "top-right",
+        autoClose: 5000,
+      });
+    }
+    data.model.data.value = text;
+    data.model.data.format = selectedType;
   }, [selectedType]);
 
   const handleCopy = () => {

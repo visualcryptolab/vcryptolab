@@ -45,6 +45,8 @@ import {
   FileUpload as FileUploadIcon,
 } from "@mui/icons-material";
 import zIndex from "@mui/material/styles/zIndex";
+import NodeModel from "../models/NodeModel";
+import KeyNodeModel from "../models/KeyNodeModel";
 
 const OpenDesignView = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -224,6 +226,7 @@ const OpenDesignView = () => {
 
       console.log("input id: " + sourceNode.id);
 
+      /* Abans de la reestructuracio gran
       const updatedTargetNode = {
         ...targetNode,
         data: {
@@ -239,10 +242,41 @@ const OpenDesignView = () => {
             },
           },
         },
+      };*/
+      if (targetNode.data?.model !== undefined && sourceNode.data?.model !== undefined) {
+        console.log("models");
+        console.log("Target: " + JSON.stringify(targetNode.data.model, null, 2));
+        targetNode.data.model.inputs.push(sourceNode.data.model);
+        console.log("Input: " + JSON.stringify(sourceNode.data.model, null, 2));
+      }
+
+      const updatedTargetNode = {
+        ...targetNode,
+        data: {
+          ...targetNode.data,
+        },
       };
+
+/*
+      const updatedTargetNode = {
+        ...targetNode,
+        data: {
+          ...targetNode.data,
+          sources: {
+            ...targetNode.data?.sources, 
+            [sourceNode.id]: {
+              ...targetNode.data?.sources?.[sourceNode.id], 
+              ...(sourceNode.data.output && { input: sourceNode.data.output }),
+              ...(sourceNode.data.seed && { seed: sourceNode.data.seed }),
+              ...(sourceNode.data.pubKey && { pubKey: sourceNode.data.pubKey }),
+              ...(sourceNode.data.privKey && { privKey: sourceNode.data.privKey }),
+            },
+          },
+        },
+      };*/
+
       
-      
-      
+      console.log("updatedTargetNode: " + JSON.stringify(updatedTargetNode, null, 2));
 
       setNodes((nds) =>
         nds.map((n) => (n.id === targetNode.id ? updatedTargetNode : n))
@@ -250,13 +284,50 @@ const OpenDesignView = () => {
     }
   };
 
+  const createNewNodeModelFromTypeString = (typeString, id) => {
+    
+    switch (typeString) {
+      case "Input":
+        return new NodeModel(id);//InputNodeModel(id);
+      case "Output":
+          return new NodeModel(id);
+      case "Hash":
+        return new NodeModel(id);
+      case "Key Generator":
+        return new KeyNodeModel(id);
+      case "Private Key":
+        return new KeyNodeModel(id);
+      case "Public Key":
+        console.log("Entra");
+        return new KeyNodeModel(id);
+      case "Concatenate":
+        return "ConcatenateNode";
+      case "CustomResizer":
+        return "CustomResizerNode";
+      case "Decrypt":
+        return "DecryptNode";
+      case "Encrypt":
+        return "EncryptNode";      
+      case "Seed":
+        return "SeedNode";
+      case "Xor":
+        return "XorNode";
+      default:
+        return null; 
+    }
+  };
+
   const handleNewNode = (item) => {
+
+    const id = uuidv4();
+    const newNodeModel = createNewNodeModelFromTypeString(item, id);
+
     const type = item.replace(/\s+/g, "") + "Node";
     const newNode = {
-      id: uuidv4(),
+      id: id,
       type: type,
       position: { x: Math.random() * 400, y: Math.random() * 400 },
-      data: { label: item },
+      data: { label: item, model: newNodeModel },
     };
     OpenDesignController.addNode(newNode);
     setNodes((nds) => [...nds, newNode]);
@@ -281,6 +352,7 @@ const OpenDesignView = () => {
         if (node.id === nodeId) {
           return {
             ...node,
+            test,
             data: {
               ...node.data,
               input: "",

@@ -1,7 +1,8 @@
 import { memo, useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
-import RSAPrivateKey from "../algorithms/RSAPrivateKey";
+//import RSAPrivateKey from "../algorithms/RSAPrivateKey";
+import RSAPrivateKey from "../../../models/RSAPrivateKey";
 
 const nodeStyle = {
   padding: "15px",

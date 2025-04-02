@@ -2,7 +2,8 @@
 
 import React from "react";
 import { toast } from "react-toastify";
-import RSAPublicKey from "./RSAPublicKey";
+//import RSAPublicKey from "./RSAPublicKey";
+import RSAPublicKey from "../../../models/RSAPublicKey";
 
 class RSAAlgorithm {
   constructor(setParams) {
