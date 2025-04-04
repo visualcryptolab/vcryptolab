@@ -5,6 +5,8 @@ import * as Algorithms from "../algorithms";
 import NodeWrapper from "./NodeWrapper";
 import { toast } from "react-toastify";
 import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
+import KeyNodeModel from "../../../models/KeyNodeModel";
+import NodeModel from "../../../models/NodeModel";
 import styled from "styled-components";
 
 // Styles for the control container
@@ -70,6 +72,60 @@ const EncryptNode = ({ data }) => {
     name.replace("Algorithm", "")
   );
 
+  useEffect(() => {
+
+    let updatedMissingParams = [];
+
+    let sourcePubKey = null;
+    let sourceMessage = null;
+
+    if (data?.model?.inputs?.length > 0 && data?.model?.inputs[0] instanceof KeyNodeModel && 
+      data?.model?.inputs[0].publicKey?.e !== null && data?.model?.inputs[0].publicKey?.n !== null){
+      console.log("pk: " + JSON.stringify(data?.model?.inputs[0].publicKey, null, 2));
+      sourcePubKey = data.model.inputs[0].publicKey;
+    }
+
+    if (data?.model?.inputs?.length > 0 && data?.model?.inputs[0] instanceof NodeModel && 
+      data?.model?.inputs[0].data.value !== null && data?.model?.inputs[0].format !== null && 
+      data?.model?.inputs[0].data.value !== '' && data?.model?.inputs[0].format !== ''){
+      sourceMessage = data.model.inputs[0].data;
+    }
+
+    if (data?.model?.inputs?.length > 1 && data?.model?.inputs[1] instanceof KeyNodeModel && 
+      data?.model?.inputs[1].publicKey?.e !== null && data?.model?.inputs[1].publicKey?.n !== null){
+      sourcePubKey = data.model.inputs[1].publicKey;
+    }
+
+    if (data?.model?.inputs?.length > 1 && data?.model?.inputs[1] instanceof NodeModel && 
+      data?.model?.inputs[1].data.value !== null && data?.model?.inputs[1].format !== null && 
+      data?.model?.inputs[1].data.value !== '' && data?.model?.inputs[1].format !== ''){
+      sourceMessage = data.model.inputs[1].data;
+    }
+
+    if (sourcePubKey !== null && sourceMessage !== null) {
+      const value = sourceMessage.inputValue;
+      const format = sourceMessage.inputFormat;
+
+        // Convert the input value to the required type
+        const valueWithFormat = DataWrapper.convertToType(value, format, FORMAT_TYPES.DECIMAL).toString();
+        const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, sourcePubKey);
+        data.model.data.value = result;
+        data.model.data.format = FORMAT_TYPES.DECIMAL;
+
+    } else {
+      if (sourceMessage === null) {
+        updatedMissingParams.push("Message to encrypt");
+      }
+      if (sourcePubKey === null) {
+        updatedMissingParams.push("Public key");
+      }      
+    }
+    setMissingParams(updatedMissingParams);
+  }, [algorithm, algorithms, data]); 
+
+
+  /*
+
   // Effect to update missing parameters when the data changes
   useEffect(() => {
     // Display data in the toast for debugging purposes
@@ -119,7 +175,7 @@ const EncryptNode = ({ data }) => {
     // Update the missingParams state with the new values
     setMissingParams(updatedMissingParams);
   }, [algorithm, algorithms, data]); // Depend on data so the effect runs when it changes
-
+*/
   // Handle change in algorithm selection
   const handleAlgorithmChange = (event) => {
     setAlgorithm(event.target.value);

@@ -1,3 +1,5 @@
+/* global BigInt */
+
 import { memo, useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
@@ -19,12 +21,37 @@ const PrivateKeyNode = ({ data }) => {
   const [n, setN] = useState("");
 
   useEffect(() => {
+    if (data?.model?.inputs?.length > 0) {    
+      //console.log("public key generada: " + JSON.stringify(data.model, null, 2));  
+      const sourcePrivKey = data.model.inputs[0]; //If there is more than 1 input, we just use the first one.
+      setD(sourcePrivKey.privateKey.d);
+      setN(sourcePrivKey.privateKey.n);
+      data.model.privateKey.d = sourcePrivKey.privateKey.d;
+      data.model.privateKey.n = sourcePrivKey.privateKey.n;
+    } else {    
+      //console.log("public key: " + JSON.stringify(data.model, null, 2));
+      
+      if (/^-?\d+$/.test(n)) {      
+        data.model.privateKey.n = BigInt(n);        
+      } else {
+        data.model.privateKey.n = null;
+      }
+
+      if (/^-?\d+$/.test(d)) {
+        data.model.privateKey.d = BigInt(d);        
+      } else {
+        data.model.privateKey.d = null;
+      }
+      //data.model.privateKey.d = d;
+      //data.model.privateKey.n = n;
+    }
+    /*
     if (data?.privKey) {
       setD(data.privKey.d);
       setN(data.privKey.n);
     } else {
       data.privKey = new RSAPrivateKey(d, n);
-    }
+    }*/
   }, [data, d, n]);
 
   return (

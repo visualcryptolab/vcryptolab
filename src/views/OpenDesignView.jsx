@@ -244,10 +244,10 @@ const OpenDesignView = () => {
         },
       };*/
       if (targetNode.data?.model !== undefined && sourceNode.data?.model !== undefined) {
-        console.log("models");
-        console.log("Target: " + JSON.stringify(targetNode.data.model, null, 2));
+        //console.log("models");
+        //console.log("Target: " + JSON.stringify(targetNode.data.model, null, 2));
         targetNode.data.model.inputs.push(sourceNode.data.model);
-        console.log("Input: " + JSON.stringify(sourceNode.data.model, null, 2));
+        //console.log("Input: " + JSON.stringify(sourceNode.data.model, null, 2));
       }
 
       const updatedTargetNode = {
@@ -276,7 +276,7 @@ const OpenDesignView = () => {
       };*/
 
       
-      console.log("updatedTargetNode: " + JSON.stringify(updatedTargetNode, null, 2));
+      //console.log("updatedTargetNode: " + JSON.stringify(updatedTargetNode, null, 2));
 
       setNodes((nds) =>
         nds.map((n) => (n.id === targetNode.id ? updatedTargetNode : n))
@@ -298,16 +298,15 @@ const OpenDesignView = () => {
       case "Private Key":
         return new KeyNodeModel(id);
       case "Public Key":
-        console.log("Entra");
         return new KeyNodeModel(id);
+      case "Encrypt":
+        return new NodeModel(id);     
       case "Concatenate":
         return "ConcatenateNode";
       case "CustomResizer":
         return "CustomResizerNode";
       case "Decrypt":
-        return "DecryptNode";
-      case "Encrypt":
-        return "EncryptNode";      
+        return "DecryptNode";      
       case "Seed":
         return "SeedNode";
       case "Xor":

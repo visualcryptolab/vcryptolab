@@ -1,3 +1,5 @@
+/* global BigInt */
+
 import { memo, useState, useMemo, useEffect } from "react";
 import { Handle, Position } from "@xyflow/react";
 import NodeWrapper from "./NodeWrapper";
@@ -39,10 +41,32 @@ const KeyGeneratorNode = ({ data }) => {
     if (data?.model !== null && data?.model !== undefined && params.e && params.n && params.d) {
       //data.pubKey = new RSAPublicKey(params.e, params.n);
       //data.privKey = new RSAPrivateKey(params.d, params.n);
-      console.log("kgn: " + JSON.stringify(data.model, null, 2));
+      //console.log("kgn: " + JSON.stringify(data.model, null, 2));
       data.model.algorithm = ALGORITHM_TYPES.RSA;
-      data.model.publicKey = new RSAPublicKey(params.e, params.n);
-      data.model.privateKey = new RSAPrivateKey(params.d, params.n);
+      if (/^-?\d+$/.test(params.e)) {
+        data.model.publicKey.e = BigInt(params.e);        
+      } else {
+        data.model.publicKey.e = null;
+      }
+
+      if (/^-?\d+$/.test(params.n)) {
+        data.model.publicKey.n = BigInt(params.n);        
+        data.model.privateKey.n = BigInt(params.n);        
+      } else {
+        data.model.publicKey.n = null;
+        data.model.privateKey.n = null;
+      }
+
+      if (/^-?\d+$/.test(params.d)) {
+        data.model.privateKey.d = BigInt(params.d);        
+      } else {
+        data.model.privateKey.d = null;
+      }
+      
+      //data.model.publicKey.e = params.e;
+      //data.model.publicKey.n = params.n;
+      //data.model.privateKey.d = params.d;
+      //data.model.privateKey.n = params.n;
     }
   }, [params]);
 
