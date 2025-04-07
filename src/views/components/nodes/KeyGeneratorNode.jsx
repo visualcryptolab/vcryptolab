@@ -44,29 +44,25 @@ const KeyGeneratorNode = ({ data }) => {
       //console.log("kgn: " + JSON.stringify(data.model, null, 2));
       data.model.algorithm = ALGORITHM_TYPES.RSA;
       if (/^-?\d+$/.test(params.e)) {
-        data.model.publicKey.e = BigInt(params.e);        
+        data.model.publicKey.e = params.e;
       } else {
         data.model.publicKey.e = null;
       }
 
       if (/^-?\d+$/.test(params.n)) {
-        data.model.publicKey.n = BigInt(params.n);        
-        data.model.privateKey.n = BigInt(params.n);        
+        data.model.publicKey.n = params.n;        
+        data.model.privateKey.n = params.n;        
       } else {
         data.model.publicKey.n = null;
         data.model.privateKey.n = null;
       }
 
       if (/^-?\d+$/.test(params.d)) {
-        data.model.privateKey.d = BigInt(params.d);        
+        data.model.privateKey.d = params.d;        
       } else {
         data.model.privateKey.d = null;
       }
-      
-      //data.model.publicKey.e = params.e;
-      //data.model.publicKey.n = params.n;
-      //data.model.privateKey.d = params.d;
-      //data.model.privateKey.n = params.n;
+      data.model.generateHash();
     }
   }, [params]);
 

@@ -73,7 +73,7 @@ const ButtonContainer = styled.div`
 
 const InputNode = ({ id, data }) => {
   const [selectedType, setSelectedType] = useState(FORMAT_TYPES.BINARY);
-  const [text, setText] = useState("10011");//useState("16346");
+  const [text, setText] = useState("16346");//useState("10011");//
 
   // Types that are available in the selector
   const types = useMemo(() => FORMAT_TYPES, []);
@@ -93,6 +93,7 @@ const InputNode = ({ id, data }) => {
     }
     data.model.data.value = input;
     data.model.data.format = selectedType;
+    data.model.generateHash();
     event.target.style.height = "auto";
     event.target.style.height = `${event.target.scrollHeight}px`;
   };
@@ -109,6 +110,7 @@ const InputNode = ({ id, data }) => {
     }
     data.model.data.value = text;
     data.model.data.format = selectedType;
+    data.model.generateHash();
   }, [selectedType]);
 
   const handleCopy = () => {

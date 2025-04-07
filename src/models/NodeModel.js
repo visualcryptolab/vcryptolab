@@ -6,6 +6,8 @@ class NodeModel {
       this.id = id;
       this.inputs = inputs;
       this.data = new DataWrapper();
+      this.hash = '';
+      this.generateHash();
     }
 
     // Function to serialize the object into a JSON string
@@ -19,7 +21,7 @@ class NodeModel {
     generateHash() {
       const serialized = this.serialize(); 
       const hash = CryptoJS.SHA256(serialized); 
-      return hash.toString(CryptoJS.enc.Hex); 
+      this.hash = hash.toString(CryptoJS.enc.Hex); 
     }
   }
   

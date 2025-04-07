@@ -224,7 +224,7 @@ const OpenDesignView = () => {
       };*/
 
 
-      console.log("input id: " + sourceNode.id);
+      //console.log("input id: " + sourceNode.id);
 
       /* Abans de la reestructuracio gran
       const updatedTargetNode = {
@@ -351,7 +351,6 @@ const OpenDesignView = () => {
         if (node.id === nodeId) {
           return {
             ...node,
-            test,
             data: {
               ...node.data,
               input: "",

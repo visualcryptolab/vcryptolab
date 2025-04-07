@@ -74,6 +74,8 @@ const EncryptNode = ({ data }) => {
 
   useEffect(() => {
 
+    console.log("Entra: " + JSON.stringify(data?.model?.inputs, null, 2));
+
     let updatedMissingParams = [];
 
     let sourcePubKey = null;
@@ -81,7 +83,7 @@ const EncryptNode = ({ data }) => {
 
     if (data?.model?.inputs?.length > 0 && data?.model?.inputs[0] instanceof KeyNodeModel && 
       data?.model?.inputs[0].publicKey?.e !== null && data?.model?.inputs[0].publicKey?.n !== null){
-      console.log("pk: " + JSON.stringify(data?.model?.inputs[0].publicKey, null, 2));
+      //console.log("pk: " + JSON.stringify(data?.model?.inputs[0].publicKey, null, 2));
       sourcePubKey = data.model.inputs[0].publicKey;
     }
 
@@ -103,14 +105,18 @@ const EncryptNode = ({ data }) => {
     }
 
     if (sourcePubKey !== null && sourceMessage !== null) {
-      const value = sourceMessage.inputValue;
-      const format = sourceMessage.inputFormat;
-
-        // Convert the input value to the required type
-        const valueWithFormat = DataWrapper.convertToType(value, format, FORMAT_TYPES.DECIMAL).toString();
-        const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, sourcePubKey);
-        data.model.data.value = result;
-        data.model.data.format = FORMAT_TYPES.DECIMAL;
+      const value = sourceMessage.value;
+      const format = sourceMessage.format;
+      
+      // Convert the input value to the required type
+      let valueWithFormat = DataWrapper.convertToType(value, format, FORMAT_TYPES.DECIMAL).toString();
+      valueWithFormat = parseInt(valueWithFormat);
+      console.log("Message: " + JSON.stringify(valueWithFormat + " Type: " + typeof(valueWithFormat), null, 2));
+      const result = algorithms[algorithm + "Algorithm"].encrypt(valueWithFormat, sourcePubKey);
+      data.model.data.value = result;
+      data.model.data.format = FORMAT_TYPES.DECIMAL;
+      //console.log("Result: " + JSON.stringify(result, null, 2));
+      data.model.generateHash();
 
     } else {
       if (sourceMessage === null) {
@@ -121,7 +127,7 @@ const EncryptNode = ({ data }) => {
       }      
     }
     setMissingParams(updatedMissingParams);
-  }, [algorithm, algorithms, data]); 
+  }, [algorithm, algorithms, data.model.inputs[0]?.hash, data.model.inputs[1]?.hash]); 
 
 
   /*

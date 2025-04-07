@@ -124,7 +124,7 @@ const OutputNode = ({ data, nodeKey }) => {
     //console.log("inputs: " + JSON.stringify(data.model.inputs, null, 2));
     if (data?.model?.inputs.length >0) {
       const sourceInput = data.model.inputs[0]; //If there is more than 1 input, we just use the first one.
-      console.log("1st input: " + JSON.stringify(sourceInput, null, 2));
+      //console.log("1st input: " + JSON.stringify(sourceInput, null, 2));
       setOutput(sourceInput.data.value);
       setSelectedType(sourceInput.data.format);
       
@@ -160,7 +160,7 @@ const OutputNode = ({ data, nodeKey }) => {
       setTypeToConvert("");
       setOutputConverted("");
     }
-  }, [data]);
+  }, [data.model.inputs[0]?.hash]);
 
   useEffect(() => {
     // Validate if the selected type is compatible with the input value

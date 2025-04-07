@@ -32,27 +32,19 @@ const PrivateKeyNode = ({ data }) => {
       //console.log("public key: " + JSON.stringify(data.model, null, 2));
       
       if (/^-?\d+$/.test(n)) {      
-        data.model.privateKey.n = BigInt(n);        
+        data.model.privateKey.n = n;        
       } else {
         data.model.privateKey.n = null;
       }
 
       if (/^-?\d+$/.test(d)) {
-        data.model.privateKey.d = BigInt(d);        
+        data.model.privateKey.d = d;        
       } else {
         data.model.privateKey.d = null;
       }
-      //data.model.privateKey.d = d;
-      //data.model.privateKey.n = n;
     }
-    /*
-    if (data?.privKey) {
-      setD(data.privKey.d);
-      setN(data.privKey.n);
-    } else {
-      data.privKey = new RSAPrivateKey(d, n);
-    }*/
-  }, [data, d, n]);
+    data.model.generateHash();
+  }, [data.model.inputs[0]?.hash, d, n]);
 
   return (
     <NodeWrapper nodeType="Private Key">

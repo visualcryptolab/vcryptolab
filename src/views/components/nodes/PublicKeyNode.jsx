@@ -32,21 +32,19 @@ const PublicKeyNode = ({ data }) => {
     } else {    
       //console.log("public key: " + JSON.stringify(data.model, null, 2));
       if (/^-?\d+$/.test(e)) {
-        data.model.publicKey.e = BigInt(e);        
+        data.model.publicKey.e = e;        
       } else {
         data.model.publicKey.e = null;
       }
 
       if (/^-?\d+$/.test(n)) {
-        data.model.publicKey.n = BigInt(n);         
+        data.model.publicKey.n = n;         
       } else {
         data.model.publicKey.n = null;
       }
-
-      //data.model.publicKey.e = e;
-      //data.model.publicKey.n = n;
+      data.model.generateHash();
     }
-  }, [data, e, n]);
+  }, [data.model.inputs[0]?.hash, e, n]);
 
   return (
     <NodeWrapper nodeType="Public Key">

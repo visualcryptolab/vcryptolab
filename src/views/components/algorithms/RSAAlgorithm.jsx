@@ -158,25 +158,30 @@ class RSAAlgorithm {
 
   encrypt(message, encryptionKey) {
     
-    if (message !== undefined && encryptionKey !== undefined && encryptionKey.e !== undefined && encryptionKey.n !== undefined) {
-      console.log(message);
-      console.log(encryptionKey);
+    //if (message !== undefined && encryptionKey !== undefined && encryptionKey.e !== undefined && encryptionKey.n !== undefined) {
+    if (message && typeof message === "number" && encryptionKey?.e && encryptionKey?.n) {
+      //console.log(message);
+      //console.log(encryptionKey);
       const messageBI = BigInt(message);
       const result = this.modExp(messageBI, BigInt(encryptionKey.e), BigInt(encryptionKey.n));
+      console.log(result);
       return result.toString();
     } else {
+      //TO CHANGE: Raise exception
       return "Message: " + message + " - Key: " + encryptionKey;
     }
   }
 
   decrypt(cyphertext, decryptionKey) {
-    if (cyphertext !== undefined && decryptionKey !== undefined && decryptionKey.d !== undefined && decryptionKey.n !== undefined) {
-      console.log(cyphertext);
-      console.log(decryptionKey);
+    //if (cyphertext !== undefined && decryptionKey !== undefined && decryptionKey.d !== undefined && decryptionKey.n !== undefined) {
+    if (cyphertext && typeof cyphertext === "number" && decryptionKey?.d && decryptionKey?.n) {
+      //console.log(cyphertext);
+      //console.log(decryptionKey);
       const messageBI = BigInt(cyphertext);
       const result = this.modExp(messageBI, BigInt(decryptionKey.d), BigInt(decryptionKey.n));
       return result.toString();
     } else {
+      //TO CHANGE: Raise exception
       return "Message: " + cyphertext + " - Key: " + decryptionKey;
     }
   }
