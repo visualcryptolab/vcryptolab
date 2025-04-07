@@ -300,7 +300,9 @@ const OpenDesignView = () => {
       case "Public Key":
         return new KeyNodeModel(id);
       case "Encrypt":
-        return new NodeModel(id);     
+        return new NodeModel(id);   
+      case "Xor":
+          return new NodeModel(id);   
       case "Concatenate":
         return "ConcatenateNode";
       case "CustomResizer":
@@ -309,8 +311,6 @@ const OpenDesignView = () => {
         return "DecryptNode";      
       case "Seed":
         return "SeedNode";
-      case "Xor":
-        return "XorNode";
       default:
         return null; 
     }

@@ -4,6 +4,7 @@ import NodeWrapper from "./NodeWrapper";
 import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
 import styled from "styled-components";
 import { toast } from "react-toastify";
+import NodeModel from "../../../models/NodeModel";
 
 // Styled component for missing parameters notification
 const ParameterBox = styled.div`
@@ -30,6 +31,60 @@ const XorNode = ({ data }) => {
   const [output, setOutput] = useState("");
   const [missingParams, setMissingParams] = useState([]);
 
+  useEffect(() => {
+    let updatedMissingParams = [];
+    let firstInput = null;
+    let secondInput = null;
+    
+    
+    //console.log("Result: " + JSON.stringify(data.model.inputs, null, 2));
+    if (data?.model?.inputs?.length > 0 && data?.model?.inputs[0] instanceof NodeModel && 
+      data?.model?.inputs[0].data.value !== null && data?.model?.inputs[0].format !== null && 
+      data?.model?.inputs[0].data.value !== '' && data?.model?.inputs[0].format !== ''){
+        firstInput = data.model.inputs[0].data;
+    }
+
+    if (data?.model?.inputs?.length > 1 && data?.model?.inputs[1] instanceof NodeModel && 
+      data?.model?.inputs[1].data.value !== null && data?.model?.inputs[1].format !== null && 
+      data?.model?.inputs[1].data.value !== '' && data?.model?.inputs[1].format !== ''){
+        secondInput = data.model.inputs[1].data;
+    }
+
+
+    if (firstInput && secondInput) {
+      // Ensure both inputs are binary strings
+      let firstInputValueBinary = DataWrapper.convertToType(firstInput.value, firstInput.format, FORMAT_TYPES.BINARY);
+      let secondInputValueBinary = DataWrapper.convertToType(secondInput.value, secondInput.format, FORMAT_TYPES.BINARY);
+      const binary1 = firstInputValueBinary.padStart(Math.max(firstInputValueBinary.length, secondInputValueBinary.length), "0");
+      const binary2 = secondInputValueBinary.padStart(Math.max(firstInputValueBinary.length, secondInputValueBinary.length), "0");
+      
+      // Perform bitwise XOR
+      const xorResult = binary1
+        .split("")
+        .map((bit, index) => (bit === binary2[index] ? "0" : "1"))
+        .join("");
+      
+      //console.log("xor: " + firstInput + " + " + secondInput + " = " + xorResult); 
+      // Store result in DataWrapper format
+      //const outputData = new DataWrapper(xorResult, FORMAT_TYPES.BINARY);
+      //data.output = outputData;
+      setOutput(xorResult);
+      data.model.data.value = xorResult;
+      data.model.data.format = FORMAT_TYPES.BINARY;
+      data.model.generateHash();
+    } else {
+      if (firstInput === null) {
+        updatedMissingParams.push("First input");
+      }
+      if (secondInput === null) {
+        updatedMissingParams.push("Second input");
+      }      
+    }
+
+    setMissingParams(updatedMissingParams);
+  }, [data?.model?.inputs[0]?.hash, data.model.inputs[1]?.hash]);//data]);[JSON.stringify(data)]);//data]);
+
+  /*
   useEffect(() => {
     //console.log("Data: " + data); 
     console.log("Data: " + JSON.stringify(data, null, 2)); 
@@ -85,7 +140,7 @@ const XorNode = ({ data }) => {
     }
 
     setMissingParams(updatedMissingParams);
-  }, [data.input]);//data]);[JSON.stringify(data)]);//data]);
+  }, [data.input]);//data]);[JSON.stringify(data)]);//data]);*/
 
   return (
     <NodeWrapper nodeType="XOR">
