@@ -98,7 +98,7 @@ const RowWithButton = styled.div`
   align-items: center;
 `;
 
-const OutputNode = ({ data, nodeKey }) => {
+const OutputNode = ({ data }) => {
   const [selectedType, setSelectedType] = useState("");
   const [typeToConvert, setTypeToConvert] = useState("");
   const [output, setOutput] = useState("");
@@ -154,6 +154,7 @@ const OutputNode = ({ data, nodeKey }) => {
         data.model.data.value = sourceInput.data.value;
         data.model.data.format = sourceInput.data.format;
       }
+      data.model.generateHash();
     } else {
       setOutput("");
       setSelectedType("");

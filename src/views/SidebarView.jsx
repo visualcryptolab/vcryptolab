@@ -143,6 +143,12 @@ const SidebarView = ({ onNewNode, handleDelete }) => {
               Xor
             </MenuItem>
             <MenuItem
+              icon={<SwapHorizIcon />}
+              onClick={() => handleSelectItem("Shift")}
+            >
+              Shift
+            </MenuItem>
+            <MenuItem
               icon={<LinkIcon />}
               onClick={() => handleSelectItem("Concatenate")}
             >

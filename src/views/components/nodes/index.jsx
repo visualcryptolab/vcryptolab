@@ -12,3 +12,4 @@ export { default as ResizableNode } from './ResizableNode';
 export { default as ResizableNodeSelected } from './ResizableNodeSelected';
 export { default as SeedNode } from './SeedNode';
 export { default as XorNode } from './XorNode';
+export { default as ShiftNode } from './ShiftNode';

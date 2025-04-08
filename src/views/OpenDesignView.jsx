@@ -35,6 +35,7 @@ import {
   ResizableNodeSelected,
   SeedNode,
   XorNode,
+  ShiftNode,
 } from "./components/nodes";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-toastify";
@@ -100,6 +101,7 @@ const OpenDesignView = () => {
     PublicKeyNode,
     SeedNode,
     XorNode,
+    ShiftNode,
   };
 
   const updateViewportConst = ({ x, y, zoom }) => {
@@ -302,7 +304,9 @@ const OpenDesignView = () => {
       case "Encrypt":
         return new NodeModel(id);   
       case "Xor":
-          return new NodeModel(id);   
+        return new NodeModel(id);   
+      case "Shift":
+        return new NodeModel(id);   
       case "Concatenate":
         return "ConcatenateNode";
       case "CustomResizer":
