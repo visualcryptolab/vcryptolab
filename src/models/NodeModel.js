@@ -24,8 +24,6 @@ class NodeModel {
       this.hash = hash.toString(CryptoJS.enc.Hex); 
     }
   }
-
-  //prova
   
   export default NodeModel;
   
