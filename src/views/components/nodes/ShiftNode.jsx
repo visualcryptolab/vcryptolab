@@ -3,6 +3,7 @@ import { memo, useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import styled from "styled-components";
 import DataWrapper, { FORMAT_TYPES } from "../../../models/DataWrapper";
+import { ConstructionOutlined } from "@mui/icons-material";
 
 const NodeContainer = styled.div`
   padding: 20px;
@@ -80,16 +81,14 @@ const ShiftNode = ({ data }) => {
     if (data?.model?.inputs?.length > 0) {
       const rawInput = data.model.inputs[0].data.value;
       console.log("in: " + rawInput);
-      let numericInput = 0;
+      let binaryInput = rawInput;
 
-      if (data.model.inputs[0]?.data.format !== FORMAT_TYPES.DECIMAL) {
-        numericInput = DataWrapper.convertToType(rawInput.toString(), data.model.inputs[0]?.data.format, FORMAT_TYPES.DECIMAL);
-      } else {
-        numericInput = parseInt(rawInput)
-      }
+      if (data.model.inputs[0]?.data.format !== FORMAT_TYPES.BINARY) {
+        binaryInput = DataWrapper.convertToType(rawInput.toString(), data.model.inputs[0]?.data.format, FORMAT_TYPES.BINARY);
+      } 
 
-      console.log("in: " + rawInput + " - Numeric: " + numericInput);
-      setInputValue(numericInput);
+      console.log("in: " + rawInput + " - Numeric: " + binaryInput);
+      setInputValue(binaryInput);
     }
   }, [data.model.inputs[0]?.hash]);
 
@@ -97,11 +96,16 @@ const ShiftNode = ({ data }) => {
     let resultInt;
     if (direction === "left") {
       // Realizamos el desplazamiento de bits a la izquierda
-      resultInt = inputValue << shiftAmount;
+      //resultInt = inputValue << shiftAmount;
+      if(inputValue){
+        //console.log(inputValue.toString(2).padStart(shiftAmount, '0'));
+      }
+      
+
       //console.log("in: " + inputValue + " - amount: " + shiftAmount + " - Result: " + resultInt);
     } else {
       // Realizamos el desplazamiento de bits a la derecha
-      resultInt = inputValue >>> shiftAmount;
+      //resultInt = inputValue >>> shiftAmount;
     }
     setShiftedValue(resultInt);
     let result = resultInt;
