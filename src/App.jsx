@@ -258,8 +258,8 @@ const Toolbar = ({ addNode }) => {
       {/* Logo Container at the top of the left tool bar */}
       <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex justify-center items-center bg-white">
         <img 
-          src="/VCL - Logo and Name.png" // UPDATED: Using the user's requested relative path for external deployment
-          alt="VisualCryptoLab Logo and Name" 
+          src="/VCL - Logo.png" // UPDATED: Using the user's requested relative path for external deployment
+          alt="VisualCryptoLab Logo and Name " 
           className="w-full h-auto max-w-[180px]"
         />
       </div>
