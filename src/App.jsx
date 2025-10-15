@@ -8,28 +8,28 @@ import { LayoutGrid, Cpu, Key, Database, Zap, Settings, Lock, Unlock, Hash, Arro
 // --- Static Tailwind Class Maps (Ensures no dynamic class generation) ---
 
 const BORDER_CLASSES = {
-  blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', purple: 'border-purple-600', pink: 'border-pink-600', 
-  cyan: 'border-cyan-600', teal: 'border-teal-600', gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
+  blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-600', 
+  teal: 'border-teal-600', gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
 };
 
 const HOVER_BORDER_CLASSES = {
-  blue: 'hover:border-blue-500', red: 'hover:border-red-500', orange: 'hover:border-orange-500', purple: 'hover:border-purple-500', pink: 'hover:border-pink-500', 
-  cyan: 'hover:border-cyan-500', teal: 'hover:border-teal-500', gray: 'hover:border-gray-500', lime: 'hover:border-lime-500', indigo: 'hover:border-indigo-500',
+  blue: 'hover:border-blue-500', red: 'hover:border-red-500', orange: 'hover:border-orange-500', cyan: 'hover:border-cyan-500', pink: 'hover:border-pink-500', 
+  teal: 'hover:border-teal-500', gray: 'hover:border-gray-500', lime: 'hover:border-lime-500', indigo: 'hover:border-indigo-500',
 };
 
 const TEXT_ICON_CLASSES = {
-  blue: 'text-blue-600', red: 'text-red-600', orange: 'text-orange-600', purple: 'text-purple-600', pink: 'text-pink-600', 
-  cyan: 'text-cyan-600', teal: 'text-teal-600', gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
+  blue: 'text-blue-600', red: 'text-red-600', orange: 'text-orange-600', cyan: 'text-cyan-600', pink: 'text-pink-600', 
+  teal: 'text-teal-600', gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
 };
 
 const TEXT_LABEL_CLASSES = {
-  blue: 'text-blue-500', red: 'text-red-500', orange: 'text-orange-500', purple: 'text-purple-500', pink: 'text-pink-500', 
-  cyan: 'text-cyan-500', teal: 'text-teal-500', gray: 'text-gray-500', lime: 'text-lime-500', indigo: 'text-indigo-500',
+  blue: 'text-blue-500', red: 'text-red-500', orange: 'text-orange-500', cyan: 'text-cyan-500', pink: 'text-pink-500', 
+  teal: 'text-teal-500', gray: 'text-gray-500', lime: 'text-lime-500', indigo: 'text-indigo-500',
 };
 
 const HOVER_BORDER_TOOLBAR_CLASSES = {
-  blue: 'hover:border-blue-400', red: 'hover:border-red-400', orange: 'hover:border-orange-400', purple: 'hover:border-purple-400', pink: 'hover:border-pink-400', 
-  cyan: 'hover:border-cyan-400', teal: 'hover:border-teal-400', gray: 'hover:border-gray-400', lime: 'hover:border-lime-400', indigo: 'hover:border-indigo-400',
+  blue: 'hover:border-blue-400', red: 'hover:border-red-400', orange: 'hover:border-orange-400', cyan: 'hover:border-cyan-400', pink: 'hover:border-pink-400', 
+  teal: 'hover:border-teal-400', gray: 'hover:border-gray-400', lime: 'hover:border-lime-400', indigo: 'hover:border-indigo-400',
 };
 
 // --- Port Configuration ---
@@ -41,21 +41,36 @@ const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Output
 // Supported Hash Algorithms
 const HASH_ALGORITHMS = ['SHA-256', 'SHA-512'];
 
-// Supported Symmetric Algorithms for KEY_GEN and SYM_ENC
+// Supported Symmetric Algorithms
 const SYM_ALGORITHMS = ['AES-GCM']; 
 
+// Supported Asymmetric Algorithms
+const ASYM_ALGORITHMS = ['RSA-OAEP']; 
+const RSA_MODULUS_LENGTHS = [1024, 2048, 4096];
+
 // --- Node Definitions with detailed Port structure ---
-// inputPorts: [{ name: string, type: 'data'|'key'|'iv'|'public', mandatory: boolean }]
-// outputPort: { name: string, type: 'data'|'key'|'public'|'private' }
+// Note: All nodes now use 'outputPorts' array. keyField specifies which node property holds the output data.
 
 const NODE_DEFINITIONS = {
   // --- Core Nodes ---
-  DATA_INPUT: { label: 'Input Data', color: 'blue', icon: LayoutGrid, inputPorts: [], outputPort: { name: 'Data Out', type: 'data' } },
-  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: null },
+  DATA_INPUT: { label: 'Input Data', color: 'blue', icon: LayoutGrid, inputPorts: [], outputPorts: [{ name: 'Data Out', type: 'data', keyField: 'dataOutput' }] },
+  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPorts: [] },
   
-  // --- Key/Cipher Nodes ---
-  KEY_GEN: { label: 'Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPort: { name: 'Key Out (AES)', type: 'key' } }, // Outputs an AES Key
+  // --- Key Generators ---
+  KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Out (AES)', type: 'key', keyField: 'dataOutput' }] }, 
+
+  RSA_KEY_GEN: { 
+    label: 'RSA Key Generator', 
+    color: 'cyan', // Changed color to cyan
+    icon: Key, // Changed icon to Key
+    inputPorts: [], 
+    outputPorts: [
+        { name: 'Public Key', type: 'public', keyField: 'dataOutputPublic' },
+        { name: 'Private Key', type: 'private', keyField: 'dataOutputPrivate' }
+    ]
+  },
   
+  // --- Cipher Nodes ---
   SYM_ENC: { 
     label: 'Sym Encrypt', 
     color: 'red', 
@@ -64,7 +79,7 @@ const NODE_DEFINITIONS = {
         { name: 'Data In', type: 'data', mandatory: true, id: 'data' },
         { name: 'Key In', type: 'key', mandatory: true, id: 'key' }
     ], 
-    outputPort: { name: 'Ciphertext', type: 'data' } 
+    outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }]
   },
   SYM_DEC: { 
     label: 'Sym Decrypt', 
@@ -74,17 +89,32 @@ const NODE_DEFINITIONS = {
         { name: 'Cipher In', type: 'data', mandatory: true, id: 'cipher' }, 
         { name: 'Key In', type: 'key', mandatory: true, id: 'key' }
     ], 
-    outputPort: { name: 'Plaintext', type: 'data' } 
+    outputPorts: [{ name: 'Plaintext', type: 'data', keyField: 'dataOutput' }] 
   },
 
-  ASYM_ENC: { label: 'Asym Encrypt', color: 'cyan', icon: Lock, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Ciphertext', type: 'data' } },
-  ASYM_DEC: { label: 'Asym Decrypt', color: 'teal', icon: Unlock, inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }], outputPort: { name: 'Plaintext', type: 'data' } },
+  ASYM_ENC: { 
+    label: 'Asym Encrypt', 
+    color: 'cyan', // Changed color to cyan
+    icon: Lock, 
+    inputPorts: [
+        { name: 'Data In', type: 'data', mandatory: true }, 
+        { name: 'Public Key In', type: 'public', mandatory: true }
+    ], 
+    outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }] 
+  },
+  ASYM_DEC: { 
+    label: 'Asym Decrypt', 
+    color: 'teal', 
+    icon: Unlock, 
+    inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }, { name: 'Private Key In', type: 'private', mandatory: true }], 
+    outputPorts: [{ name: 'Plaintext', type: 'data', keyField: 'dataOutput' }]
+  },
 
   // --- Utility Nodes ---
-  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Hash Out', type: 'data' } },
+  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPorts: [{ name: 'Hash Out', type: 'data', keyField: 'dataOutput' }] },
 
-  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, inputPorts: [{ name: 'Input A', type: 'data', mandatory: true }, { name: 'Input B', type: 'data', mandatory: true }], outputPort: { name: 'Result', type: 'data' } },
-  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Result', type: 'data' } },
+  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, inputPorts: [{ name: 'Input A', type: 'data', mandatory: true }, { name: 'Input B', type: 'data', mandatory: true }], outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
+  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
 };
 
 // Initial nodes on the canvas
@@ -92,7 +122,7 @@ const INITIAL_NODES = [
   // Example initial nodes for demonstration
   { 
     id: 'start_key', 
-    label: 'Key Generator', 
+    label: 'Sym Key Generator', 
     position: { x: 50, y: 50 }, 
     type: 'KEY_GEN', 
     color: 'orange', 
@@ -200,6 +230,107 @@ const generateSymmetricKey = async (algorithm) => {
         return { keyObject: null, keyBase64: `ERROR: Key generation failed. ${error.message}` };
     }
 };
+
+/** Generates an RSA Key Pair. */
+const generateAsymmetricKeyPair = async (algorithm, modulusLength, publicExponentDecimal) => {
+    
+    let publicExponentArray;
+    
+    // Standard public exponent 65537 (0x10001) in byte form
+    publicExponentArray = new Uint8Array([0x01, 0x00, 0x01]); 
+
+    const hashAlgorithm = "SHA-256";
+    const exponentValue = publicExponentDecimal || 65537;
+
+    if (exponentValue !== 65537) {
+        console.warn(`Non-standard public exponent (${exponentValue}) detected. Using standard 65537 for Web Crypto API compatibility.`);
+    }
+
+    try {
+        const keyPair = await crypto.subtle.generateKey(
+            {
+                name: algorithm,
+                modulusLength: modulusLength,
+                publicExponent: publicExponentArray,
+                hash: { name: hashAlgorithm },
+            },
+            true, // extractable
+            ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+        );
+        
+        // Export public key to SPKI format (Base64) - Standard for transport
+        const publicKey = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+        const base64PublicKey = arrayBufferToBase64(publicKey);
+        
+        // Export private key to PKCS#8 format (Base64) - Standard for transport
+        const privateKey = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+        const base64PrivateKey = arrayBufferToBase64(privateKey);
+        
+        // Export PRIVATE key in JWK format to extract internal parameters (p, q, d, n) for visualization
+        const privateKeyJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
+        
+        const rsaParams = {
+            n: privateKeyJwk.n, // Modulus (public)
+            e: privateKeyJwk.e, // Public Exponent (public)
+            d: privateKeyJwk.d, // Private Exponent (private)
+            p: privateKeyJwk.p, // First Prime Factor (private)
+            q: privateKeyJwk.q, // Second Prime Factor (private)
+        };
+        
+        return { 
+            publicKey: base64PublicKey, 
+            privateKey: base64PrivateKey,
+            keyPairObject: keyPair,
+            rsaParameters: rsaParams
+        };
+
+    } catch (error) {
+        console.error("RSA Key generation failed:", error);
+        return { 
+            publicKey: `ERROR: ${error.message}`, 
+            privateKey: `ERROR: ${error.message}`
+        };
+    }
+};
+
+/** Encrypts data using an RSA public key (Asymmetric). */
+const asymmetricEncrypt = async (dataStr, base64PublicKey, algorithm) => {
+    if (!dataStr) return 'Missing Data Input.';
+    if (!base64PublicKey || typeof base64PublicKey !== 'string' || base64PublicKey.length === 0) {
+        return 'Missing or invalid Public Key Input.'; 
+    }
+
+    try {
+        const keyBuffer = base64ToArrayBuffer(base64PublicKey);
+        
+        // Import Public Key (SPKI format)
+        const publicKey = await crypto.subtle.importKey(
+            'spki',
+            keyBuffer,
+            { name: algorithm, hash: "SHA-256" },
+            true, // extractable
+            ['encrypt']
+        );
+        
+        const encoder = new TextEncoder();
+        const dataBuffer = encoder.encode(dataStr);
+
+        // Encrypt
+        const encryptedBuffer = await crypto.subtle.encrypt(
+            { name: algorithm },
+            publicKey,
+            dataBuffer
+        );
+        
+        // Convert encrypted buffer to Base64 for transport
+        return arrayBufferToBase64(encryptedBuffer);
+
+    } catch (error) {
+        console.error("Asymmetric Encryption failed:", error);
+        return `ERROR: Asymmetric Encryption failed. ${error.message}`;
+    }
+};
+
 
 /** Encrypts data using an AES-GCM key. */
 const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
@@ -367,7 +498,7 @@ const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEn
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingNodeId, updateNodeContent, connections }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, key, symAlgorithm } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, dataOutputPublic, dataOutputPrivate, publicExponent, rsaParameters, asymAlgorithm } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
@@ -379,8 +510,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isOutputViewer = type === 'OUTPUT_VIEWER';
   const isHashFn = type === 'HASH_FN';
   const isKeyGen = type === 'KEY_GEN';
+  const isRSAKeyGen = type === 'RSA_KEY_GEN'; 
   const isSymEnc = type === 'SYM_ENC';
-  const isSymDec = type === 'SYM_DEC'; // NEW FLAG
+  const isSymDec = type === 'SYM_DEC';
+  const isAsymEnc = type === 'ASYM_ENC'; // NEW FLAG
   
   const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
   
@@ -393,7 +526,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   // --- Drag Handlers (standard) ---
   const handleDragStart = useCallback((e) => {
     if (connectingNodeId) return; 
-    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'DIV', 'BUTTON']; // Added BUTTON
+    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'DIV', 'BUTTON', 'INPUT']; 
     if (e.target.tagName === 'DIV' && e.target.classList.contains('w-4') && e.target.classList.contains('h-4')) {
         return; // Clicked on a port, prevent drag
     }
@@ -524,9 +657,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     return definition.inputPorts.map((portDef, index) => {
         const topPosition = (index + 1) * step;
         
-        // FIX: Remove 'isPortConnected' logic for visual disabling. 
-        // We rely on the App component's connection logic for validation.
-        
         return (
             <div 
                 key={portDef.name}
@@ -550,24 +680,35 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     });
   };
 
-  const renderOutputPort = () => {
-    if (!definition.outputPort) return null;
+  const renderOutputPorts = () => {
+    if (!definition.outputPorts || definition.outputPorts.length === 0) return null;
     
-    // For simplicity, all single output ports are placed at 50% height
-    return (
-        <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 z-20">
-            <Port 
-                nodeId={id} 
-                type="output"
-                colorClass={OUTPUT_PORT_COLOR} 
-                isConnecting={connectingNodeId}
-                onStart={handleConnectStart}
-                onEnd={handleConnectEnd}
-                title={definition.outputPort.name}
-                isMandatory={true}
-            />
-        </div>
-    );
+    const numPorts = definition.outputPorts.length;
+    // Calculate vertical offset for even distribution
+    const step = 100 / (numPorts + 1); 
+
+    return definition.outputPorts.map((portDef, index) => {
+        const topPosition = (index + 1) * step;
+
+        return (
+            <div 
+                key={portDef.name}
+                className="absolute -right-2 transform -translate-y-1/2 z-20"
+                style={{ top: `${topPosition}%` }}
+            >
+                <Port 
+                    nodeId={id} 
+                    type="output"
+                    colorClass={OUTPUT_PORT_COLOR} 
+                    isConnecting={connectingNodeId}
+                    onStart={handleConnectStart}
+                    onEnd={handleConnectEnd}
+                    title={portDef.name}
+                    isMandatory={true} // Output is always considered essential for flow
+                />
+            </div>
+        );
+    });
   };
   
   // --- Class Lookups ---
@@ -607,7 +748,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       
       {/* -------------------- PORTS -------------------- */}
       {renderInputPorts()}
-      {renderOutputPort()}
+      {renderOutputPorts()} {/* RENDER PORTS ARRAY */}
 
       {/* -------------------- CONTENT -------------------- */}
       <div className="flex flex-col h-full w-full justify-start items-center overflow-hidden">
@@ -618,9 +759,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {/* Show algorithm name for functional nodes */}
           {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
           {isKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({keyAlgorithm})</span>}
+          {isRSAKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({node.keyAlgorithm} {modulusLength} bits, e={publicExponent})</span>}
           {isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
-          {isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>} {/* ADDED for SymDec */}
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
+          {isAsymEnc && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -709,6 +852,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
         
+        {/* Symmetric Key Generator */}
         {isKeyGen && (
             <div className="text-xs w-full text-center flex flex-col items-center">
                 <select
@@ -742,6 +886,79 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </p>
             </div>
         )}
+
+        {/* RSA Asymmetric Key Generator */}
+        {isRSAKeyGen && (
+            <div className="text-xs w-full text-center flex flex-col items-center">
+                
+                {/* Modulus Length (n size) */}
+                <div className="w-full mb-1">
+                    <label className="block text-left text-[10px] font-semibold text-gray-600">Modulus Length (Size of n)</label>
+                    <select
+                      className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200"
+                      value={modulusLength || 2048}
+                      onChange={(e) => updateNodeContent(id, 'modulusLength', parseInt(e.target.value))}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {RSA_MODULUS_LENGTHS.map(len => (
+                        <option key={len} value={len}>{len} bits</option>
+                      ))}
+                    </select>
+                </div>
+                
+                {/* Public Exponent (e) - Input */}
+                <div className="w-full mb-2">
+                    <label className="block text-left text-[10px] font-semibold text-gray-600">Public Exponent (e)</label>
+                    <input
+                        type="number"
+                        className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm 
+                                 text-gray-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200"
+                        value={publicExponent || 65537}
+                        onChange={(e) => updateNodeContent(id, 'publicExponent', parseInt(e.target.value) || 65537)}
+                        onMouseDown={(e) => e.stopPropagation()} 
+                        onTouchStart={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+                
+                <button
+                    onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
+                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-cyan-500 hover:bg-cyan-600`}
+                >
+                    <Key className="w-4 h-4" />
+                    <span>Generate RSA Key Pair</span>
+                </button>
+                
+                <span className={`font-semibold mt-2 ${dataOutputPublic ? 'text-cyan-600' : 'text-gray-500'}`}>
+                    {isProcessing ? 'Generating...' : dataOutputPublic ? 'Keys Ready' : 'Configure and Generate'}
+                </span>
+
+                <div className="w-full mt-1 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-2">
+                    <label className="block text-[10px] font-semibold text-gray-600">Extracted Key Parameters (Derived Secrets)</label>
+                    
+                    {/* READ-ONLY PARAMETERS */}
+                    {['n', 'd', 'p', 'q'].map(param => (
+                        <div key={param} className="flex flex-col">
+                            <label className="text-[10px] font-medium text-gray-500 capitalize">{param} (Base64URL):</label>
+                            <input
+                                type="text"
+                                readOnly
+                                className="w-full text-[8px] p-1 border border-gray-100 rounded bg-gray-50 break-all overflow-hidden cursor-default"
+                                value={rsaParameters?.[param] ? `${rsaParameters[param].substring(0, 20)}...` : 'N/A'}
+                                title={rsaParameters?.[param] || 'Parameter not yet generated'}
+                                onMouseDown={(e) => e.stopPropagation()} 
+                                onTouchStart={(e) => e.stopPropagation()} 
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
         
         {isSymEnc && (
             <div className="text-xs w-full text-center">
@@ -765,7 +982,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && (
+        {isAsymEnc && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                    {isProcessing ? 'Encrypting (RSA-OAEP)...' : 'Active'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Ciphertext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Public Key...'}
+                </p>
+            </div>
+        )}
+
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -896,6 +1124,46 @@ const App = () => {
                 } else {
                     outputData = 'Click "Generate New Key"';
                 }
+            } else if (sourceNode.type === 'RSA_KEY_GEN') { 
+
+                 if (sourceNode.keyPairObject || sourceNode.generateKey) {
+                    isProcessing = true;
+                    
+                    if (!sourceNode.keyPairObject || sourceNode.generateKey) {
+                         const algorithm = ASYM_ALGORITHMS[0]; // RSA-OAEP
+                         const modulusLength = sourceNode.modulusLength || 2048;
+                         const publicExponent = sourceNode.publicExponent || 65537;
+                         
+                         generateAsymmetricKeyPair(algorithm, modulusLength, publicExponent).then(({ publicKey, privateKey, keyPairObject, rsaParameters }) => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { 
+                                        ...n, 
+                                        dataOutputPublic: publicKey, 
+                                        dataOutputPrivate: privateKey, 
+                                        keyPairObject: keyPairObject, 
+                                        rsaParameters: rsaParameters, 
+                                        isProcessing: false, 
+                                        generateKey: false 
+                                      } 
+                                    : n
+                            ));
+                        }).catch(err => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutputPublic: `ERROR: ${err.message}`, dataOutputPrivate: `ERROR: ${err.message}`, isProcessing: false, generateKey: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutputPublic || 'Generating Keys...';
+                    } else {
+                        // Keys already exist, just pass it through (Output Public is the main dataOutput)
+                        outputData = sourceNode.dataOutputPublic || '';
+                        isProcessing = false;
+                    }
+                } else {
+                    outputData = 'Click "Generate RSA Key Pair"';
+                }
             }
         
         // --- PROCESSING/SINK NODES (Have input ports) ---
@@ -905,18 +1173,22 @@ const App = () => {
             const inputSources = incomingConns.map(conn => newNodesMap.get(conn.source));
 
             // Map inputs to data types for multi-input nodes
-            let dataInput = null;
-            let keyInput = null; 
+            let dataInput = null; // Data or Ciphertext
+            let keyInput = null; // Symmetric Key
+            let publicKeyInput = null; // RSA Public Key
+            let privateKeyInput = null; // RSA Private Key
             
             inputSources.forEach(input => {
-                const outputType = NODE_DEFINITIONS[input.type]?.outputPort?.type;
-                // Since there are multiple inputs of type 'data' possible (data or ciphertext)
-                // we prioritize the first one found for simplicity in multi-input nodes like SymEnc/Dec
-                if (outputType === 'data' && !dataInput) {
+                const outputType = NODE_DEFINITIONS[input.type]?.outputPorts?.[0]?.type; 
+                // Need to check specific key fields for RSA Gen Node
+                if (input.type === 'RSA_KEY_GEN') {
+                    if (!publicKeyInput) publicKeyInput = input.dataOutputPublic;
+                    if (!privateKeyInput) privateKeyInput = input.dataOutputPrivate;
+                } else if (outputType === 'data' && !dataInput) {
                     dataInput = input.dataOutput;
                 } else if (outputType === 'key' && !keyInput) {
                     keyInput = input.dataOutput;
-                }
+                } 
             });
 
 
@@ -971,10 +1243,10 @@ const App = () => {
                     }
                     break;
                 
-                case 'SYM_DEC': // NEW DECRYPT LOGIC
+                case 'SYM_DEC': 
                     if (dataInput && keyInput) {
                         isProcessing = true;
-                        const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; // Assuming same as encryption
+                        const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
 
                         symmetricDecrypt(dataInput, keyInput, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => 
@@ -999,8 +1271,36 @@ const App = () => {
                     }
                     break;
 
-                // Unimplemented Processing Nodes (They return the placeholder)
                 case 'ASYM_ENC':
+                    if (dataInput && publicKeyInput) {
+                        isProcessing = true;
+                        const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
+
+                        asymmetricEncrypt(dataInput, publicKeyInput, algorithm).then(ciphertext => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: ciphertext, isProcessing: false } 
+                                    : n
+                            ));
+                        }).catch(err => {
+                             setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: `ERROR: Encrypt failed. ${err.message}`, isProcessing: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutput || 'Encrypting...';
+                    } else if (dataInput && !publicKeyInput) {
+                        outputData = 'Waiting for Public Key input.';
+                    } else if (!dataInput && publicKeyInput) {
+                        outputData = 'Waiting for Data input.';
+                    } else {
+                        outputData = 'Waiting for Data and Public Key inputs.';
+                    }
+                    break;
+
+
+                // Unimplemented Processing Nodes (They return the placeholder)
                 case 'ASYM_DEC':
                 case 'XOR_OP':
                 case 'SHIFT_OP':
@@ -1014,7 +1314,8 @@ const App = () => {
         }
         
         // Update the node's output and processing status
-        sourceNode.dataOutput = outputData;
+        // For RSA_KEY_GEN, dataOutput is just the public key preview, but we update both in the state
+        sourceNode.dataOutput = outputData; 
         sourceNode.isProcessing = isProcessing;
         newNodesMap.set(sourceId, sourceNode);
         processed.add(sourceId);
@@ -1038,7 +1339,7 @@ const App = () => {
     setNodes(prevNodes => {
         const nextNodes = prevNodes.map(node =>
             node.id === id 
-                ? { ...node, [field]: value, generateKey: (field === 'generateKey' ? value : node.generateKey) } // Handle key gen button flag
+                ? { ...node, [field]: value, generateKey: (field === 'generateKey' ? value : node.generateKey), modulusLength: (field === 'modulusLength' ? value : node.modulusLength), publicExponent: (field === 'publicExponent' ? value : node.publicExponent) } 
                 : node
         );
         // Pass the changed node ID to ensure recalculation starts from that point.
@@ -1058,7 +1359,7 @@ const App = () => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
-    const initialContent = {};
+    const initialContent = { dataOutput: '', isProcessing: false };
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
@@ -1070,8 +1371,19 @@ const App = () => {
     } else if (type === 'KEY_GEN') {
       initialContent.keyAlgorithm = 'AES-GCM';
       initialContent.key = null; // CryptoKey object
-    } else if (type === 'SYM_ENC' || type === 'SYM_DEC') { // Updated to include SymDec
+    } else if (type === 'RSA_KEY_GEN') { // RSA INITIALIZATION
+      initialContent.keyAlgorithm = 'RSA-OAEP';
+      initialContent.modulusLength = 2048;
+      initialContent.publicExponent = 65537; // Default value for e
+      initialContent.dataOutputPublic = '';
+      initialContent.dataOutputPrivate = '';
+      initialContent.keyPairObject = null;
+      // Initialize new parameter object
+      initialContent.rsaParameters = { n: '', d: '', p: '', q: '', e: 65537 }; 
+    } else if (type === 'SYM_ENC' || type === 'SYM_DEC') {
       initialContent.symAlgorithm = 'AES-GCM';
+    } else if (type === 'ASYM_ENC' || type === 'ASYM_DEC') {
+      initialContent.asymAlgorithm = 'RSA-OAEP';
     }
 
     setNodes(prevNodes => [
@@ -1082,8 +1394,6 @@ const App = () => {
         position: { x: 50 + Math.random() * 200, y: 50 + Math.random() * 200 }, 
         type: type, 
         color: color,
-        dataOutput: '',
-        isProcessing: false, 
         ...initialContent 
       },
     ]);
