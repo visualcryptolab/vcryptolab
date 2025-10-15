@@ -106,7 +106,10 @@ const NODE_DEFINITIONS = {
     label: 'Asym Decrypt', 
     color: 'teal', 
     icon: Unlock, 
-    inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }, { name: 'Private Key In', type: 'private', mandatory: true }], 
+    inputPorts: [
+        { name: 'Cipher In', type: 'data', mandatory: true }, 
+        { name: 'Private Key In', type: 'private', mandatory: true }
+    ], 
     outputPorts: [{ name: 'Plaintext', type: 'data', keyField: 'dataOutput' }]
   },
 
@@ -331,6 +334,45 @@ const asymmetricEncrypt = async (dataStr, base64PublicKey, algorithm) => {
     }
 };
 
+/** Decrypts data using an RSA private key (Asymmetric). */
+const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) => {
+    if (!base64Ciphertext) return 'Missing Ciphertext Input.';
+    if (!base64PrivateKey || typeof base64PrivateKey !== 'string' || base64PrivateKey.length === 0) {
+        return 'Missing or invalid Private Key Input.'; 
+    }
+
+    try {
+        const keyBuffer = base64ToArrayBuffer(base64PrivateKey);
+        
+        // Import Private Key (PKCS#8 format)
+        const privateKey = await crypto.subtle.importKey(
+            'pkcs8',
+            keyBuffer,
+            { name: algorithm, hash: "SHA-256" },
+            true, // extractable
+            ['decrypt']
+        );
+        
+        // Decode ciphertext
+        const cipherBuffer = base64ToArrayBuffer(base64Ciphertext);
+
+        // Decrypt
+        const decryptedBuffer = await crypto.subtle.decrypt(
+            { name: algorithm },
+            privateKey,
+            cipherBuffer
+        );
+        
+        // Convert ArrayBuffer back to text
+        const decoder = new TextDecoder();
+        return decoder.decode(decryptedBuffer);
+
+    } catch (error) {
+        console.error("Asymmetric Decryption failed:", error);
+        return `ERROR: Asymmetric Decryption failed. ${error.message}`;
+    }
+};
+
 
 /** Encrypts data using an AES-GCM key. */
 const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
@@ -514,6 +556,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isSymEnc = type === 'SYM_ENC';
   const isSymDec = type === 'SYM_DEC';
   const isAsymEnc = type === 'ASYM_ENC'; // NEW FLAG
+  const isAsymDec = type === 'ASYM_DEC'; // NEW FLAG
   
   const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
   
@@ -763,7 +806,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
           {isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
           {isAsymEnc && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {isAsymDec && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -993,7 +1037,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && (
+        {isAsymDec && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                    {isProcessing ? 'Decrypting (RSA-OAEP)...' : 'Active'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Plaintext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Private Key...'}
+                </p>
+            </div>
+        )}
+
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -1182,8 +1237,19 @@ const App = () => {
                 const outputType = NODE_DEFINITIONS[input.type]?.outputPorts?.[0]?.type; 
                 // Need to check specific key fields for RSA Gen Node
                 if (input.type === 'RSA_KEY_GEN') {
-                    if (!publicKeyInput) publicKeyInput = input.dataOutputPublic;
-                    if (!privateKeyInput) privateKeyInput = input.dataOutputPrivate;
+                    // This logic assumes RSA Key Gen is connected to two downstream nodes.
+                    // If it is connected to a single node needing only Public/Private key, this simple check works.
+                    // If the input is from RSA_KEY_GEN, we check which output port type the target needs.
+                    
+                    const targetInputPorts = sourceNodeDef.inputPorts.map(p => p.type);
+                    
+                    if (targetInputPorts.includes('public')) {
+                        if (!publicKeyInput) publicKeyInput = input.dataOutputPublic;
+                    }
+                    if (targetInputPorts.includes('private')) {
+                        if (!privateKeyInput) privateKeyInput = input.dataOutputPrivate;
+                    }
+                    
                 } else if (outputType === 'data' && !dataInput) {
                     dataInput = input.dataOutput;
                 } else if (outputType === 'key' && !keyInput) {
@@ -1299,9 +1365,36 @@ const App = () => {
                     }
                     break;
 
+                case 'ASYM_DEC':
+                    if (dataInput && privateKeyInput) {
+                        isProcessing = true;
+                        const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
+
+                        asymmetricDecrypt(dataInput, privateKeyInput, algorithm).then(plaintext => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: plaintext, isProcessing: false } 
+                                    : n
+                            ));
+                        }).catch(err => {
+                             setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: `ERROR: Decrypt failed. ${err.message}`, isProcessing: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutput || 'Decrypting...';
+                    } else if (dataInput && !privateKeyInput) {
+                        outputData = 'Waiting for Private Key input.';
+                    } else if (!dataInput && privateKeyInput) {
+                        outputData = 'Waiting for Ciphertext input.';
+                    } else {
+                        outputData = 'Waiting for Ciphertext and Private Key inputs.';
+                    }
+                    break;
+
 
                 // Unimplemented Processing Nodes (They return the placeholder)
-                case 'ASYM_DEC':
                 case 'XOR_OP':
                 case 'SHIFT_OP':
                     outputData = `Processed(PENDING) by ${sourceNode.label}`;
