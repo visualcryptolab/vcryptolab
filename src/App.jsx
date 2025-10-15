@@ -8,7 +8,7 @@ import { LayoutGrid, Cpu, Key, Database, Zap, Settings, Lock, Unlock, Hash, Arro
 // --- Static Tailwind Class Maps (Ensures no dynamic class generation) ---
 
 const BORDER_CLASSES = {
-  blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-600', 
+  blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-500', 
   teal: 'border-teal-600', gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
 };
 
@@ -18,7 +18,7 @@ const HOVER_BORDER_CLASSES = {
 };
 
 const TEXT_ICON_CLASSES = {
-  blue: 'text-blue-600', red: 'text-red-600', orange: 'text-orange-600', cyan: 'text-cyan-600', pink: 'text-pink-600', 
+  blue: 'text-blue-600', red: 'text-red-600', orange: 'text-orange-600', cyan: 'text-cyan-600', pink: 'text-pink-500', 
   teal: 'text-teal-600', gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
 };
 
@@ -167,7 +167,9 @@ const INITIAL_NODES = [
 
 const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
 
-// --- Utility Functions for Web Crypto ---
+// =================================================================
+// 2. CRYPTO & UTILITY FUNCTIONS
+// =================================================================
 
 /** Converts ArrayBuffer to Base64 URL-safe string. */
 const arrayBufferToBase64 = (buffer) => {
@@ -188,6 +190,75 @@ const base64ToArrayBuffer = (base64) => {
     bytes[i] = binary_string.charCodeAt(i);
   }
   return bytes.buffer;
+};
+
+/**
+ * Performs XOR operation on two input strings (converted to Uint8Array).
+ * The result is truncated to the length of the shorter input.
+ * Returns result as a Base64 string.
+ */
+const performBitwiseXor = (strA, strB) => {
+    if (!strA || !strB) {
+        return "ERROR: Missing one or both inputs.";
+    }
+
+    try {
+        const encoder = new TextEncoder();
+        const bufferA = encoder.encode(strA);
+        const bufferB = encoder.encode(strB);
+
+        const len = Math.min(bufferA.length, bufferB.length);
+        const result = new Uint8Array(len);
+
+        for (let i = 0; i < len; i++) {
+            result[i] = bufferA[i] ^ bufferB[i];
+        }
+
+        return arrayBufferToBase64(result.buffer);
+    } catch (error) {
+        console.error("XOR operation failed:", error);
+        return `ERROR: XOR failed. ${error.message}`;
+    }
+};
+
+/**
+ * Performs a byte shift operation on the input string (converted to Uint8Array).
+ * For simplicity, shiftAmount is treated as number of BYTES to shift.
+ * Returns result as a Base64 string.
+ */
+const performByteShiftOperation = (dataStr, shiftType, shiftAmount) => {
+    if (!dataStr) return "ERROR: Missing data input.";
+    // Ensure shiftAmount is a safe integer
+    const byteAmount = Math.max(0, parseInt(shiftAmount) || 0);
+
+    try {
+        const encoder = new TextEncoder();
+        const buffer = encoder.encode(dataStr);
+        const numBytes = buffer.length;
+        const result = new Uint8Array(numBytes);
+
+        if (byteAmount >= numBytes) {
+            // If shift amount is >= array length, the result is all zeros
+            return arrayBufferToBase64(result.buffer); 
+        }
+        
+        if (shiftType === 'Left') {
+            // Shift Left: [A, B, C, D] -> [C, D, 0, 0] (amount 2)
+            // Copy remaining bytes to the start, fill end with zeros (default behavior of Uint8Array.set)
+            result.set(buffer.slice(byteAmount), 0);
+        } else if (shiftType === 'Right') {
+            // Shift Right: [A, B, C, D] -> [0, 0, A, B] (amount 2)
+            // Copy starting bytes to the shifted position
+            result.set(buffer.slice(0, numBytes - byteAmount), byteAmount);
+        } else {
+            return "ERROR: Invalid shift type.";
+        }
+
+        return arrayBufferToBase64(result.buffer);
+    } catch (error) {
+        console.error("Byte Shift operation failed:", error);
+        return `ERROR: Byte Shift failed. ${error.message}`;
+    }
 };
 
 
@@ -468,7 +539,9 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
 };
 
 
-// --- Graph Drawing Utilities ---
+// =================================================================
+// 3. UI COMPONENTS & GRAPH LOGIC
+// =================================================================
 
 // Calculates the path for the line connecting two ports (right of source to left of target)
 const getLinePath = (sourceNode, targetNode) => {
@@ -557,6 +630,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isSymDec = type === 'SYM_DEC';
   const isAsymEnc = type === 'ASYM_ENC'; // NEW FLAG
   const isAsymDec = type === 'ASYM_DEC'; // NEW FLAG
+  const isBitShift = type === 'SHIFT_OP'; // NEW FLAG
   
   const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
   
@@ -807,7 +881,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
           {isAsymEnc && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
           {isAsymDec && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          
+          {/* Show status/algorithm for XOR and Bit Shift */}
+          {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
+          {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
+
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -1047,8 +1126,58 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </p>
             </div>
         )}
+        
+        {type === 'XOR_OP' && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-lime-600'}`}>
+                    {isProcessing ? 'Calculating XOR...' : 'Active'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for two data inputs...'}
+                </p>
+            </div>
+        )}
 
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && (
+        {isBitShift && (
+             <div className="text-xs w-full text-center">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT AMOUNT (BYTES)</span>
+                <input
+                    type="number"
+                    min="0"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                               text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
+                    value={node.shiftAmount || 0}
+                    onChange={(e) => updateNodeContent(id, 'shiftAmount', parseInt(e.target.value) || 0)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+                
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT DIRECTION</span>
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2
+                               bg-white appearance-none cursor-pointer text-gray-700 
+                               focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
+                    value={node.shiftType || 'Left'}
+                    onChange={(e) => updateNodeContent(id, 'shiftType', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <option value="Left">Left (&lt;&lt;)</option>
+                    <option value="Right">Right (&gt;&gt;)</option>
+                </select>
+
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'}`}>
+                    {isProcessing ? 'Shifting...' : 'Active'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                </p>
+            </div>
+        )}
+
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -1232,15 +1361,13 @@ const App = () => {
             let keyInput = null; // Symmetric Key
             let publicKeyInput = null; // RSA Public Key
             let privateKeyInput = null; // RSA Private Key
+            let dataInputA = null; // XOR Input A
+            let dataInputB = null; // XOR Input B
             
             inputSources.forEach(input => {
                 const outputType = NODE_DEFINITIONS[input.type]?.outputPorts?.[0]?.type; 
-                // Need to check specific key fields for RSA Gen Node
+                
                 if (input.type === 'RSA_KEY_GEN') {
-                    // This logic assumes RSA Key Gen is connected to two downstream nodes.
-                    // If it is connected to a single node needing only Public/Private key, this simple check works.
-                    // If the input is from RSA_KEY_GEN, we check which output port type the target needs.
-                    
                     const targetInputPorts = sourceNodeDef.inputPorts.map(p => p.type);
                     
                     if (targetInputPorts.includes('public')) {
@@ -1250,8 +1377,17 @@ const App = () => {
                         if (!privateKeyInput) privateKeyInput = input.dataOutputPrivate;
                     }
                     
-                } else if (outputType === 'data' && !dataInput) {
-                    dataInput = input.dataOutput;
+                } else if (outputType === 'data') {
+                    // Handle XOR inputs specially since they both are 'data' type
+                    if (sourceNode.type === 'XOR_OP') {
+                        if (!dataInputA) {
+                            dataInputA = input.dataOutput;
+                        } else if (!dataInputB) {
+                            dataInputB = input.dataOutput;
+                        }
+                    } else if (!dataInput) {
+                        dataInput = input.dataOutput;
+                    }
                 } else if (outputType === 'key' && !keyInput) {
                     keyInput = input.dataOutput;
                 } 
@@ -1280,7 +1416,36 @@ const App = () => {
                         outputData = 'Waiting for data input.';
                     }
                     break;
-                    
+                
+                case 'XOR_OP':
+                    if (dataInputA && dataInputB) {
+                         isProcessing = true;
+                         // XOR is sync, so we update the state directly
+                         outputData = performBitwiseXor(dataInputA, dataInputB);
+                         isProcessing = false;
+                    } else if (dataInputA && !dataInputB) {
+                        outputData = 'Waiting for Input B.';
+                    } else if (!dataInputA && dataInputB) {
+                        outputData = 'Waiting for Input A.';
+                    } else {
+                        outputData = 'Waiting for two data inputs.';
+                    }
+                    break;
+                
+                case 'SHIFT_OP':
+                    const shiftType = sourceNode.shiftType || 'Left';
+                    const shiftAmount = sourceNode.shiftAmount || 0;
+
+                    if (dataInput) {
+                        isProcessing = true;
+                        // Shift is sync, so we update the state directly
+                        outputData = performByteShiftOperation(dataInput, shiftType, shiftAmount);
+                        isProcessing = false;
+                    } else {
+                        outputData = 'Waiting for data input.';
+                    }
+                    break;
+
                 case 'SYM_ENC':
                     if (dataInput && keyInput) {
                         isProcessing = true;
@@ -1395,10 +1560,7 @@ const App = () => {
 
 
                 // Unimplemented Processing Nodes (They return the placeholder)
-                case 'XOR_OP':
-                case 'SHIFT_OP':
-                    outputData = `Processed(PENDING) by ${sourceNode.label}`;
-                    break;
+                // Removed SHIFT_OP since it is now implemented.
                     
                 default:
                     outputData = 'ERROR: Unrecognized Node Type.';
@@ -1432,7 +1594,15 @@ const App = () => {
     setNodes(prevNodes => {
         const nextNodes = prevNodes.map(node =>
             node.id === id 
-                ? { ...node, [field]: value, generateKey: (field === 'generateKey' ? value : node.generateKey), modulusLength: (field === 'modulusLength' ? value : node.modulusLength), publicExponent: (field === 'publicExponent' ? value : node.publicExponent) } 
+                ? { 
+                    ...node, 
+                    [field]: value, 
+                    generateKey: (field === 'generateKey' ? value : node.generateKey), 
+                    modulusLength: (field === 'modulusLength' ? value : node.modulusLength), 
+                    publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
+                    shiftType: (field === 'shiftType' ? value : node.shiftType),
+                    shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount)
+                  } 
                 : node
         );
         // Pass the changed node ID to ensure recalculation starts from that point.
@@ -1477,6 +1647,9 @@ const App = () => {
       initialContent.symAlgorithm = 'AES-GCM';
     } else if (type === 'ASYM_ENC' || type === 'ASYM_DEC') {
       initialContent.asymAlgorithm = 'RSA-OAEP';
+    } else if (type === 'SHIFT_OP') {
+      initialContent.shiftType = 'Left';
+      initialContent.shiftAmount = 1;
     }
 
     setNodes(prevNodes => [
