@@ -66,7 +66,16 @@ const NODE_DEFINITIONS = {
     ], 
     outputPort: { name: 'Ciphertext', type: 'data' } 
   },
-  SYM_DEC: { label: 'Sym Decrypt', color: 'pink', icon: Unlock, inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }, { name: 'Key In', type: 'key', mandatory: true }], outputPort: { name: 'Plaintext', type: 'data' } },
+  SYM_DEC: { 
+    label: 'Sym Decrypt', 
+    color: 'pink', 
+    icon: Unlock, 
+    inputPorts: [
+        { name: 'Cipher In', type: 'data', mandatory: true, id: 'cipher' }, 
+        { name: 'Key In', type: 'key', mandatory: true, id: 'key' }
+    ], 
+    outputPort: { name: 'Plaintext', type: 'data' } 
+  },
 
   ASYM_ENC: { label: 'Asym Encrypt', color: 'cyan', icon: Lock, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Ciphertext', type: 'data' } },
   ASYM_DEC: { label: 'Asym Decrypt', color: 'teal', icon: Unlock, inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }], outputPort: { name: 'Plaintext', type: 'data' } },
@@ -196,7 +205,7 @@ const generateSymmetricKey = async (algorithm) => {
 const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     if (!dataStr) return 'Missing Data Input.';
     if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
-        return 'Missing or invalid Key Input.'; // FIX: Improved key input validation
+        return 'Missing or invalid Key Input.'; 
     }
     
     try {
@@ -234,6 +243,54 @@ const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     } catch (error) {
         console.error("Encryption failed:", error);
         return `ERROR: Encryption failed. ${error.message}`;
+    }
+};
+
+/** Decrypts data using an AES-GCM key. */
+const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
+    if (!base64Ciphertext) return 'Missing Ciphertext Input.';
+    if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
+        return 'Missing or invalid Key Input.'; 
+    }
+
+    try {
+        const keyBuffer = base64ToArrayBuffer(base64Key);
+        
+        // Import Key
+        const key = await crypto.subtle.importKey(
+            'raw',
+            keyBuffer,
+            { name: algorithm, length: 256 },
+            true, 
+            ['encrypt', 'decrypt']
+        );
+        
+        // Decode the full ciphertext (IV + Encrypted Data)
+        const fullCipherBuffer = base64ToArrayBuffer(base64Ciphertext);
+        
+        // Check if buffer is large enough for IV (12 bytes for AES-GCM)
+        if (fullCipherBuffer.byteLength < 12) {
+             throw new Error('Ciphertext is too short to contain IV.');
+        }
+
+        // Separate IV (first 12 bytes for AES-GCM) and Ciphertext
+        const iv = fullCipherBuffer.slice(0, 12);
+        const ciphertext = fullCipherBuffer.slice(12);
+
+        // Decrypt
+        const decryptedBuffer = await crypto.subtle.decrypt(
+            { name: algorithm, iv: new Uint8Array(iv) },
+            key,
+            ciphertext
+        );
+        
+        // Convert ArrayBuffer back to text
+        const decoder = new TextDecoder();
+        return decoder.decode(decryptedBuffer);
+
+    } catch (error) {
+        console.error("Decryption failed:", error);
+        return `ERROR: Decryption failed. ${error.message}. Check key/data integrity.`;
     }
 };
 
@@ -323,6 +380,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isHashFn = type === 'HASH_FN';
   const isKeyGen = type === 'KEY_GEN';
   const isSymEnc = type === 'SYM_ENC';
+  const isSymDec = type === 'SYM_DEC'; // NEW FLAG
   
   const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
   
@@ -561,7 +619,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
           {isKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({keyAlgorithm})</span>}
           {isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>} {/* ADDED for SymDec */}
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -695,7 +754,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && (
+        {isSymDec && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                    {isProcessing ? 'Decrypting...' : 'Active'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Plaintext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Key...'}
+                </p>
+            </div>
+        )}
+
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -711,8 +781,13 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 const Toolbar = ({ addNode }) => {
   return (
     <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
+      {/* Logo Container at the top of the left tool bar */}
       <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex justify-center items-center bg-white">
-        <div className="text-xl font-extrabold text-indigo-700">VisualCryptoLab</div>
+        <img 
+          src="VCL - Logo and Name.png"
+          alt="VisualCryptoLab Logo and Name" 
+          className="w-full h-auto max-w-[180px]"
+        />
       </div>
 
       <div className="flex flex-col space-y-1 p-3 overflow-y-auto pt-4">
@@ -835,6 +910,8 @@ const App = () => {
             
             inputSources.forEach(input => {
                 const outputType = NODE_DEFINITIONS[input.type]?.outputPort?.type;
+                // Since there are multiple inputs of type 'data' possible (data or ciphertext)
+                // we prioritize the first one found for simplicity in multi-input nodes like SymEnc/Dec
                 if (outputType === 'data' && !dataInput) {
                     dataInput = input.dataOutput;
                 } else if (outputType === 'key' && !keyInput) {
@@ -893,9 +970,36 @@ const App = () => {
                         outputData = 'Waiting for Data and Key inputs.';
                     }
                     break;
+                
+                case 'SYM_DEC': // NEW DECRYPT LOGIC
+                    if (dataInput && keyInput) {
+                        isProcessing = true;
+                        const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; // Assuming same as encryption
+
+                        symmetricDecrypt(dataInput, keyInput, algorithm).then(plaintext => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: plaintext, isProcessing: false } 
+                                    : n
+                            ));
+                        }).catch(err => {
+                             setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: `ERROR: Decrypt failed. ${err.message}`, isProcessing: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutput || 'Decrypting...';
+                    } else if (dataInput && !keyInput) {
+                        outputData = 'Waiting for Key input.';
+                    } else if (!dataInput && keyInput) {
+                        outputData = 'Waiting for Ciphertext input.';
+                    } else {
+                        outputData = 'Waiting for Cipher and Key inputs.';
+                    }
+                    break;
 
                 // Unimplemented Processing Nodes (They return the placeholder)
-                case 'SYM_DEC':
                 case 'ASYM_ENC':
                 case 'ASYM_DEC':
                 case 'XOR_OP':
@@ -966,7 +1070,7 @@ const App = () => {
     } else if (type === 'KEY_GEN') {
       initialContent.keyAlgorithm = 'AES-GCM';
       initialContent.key = null; // CryptoKey object
-    } else if (type === 'SYM_ENC') {
+    } else if (type === 'SYM_ENC' || type === 'SYM_DEC') { // Updated to include SymDec
       initialContent.symAlgorithm = 'AES-GCM';
     }
 
