@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Database, Zap, Settings, Lock, Unlock, Hash, ArrowRight, ArrowLeft } from 'lucide-react';
+import { LayoutGrid, Cpu, Key, Database, Zap, Settings, Lock, Unlock, Hash, ArrowRight, ArrowLeft, Clipboard, Code } from 'lucide-react';
 
 // =================================================================
 // 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS
@@ -7,31 +7,26 @@ import { LayoutGrid, Cpu, Key, Database, Zap, Settings, Lock, Unlock, Hash, Arro
 
 // --- Static Tailwind Class Maps (Ensures no dynamic class generation) ---
 
-// Map for DraggableBox main border (border-{color}-600)
 const BORDER_CLASSES = {
   blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', purple: 'border-purple-600', pink: 'border-pink-600', 
   cyan: 'border-cyan-600', teal: 'border-teal-600', gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
 };
 
-// Map for DraggableBox hover border (hover:border-{color}-500)
 const HOVER_BORDER_CLASSES = {
   blue: 'hover:border-blue-500', red: 'hover:border-red-500', orange: 'hover:border-orange-500', purple: 'hover:border-purple-500', pink: 'hover:border-pink-500', 
   cyan: 'hover:border-cyan-500', teal: 'hover:border-teal-500', gray: 'hover:border-gray-500', lime: 'hover:border-lime-500', indigo: 'hover:border-indigo-500',
 };
 
-// Map for Icon text color (text-{color}-600)
 const TEXT_ICON_CLASSES = {
   blue: 'text-blue-600', red: 'text-red-600', orange: 'text-orange-600', purple: 'text-purple-600', pink: 'text-pink-600', 
   cyan: 'text-cyan-600', teal: 'text-teal-600', gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
 };
 
-// Map for Sub-label text color (text-{color}-500)
 const TEXT_LABEL_CLASSES = {
   blue: 'text-blue-500', red: 'text-red-500', orange: 'text-orange-500', purple: 'text-purple-500', pink: 'text-pink-500', 
   cyan: 'text-cyan-500', teal: 'text-teal-500', gray: 'text-gray-500', lime: 'text-lime-500', indigo: 'text-indigo-500',
 };
 
-// Map for Toolbar hover border (hover:border-{color}-400)
 const HOVER_BORDER_TOOLBAR_CLASSES = {
   blue: 'hover:border-blue-400', red: 'hover:border-red-400', orange: 'hover:border-orange-400', purple: 'hover:border-purple-400', pink: 'hover:border-pink-400', 
   cyan: 'hover:border-cyan-400', teal: 'hover:border-teal-400', gray: 'hover:border-gray-400', lime: 'hover:border-lime-400', indigo: 'hover:border-indigo-400',
@@ -39,54 +34,83 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
 
 // --- Port Configuration ---
 const PORT_SIZE = 4; // w-4 h-4
-const INPUT_PORT_COLOR = 'bg-stone-500'; // Rojo/Marrón para Entrada
-const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Verde para Salida
+const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
+const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input (for future use)
+const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Output
 
-// Supported Hash Algorithms (Limited to standard Web Crypto API for security and stability)
+// Supported Hash Algorithms
 const HASH_ALGORITHMS = ['SHA-256', 'SHA-512'];
 
-// Node definitions for the simple app
+// Supported Symmetric Algorithms for KEY_GEN and SYM_ENC
+const SYM_ALGORITHMS = ['AES-GCM']; 
+
+// --- Node Definitions with detailed Port structure ---
+// inputPorts: [{ name: string, type: 'data'|'key'|'iv'|'public', mandatory: boolean }]
+// outputPort: { name: string, type: 'data'|'key'|'public'|'private' }
+
 const NODE_DEFINITIONS = {
-  // --- Cryptography & Utility Nodes ---
-  DATA_INPUT: { label: 'Input Data', color: 'blue', icon: LayoutGrid, hasInput: false, hasOutput: true },
-  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, hasInput: true, hasOutput: false },
+  // --- Core Nodes ---
+  DATA_INPUT: { label: 'Input Data', color: 'blue', icon: LayoutGrid, inputPorts: [], outputPort: { name: 'Data Out', type: 'data' } },
+  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: null },
   
-  KEY_GEN: { label: 'Key Generator', color: 'orange', icon: Key, hasInput: false, hasOutput: true }, // Key generator generally acts as a source
+  // --- Key/Cipher Nodes ---
+  KEY_GEN: { label: 'Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPort: { name: 'Key Out (AES)', type: 'key' } }, // Outputs an AES Key
   
-  SYM_ENC: { label: 'Sym Encrypt', color: 'red', icon: Lock, hasInput: true, hasOutput: true },
-  SYM_DEC: { label: 'Sym Decrypt', color: 'pink', icon: Unlock, hasInput: true, hasOutput: true },
+  SYM_ENC: { 
+    label: 'Sym Encrypt', 
+    color: 'red', 
+    icon: Lock, 
+    inputPorts: [
+        { name: 'Data In', type: 'data', mandatory: true, id: 'data' },
+        { name: 'Key In', type: 'key', mandatory: true, id: 'key' }
+    ], 
+    outputPort: { name: 'Ciphertext', type: 'data' } 
+  },
+  SYM_DEC: { label: 'Sym Decrypt', color: 'pink', icon: Unlock, inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }, { name: 'Key In', type: 'key', mandatory: true }], outputPort: { name: 'Plaintext', type: 'data' } },
 
-  ASYM_ENC: { label: 'Asym Encrypt', color: 'cyan', icon: Lock, hasInput: true, hasOutput: true },
-  ASYM_DEC: { label: 'Asym Decrypt', color: 'teal', icon: Unlock, hasInput: true, hasOutput: true },
+  ASYM_ENC: { label: 'Asym Encrypt', color: 'cyan', icon: Lock, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Ciphertext', type: 'data' } },
+  ASYM_DEC: { label: 'Asym Decrypt', color: 'teal', icon: Unlock, inputPorts: [{ name: 'Cipher In', type: 'data', mandatory: true }], outputPort: { name: 'Plaintext', type: 'data' } },
 
-  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, hasInput: true, hasOutput: true },
+  // --- Utility Nodes ---
+  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Hash Out', type: 'data' } },
 
-  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, hasInput: true, hasOutput: true },
-  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, hasInput: true, hasOutput: true },
+  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, inputPorts: [{ name: 'Input A', type: 'data', mandatory: true }, { name: 'Input B', type: 'data', mandatory: true }], outputPort: { name: 'Result', type: 'data' } },
+  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPort: { name: 'Result', type: 'data' } },
 };
 
 // Initial nodes on the canvas
 const INITIAL_NODES = [
   // Example initial nodes for demonstration
   { 
+    id: 'start_key', 
+    label: 'Key Generator', 
+    position: { x: 50, y: 50 }, 
+    type: 'KEY_GEN', 
+    color: 'orange', 
+    dataOutput: '', 
+    keyAlgorithm: 'AES-GCM',
+    key: null, // Stores the actual CryptoKey object
+  },
+  { 
     id: 'start_a', 
     label: 'Input Data', 
-    position: { x: 50, y: 50 }, 
+    position: { x: 50, y: 250 }, 
     type: 'DATA_INPUT', 
     color: 'blue', 
-    content: 'Hello World! This input box is now taller.', 
+    content: 'Secret Message', 
     format: 'Text (UTF-8)',
-    dataOutput: '' // New field for calculated output
+    dataOutput: 'Secret Message'
   },
-  { id: 'op_a', label: 'Sym Encrypt', position: { x: 250, y: 150 }, type: 'SYM_ENC', color: 'red', dataOutput: '' },
   { 
-    id: 'op_b', 
-    label: 'Hash Function', 
-    position: { x: 500, y: 50 }, 
-    type: 'HASH_FN', 
-    color: 'gray', 
+    id: 'op_a', 
+    label: 'Sym Encrypt', 
+    position: { x: 300, y: 150 }, 
+    type: 'SYM_ENC', 
+    color: 'red', 
     dataOutput: '',
-    hashAlgorithm: 'SHA-256', // NEW: Default Hash Algorithm
+    symAlgorithm: 'AES-GCM', // Sym Encrypt settings
+    key: null,
+    iv: null,
   },
   { 
     id: 'end_a', 
@@ -95,57 +119,47 @@ const INITIAL_NODES = [
     type: 'OUTPUT_VIEWER', 
     color: 'red', 
     dataOutput: '', 
-    viewFormat: 'Text (UTF-8)' // New field for viewing format
+    viewFormat: 'Text (UTF-8)'
   },
 ];
 
-// CHANGED: Fixed width (w-48) and minimum height for the box. Height is now auto (h-auto).
 const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
 
-// Calculates the path for the line connecting two ports (right of source to left of target)
-const getLinePath = (sourceNode, targetNode) => {
-  
-  // FIXED: Calculate port positions exactly on the edge
-  // Source Port is on the right edge, at 50% height (based on minHeight which the Port component uses)
-  const p1 = { 
-    x: sourceNode.position.x + BOX_SIZE.width, 
-    y: sourceNode.position.y + BOX_SIZE.minHeight / 2 
-  }; 
-  
-  // Target Port position is on the left edge, at 50% height
-  const p2 = { 
-    x: targetNode.position.x, 
-    y: targetNode.position.y + BOX_SIZE.minHeight / 2 
-  }; 
-  
-  // Use a smooth Bezier curve that flows horizontally
-  const midX = (p1.x + p2.x) / 2;
-  
-  // Draw from p1 (Output Port) to p2 (Input Port)
-  // Control points pull horizontally towards the center for a smooth arc
-  return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
+// --- Utility Functions for Web Crypto ---
+
+/** Converts ArrayBuffer to Base64 URL-safe string. */
+const arrayBufferToBase64 = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 };
 
-/**
- * Calculates the hash of a given string using the Web Crypto API.
- * @param {string} str The input string to hash.
- * @param {string} algorithm The hashing algorithm (e.g., 'SHA-256').
- * @returns {Promise<string>} The hexadecimal representation of the hash.
- */
+/** Converts Base64 URL-safe string to ArrayBuffer. */
+const base64ToArrayBuffer = (base64) => {
+  const binary_string = atob(base64);
+  const len = binary_string.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary_string.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+
+/** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
-  // FIX: Use the algorithm name directly as required by the Web Crypto API, 
-  // e.g., 'SHA-256' or 'SHA-512'.
   const webCryptoAlgorithm = algorithm.toUpperCase(); 
   
-  // Check for supported algorithm
   if (!HASH_ALGORITHMS.includes(algorithm)) {
-      return `ERROR: Algoritmo no soportado (${algorithm}).`;
+      return `ERROR: Algorithm not supported (${algorithm}).`;
   }
 
   try {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
-    // Use the dynamic algorithm name
     const hashBuffer = await crypto.subtle.digest(webCryptoAlgorithm, data);
     
     // Convert ArrayBuffer to hex string
@@ -154,55 +168,139 @@ const calculateHash = async (str, algorithm) => {
     
     return hashHex;
   } catch (error) {
-    // Log error for debugging, but return a user-friendly message
     console.error(`Error calculating hash with ${algorithm}:`, error);
-    return `ERROR: Cálculo fallido con ${algorithm}. Por favor, revisa la consola para detalles.`;
+    return `ERROR: Calculation failed with ${algorithm}. Check console for details.`;
   }
+};
+
+/** Generates an AES-GCM Key and returns it as a CryptoKey object and Base64 string. */
+const generateSymmetricKey = async (algorithm) => {
+    try {
+        const key = await crypto.subtle.generateKey(
+            { name: algorithm, length: 256 },
+            true, // extractable
+            ["encrypt", "decrypt"]
+        );
+        
+        const rawKey = await crypto.subtle.exportKey('raw', key);
+        const base64Key = arrayBufferToBase64(rawKey);
+        
+        return { keyObject: key, keyBase64: base64Key };
+    } catch (error) {
+        console.error("Key generation failed:", error);
+        return { keyObject: null, keyBase64: `ERROR: Key generation failed. ${error.message}` };
+    }
+};
+
+/** Encrypts data using an AES-GCM key. */
+const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
+    if (!dataStr) return 'Missing Data Input.';
+    if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
+        return 'Missing or invalid Key Input.'; // FIX: Improved key input validation
+    }
+    
+    try {
+        const keyBuffer = base64ToArrayBuffer(base64Key);
+        
+        // Import Key
+        const key = await crypto.subtle.importKey(
+            'raw',
+            keyBuffer,
+            { name: algorithm, length: 256 },
+            true, // extractable
+            ['encrypt', 'decrypt']
+        );
+        
+        // Generate a random Initialization Vector (IV)
+        const iv = crypto.getRandomValues(new Uint8Array(12)); 
+        
+        const encoder = new TextEncoder();
+        const dataBuffer = encoder.encode(dataStr);
+
+        // Encrypt
+        const encryptedBuffer = await crypto.subtle.encrypt(
+            { name: algorithm, iv: iv },
+            key,
+            dataBuffer
+        );
+        
+        // Concatenate IV and Ciphertext, then convert to Base64 for transport
+        const fullCipher = new Uint8Array(iv.byteLength + encryptedBuffer.byteLength);
+        fullCipher.set(new Uint8Array(iv), 0);
+        fullCipher.set(new Uint8Array(encryptedBuffer), iv.byteLength);
+
+        return arrayBufferToBase64(fullCipher.buffer);
+
+    } catch (error) {
+        console.error("Encryption failed:", error);
+        return `ERROR: Encryption failed. ${error.message}`;
+    }
+};
+
+
+// --- Graph Drawing Utilities ---
+
+// Calculates the path for the line connecting two ports (right of source to left of target)
+const getLinePath = (sourceNode, targetNode) => {
+  
+  // Calculate port positions exactly on the edge
+  // We use BOX_SIZE.minHeight / 2 as the vertical offset since Ports are styled with top: 50%
+  const p1 = { 
+    x: sourceNode.position.x + BOX_SIZE.width, 
+    y: sourceNode.position.y + BOX_SIZE.minHeight / 2 
+  }; 
+  
+  const p2 = { 
+    x: targetNode.position.x, 
+    y: targetNode.position.y + BOX_SIZE.minHeight / 2 
+  }; 
+  
+  // Use a smooth Bezier curve that flows horizontally
+  const midX = (p1.x + p2.x) / 2;
+  
+  // Control points pull horizontally towards the center for a smooth arc
+  return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
 };
 
 
 // --- Sub-Component for Ports (Visual and Interaction) ---
-const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEnd }) => {
-    // Determine hover/click logic based on port type
+const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEnd, title, portStyle, isMandatory, isInputConnected }) => {
     let interactionClasses = "";
     let clickHandler = () => {};
-    let isPortActive = false; // Is this port the active connection source?
+    
+    const portColor = isMandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR;
 
     if (type === 'output') {
-        // Output Ports start connections
         clickHandler = (e) => { e.stopPropagation(); onStart(nodeId); };
-        isPortActive = isConnecting === nodeId;
-        interactionClasses = isPortActive 
+        interactionClasses = isConnecting === nodeId 
             ? 'ring-4 ring-emerald-300 animate-pulse' 
             : 'hover:ring-4 hover:ring-emerald-300 transition duration-150';
     } else if (type === 'input') {
-        // Input Ports end connections (only if another node is currently connecting)
         const isTargetCandidate = isConnecting && isConnecting !== nodeId;
         
         if (isTargetCandidate) {
-            // Clicks trigger the onEnd handler (which is handleConnectEnd in DraggableBox)
             clickHandler = (e) => { e.stopPropagation(); onEnd(nodeId); };
             interactionClasses = 'ring-4 ring-yellow-300 cursor-pointer animate-pulse-slow';
         } else {
-             // If a connection is already established/no connection attempt is active, block interaction
-            interactionClasses = 'cursor-not-allowed opacity-70';
-            // Port's click handler stops propagation but does nothing else
+             // FIX: The port is disabled only if it's already connected AND the node only accepts one connection
+             // Since we allow multiple connections now (e.g., Sym Encrypt), we only disable the click if 
+             // it's NOT a target candidate, otherwise it should be available for connection.
+             interactionClasses = 'hover:ring-4 hover:ring-stone-300 transition duration-150';
             clickHandler = (e) => { e.stopPropagation(); }; 
         }
     }
     
-    // Stop propagation on mousedown/touchstart to prevent the parent DraggableBox from starting a drag/connection
     const stopPropagation = (e) => e.stopPropagation();
 
     return (
         <div 
-            className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${colorClass} absolute transform -translate-x-1/2 -translate-y-1/2 
+            className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${type === 'output' ? OUTPUT_PORT_COLOR : portColor} absolute transform -translate-x-1/2 -translate-y-1/2 
                         shadow-md border-2 border-white cursor-pointer ${interactionClasses}`}
             onClick={clickHandler}
             onMouseDown={stopPropagation}
             onTouchStart={stopPropagation}
-            style={{ top: '50%' }}
-            title={`${type === 'input' ? 'Puerto de Entrada' : 'Puerto de Salida'}`}
+            style={portStyle}
+            title={title}
         />
     );
 });
@@ -212,36 +310,32 @@ const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEn
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingNodeId, updateNodeContent, connections }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm } = node; // Added hashAlgorithm
+  const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, key, symAlgorithm } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
   const offset = useRef({ x: 0, y: 0 });
+  const [copyStatus, setCopyStatus] = useState('Copy'); 
 
   // Node specific flags
   const isDataInput = type === 'DATA_INPUT';
   const isOutputViewer = type === 'OUTPUT_VIEWER';
   const isHashFn = type === 'HASH_FN';
+  const isKeyGen = type === 'KEY_GEN';
+  const isSymEnc = type === 'SYM_ENC';
+  
   const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
   
-  // Constraint check: Check if this node's input port is already connected
-  const isInputConnected = connections.some(conn => conn.target === id);
-
-  // Determine connection state for visual feedback
-  const isConnectingSource = connectingNodeId === id;
-  
-  // Pass correct connection status to the Port components
-  const canStartConnection = !connectingNodeId;
-  const isPortTarget = connectingNodeId && connectingNodeId !== id && !isInputConnected;
+  // Get all connections where this node is the target (i.e., this node receives input)
+  const incomingConnections = connections.filter(conn => conn.target === id);
+  // Check if this node is currently the source of an outgoing connection attempt
   const isPortSource = connectingNodeId === id;
   
   
-  // --- Drag Handlers (largely unchanged) ---
+  // --- Drag Handlers (standard) ---
   const handleDragStart = useCallback((e) => {
     if (connectingNodeId) return; 
-
-    // Allow drag only if the event didn't originate from an interactive form element (textarea/select/port)
-    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'DIV'];
+    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'DIV', 'BUTTON']; // Added BUTTON
     if (e.target.tagName === 'DIV' && e.target.classList.contains('w-4') && e.target.classList.contains('h-4')) {
         return; // Clicked on a port, prevent drag
     }
@@ -255,7 +349,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     
     if (boxRef.current && canvas) {
       const canvasRect = canvas.getBoundingClientRect();
-      
       const mouseXRelativeToCanvas = clientX - canvasRect.left;
       const mouseYRelativeToCanvas = clientY - canvasRect.top;
 
@@ -278,7 +371,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
 
     const canvasRect = canvas.getBoundingClientRect();
-    
     const mouseXRelativeToCanvas = clientX - canvasRect.left;
     const mouseYRelativeToCanvas = clientY - canvasRect.top;
     
@@ -287,7 +379,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     
     // BOUNDS CHECKING
     const maxWidth = canvasRect.width - BOX_SIZE.width;
-    const maxHeight = canvasRect.height - BOX_SIZE.minHeight; // Using minHeight for initial boundary check
+    const maxHeight = canvasRect.height - BOX_SIZE.minHeight; 
 
     newX = Math.max(0, Math.min(newX, maxWidth));
     newY = Math.max(0, Math.min(newY, maxHeight));
@@ -299,7 +391,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     setIsDragging(false);
   }, []);
   
-  // Refactored click logic: now primarily handled by Ports for connection
   const handleBoxClick = useCallback((e) => {
     if (isDragging) return; 
     if (connectingNodeId) {
@@ -307,6 +398,38 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     }
     e.stopPropagation();
   }, [connectingNodeId, handleConnectEnd, isDragging]);
+
+  // Handle Copy to Clipboard for Output Viewer
+  const handleCopyToClipboard = useCallback((e) => {
+    e.stopPropagation();
+    if (!dataOutput) return;
+
+    try {
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = dataOutput;
+        
+        tempTextArea.style.position = 'fixed';
+        tempTextArea.style.left = '-9999px';
+        tempTextArea.style.top = '0';
+        tempTextArea.style.opacity = '0'; 
+
+        document.body.appendChild(tempTextArea);
+        
+        tempTextArea.select();
+        tempTextArea.setSelectionRange(0, 99999); 
+        
+        document.execCommand('copy');
+        
+        document.body.removeChild(tempTextArea);
+        setCopyStatus('Copied!');
+        setTimeout(() => setCopyStatus('Copy'), 1500); 
+        
+    } catch (err) {
+        console.error('Failed to copy text:', err);
+        setCopyStatus('Error');
+        setTimeout(() => setCopyStatus('Copy'), 2000);
+    }
+  }, [dataOutput]);
 
 
   // Attach global event listeners for dragging
@@ -331,26 +454,79 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   }, [isDragging, handleDragMove, handleDragEnd]);
 
 
+  // --- Port Rendering Logic ---
+  
+  const renderInputPorts = () => {
+    if (!definition.inputPorts || definition.inputPorts.length === 0) return null;
+    
+    const numPorts = definition.inputPorts.length;
+    // Calculate vertical offset for even distribution
+    const step = 100 / (numPorts + 1); 
+
+    return definition.inputPorts.map((portDef, index) => {
+        const topPosition = (index + 1) * step;
+        
+        // FIX: Remove 'isPortConnected' logic for visual disabling. 
+        // We rely on the App component's connection logic for validation.
+        
+        return (
+            <div 
+                key={portDef.name}
+                className="absolute -left-2 transform -translate-y-1/2 z-20"
+                style={{ top: `${topPosition}%` }}
+            >
+                <Port 
+                    nodeId={id} 
+                    type="input"
+                    // Use standard input color, but visually differentiate mandatory/optional via title
+                    colorClass={portDef.mandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR} 
+                    isConnecting={connectingNodeId}
+                    onStart={handleConnectStart} 
+                    // When not a target candidate, click action is still allowed to initiate target process
+                    onEnd={handleConnectEnd} 
+                    title={`${portDef.name} (${portDef.mandatory ? 'Mandatory' : 'Optional'})`}
+                    isMandatory={portDef.mandatory}
+                />
+            </div>
+        );
+    });
+  };
+
+  const renderOutputPort = () => {
+    if (!definition.outputPort) return null;
+    
+    // For simplicity, all single output ports are placed at 50% height
+    return (
+        <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 z-20">
+            <Port 
+                nodeId={id} 
+                type="output"
+                colorClass={OUTPUT_PORT_COLOR} 
+                isConnecting={connectingNodeId}
+                onStart={handleConnectStart}
+                onEnd={handleConnectEnd}
+                title={definition.outputPort.name}
+                isMandatory={true}
+            />
+        </div>
+    );
+  };
+  
   // --- Class Lookups ---
   const iconTextColorClass = TEXT_ICON_CLASSES[color] || 'text-gray-600';
-  const labelTextColorClass = TEXT_LABEL_CLASSES[color] || 'text-gray-500';
 
   let specificClasses = `${BORDER_CLASSES[color]} ${HOVER_BORDER_CLASSES[color]} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`;
 
-  // Visual feedback for connection state (now focusing more on drag/grab)
   if (isPortSource) {
     specificClasses = `border-emerald-500 ring-4 ring-emerald-300 cursor-pointer animate-pulse transition duration-200`; 
   } else {
     specificClasses = `${BORDER_CLASSES[color]} ${HOVER_BORDER_CLASSES[color]} ${isDragging ? 'cursor-grabbing' : 'cursor-pointer hover:border-blue-500'}`;
   }
   
-  // Add processing indicator class
   if (isProcessing) {
      specificClasses = `border-yellow-500 ring-4 ring-yellow-300 animate-pulse transition duration-200`; 
   }
 
-
-  // UPDATED: Base classes use w-48 and min-h-36, with h-auto and py-3 for padding
   const baseClasses = 
     `w-[${BOX_SIZE.width}px] min-h-[${BOX_SIZE.minHeight}px] h-auto flex flex-col justify-start items-center p-3 
     bg-white shadow-xl rounded-xl border-4 transition duration-150 ease-in-out 
@@ -372,51 +548,25 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     >
       
       {/* -------------------- PORTS -------------------- */}
-      {/* Ports are positioned absolutely relative to the container which now has variable height */}
-
-      {/* Input Port (Left Side - Rojo/Marrón) */}
-      {definition.hasInput && (
-        <div className="absolute top-1/2 -left-2 transform -translate-y-1/2 z-20">
-            <Port 
-                nodeId={id} 
-                type="input"
-                colorClass={INPUT_PORT_COLOR} 
-                isConnecting={connectingNodeId}
-                onStart={handleConnectStart} // Input ports don't start, but pass functions to Port
-                // If input is connected, pass a no-op function
-                onEnd={isInputConnected ? () => {} : handleConnectEnd} 
-            />
-        </div>
-      )}
-
-      {/* Output Port (Right Side - Verde) */}
-      {definition.hasOutput && (
-        <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 z-20">
-            <Port 
-                nodeId={id} 
-                type="output"
-                colorClass={OUTPUT_PORT_COLOR} 
-                isConnecting={connectingNodeId}
-                onStart={handleConnectStart} // Output ports start connections
-                onEnd={handleConnectEnd}
-            />
-        </div>
-      )}
+      {renderInputPorts()}
+      {renderOutputPort()}
 
       {/* -------------------- CONTENT -------------------- */}
-      {/* Inner content wrapper, removed p-2 since p-3 is on the parent */}
       <div className="flex flex-col h-full w-full justify-start items-center overflow-hidden">
         {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
           {definition.icon && <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />}
           <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
-          {!isDataInput && !isOutputViewer && <span className={`text-xs ${labelTextColorClass} mt-1`}>({definition.label})</span>}
+          {/* Show algorithm name for functional nodes */}
+          {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
+          {isKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({keyAlgorithm})</span>}
+          {isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
           /* Data Input Specific Controls */
           <div className="w-full flex flex-col items-center flex-grow">
-            {/* UPDATED: Textarea rows increased to 4, mb-2 margin added */}
             <textarea
               className="w-full text-xs p-2 border border-gray-200 rounded-lg shadow-md resize-none mb-2 
                          placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
@@ -425,19 +575,16 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
               placeholder="Enter data here..."
               value={content || ''}
               onChange={(e) => updateNodeContent(id, 'content', e.target.value)}
-              // Stop propagation to allow interaction
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => e.stopPropagation()} 
               onClick={(e) => e.stopPropagation()}
             />
-            {/* UPDATED: Select box with modern styling */}
             <select
               className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
                          bg-white appearance-none cursor-pointer text-gray-700 
                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
               value={format || 'Text (UTF-8)'}
               onChange={(e) => updateNodeContent(id, 'format', e.target.value)}
-              // Stop propagation to allow interaction
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
@@ -452,23 +599,33 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         {isOutputViewer && (
             /* Output Viewer Display */
             <div className="w-full mt-1 flex flex-col items-center flex-grow text-xs text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded-lg shadow-inner overflow-y-auto">
-                <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RESULTADO</span>
+                <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RESULT</span>
                 
-                {/* Data Display Area - Increased min-h-16 to give more room */}
                 <div className="w-full flex-grow break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200 min-h-[4rem]">
-                    <p>{dataOutput || 'No conectado o sin datos.'}</p>
+                    <p>{dataOutput || 'Not connected or no data.'}</p>
                 </div>
 
-                {/* Format Indicator (To be enhanced with a selector later) */}
-                <span className="text-[10px] text-gray-500 mt-auto flex-shrink-0">
-                    Vista actual: <span className="font-semibold text-gray-700">{viewFormat || 'Text (UTF-8)'}</span>
+                <button
+                    onClick={handleCopyToClipboard}
+                    disabled={!dataOutput}
+                    className={`mt-auto w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md 
+                                ${dataOutput 
+                                    ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
+                                    : 'bg-red-300 cursor-not-allowed'}`}
+                >
+                    <Clipboard className="w-4 h-4" />
+                    <span>{copyStatus}</span>
+                </button>
+
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">
+                    Current View: <span className="font-semibold text-gray-700">{viewFormat || 'Text (UTF-8)'}</span>
                 </span>
             </div>
         )}
 
         {isHashFn && (
              <div className="text-xs w-full text-center">
-                {/* New Algorithm Selector */}
+                {/* Algorithm Selector */}
                 <select
                   className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
                              bg-white appearance-none cursor-pointer text-gray-700 
@@ -485,17 +642,62 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </select>
 
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
-                    {isProcessing ? 'Calculando...' : `${hashAlgorithm || 'SHA-256'} Activo`}
+                    {isProcessing ? 'Calculating...' : 'Active'}
                 </span>
                 <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Hash: ${dataOutput.substring(0, 15)}...` : 'Esperando entrada...'}
+                    {dataOutput ? `Hash: ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                </p>
+            </div>
+        )}
+        
+        {isKeyGen && (
+            <div className="text-xs w-full text-center flex flex-col items-center">
+                <select
+                  className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                             bg-white appearance-none cursor-pointer text-gray-700 
+                             focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition duration-200"
+                  value={keyAlgorithm || 'AES-GCM'}
+                  onChange={(e) => updateNodeContent(id, 'keyAlgorithm', e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {SYM_ALGORITHMS.map(alg => (
+                    <option key={alg} value={alg}>{alg}</option>
+                  ))}
+                </select>
+                
+                <button
+                    onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
+                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-orange-500 hover:bg-orange-600`}
+                >
+                    <Key className="w-4 h-4" />
+                    <span>Generate New Key</span>
+                </button>
+
+                <span className={`font-semibold mt-2 ${dataOutput ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {isProcessing ? 'Generating...' : dataOutput ? 'Key Ready' : 'Click to Generate'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Key (Base64): ${dataOutput.substring(0, 15)}...` : 'No key generated.'}
+                </p>
+            </div>
+        )}
+        
+        {isSymEnc && (
+            <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                    {isProcessing ? 'Encrypting...' : 'Active'}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Ciphertext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Key...'}
                 </p>
             </div>
         )}
 
-        {!isDataInput && !isOutputViewer && !isHashFn && (
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && (
             <div className="text-xs text-gray-500 mt-2">
-                <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Esperando conexión'}</p>
+                <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
         )}
       </div>
@@ -504,21 +706,17 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 };
 
 
-// --- Toolbar Component (No functional changes) ---
+// --- Toolbar Component (Standard) ---
 
 const Toolbar = ({ addNode }) => {
   return (
     <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
-      {/* Logo Container at the top of the left tool bar */}
       <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex justify-center items-center bg-white">
-        {/* Placeholder for the logo image */}
         <div className="text-xl font-extrabold text-indigo-700">VisualCryptoLab</div>
       </div>
 
-      {/* Node list container */}
       <div className="flex flex-col space-y-1 p-3 overflow-y-auto pt-4">
         
-        {/* Map over all defined node types */}
         {Object.entries(NODE_DEFINITIONS).map(([type, def]) => {
             const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
             const iconTextColorClass = TEXT_ICON_CLASSES[def.color] || 'text-gray-600';
@@ -550,22 +748,20 @@ const App = () => {
   const [connections, setConnections] = useState([]); 
   const [connectingNodeId, setConnectingNodeId] = useState(null); 
   const canvasRef = useRef(null);
-
-  // Helper to map connections by target (Input Node ID) for easy lookup (Constraint #3)
-  const targetMap = useMemo(() => {
-    return connections.reduce((acc, conn) => {
-      acc[conn.target] = conn.source;
-      return acc;
-    }, {});
-  }, [connections]);
   
-  // --- Core Logic: Graph Recalculation (Data Flow Engine Placeholder) ---
+  // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
     const newNodesMap = new Map(currentNodes.map(n => [n.id, { ...n }]));
     
-    // Nodes that need to be re-evaluated (starting with data inputs and the node that was just changed)
-    let initialQueue = new Set(currentNodes.filter(n => n.type === 'DATA_INPUT').map(n => n.id));
+    // FIX: Use NODE_DEFINITIONS to safely check if a node is a source (has no input ports)
+    // Initial nodes to process: Data sources (inputs, keygens) and the node that was just changed
+    let initialQueue = new Set(currentNodes.filter(n => {
+        const def = NODE_DEFINITIONS[n.type];
+        // Check if definition exists and if its inputPorts array is empty
+        return def && def.inputPorts && def.inputPorts.length === 0;
+    }).map(n => n.id));
+    
     if (changedNodeId) initialQueue.add(changedNodeId);
     
     const nodesToProcess = Array.from(initialQueue);
@@ -584,73 +780,133 @@ const App = () => {
         if (processed.has(sourceId) || !newNodesMap.has(sourceId)) continue; 
 
         const sourceNode = newNodesMap.get(sourceId);
-        
+        const sourceNodeDef = NODE_DEFINITIONS[sourceNode.type];
+
         let outputData = '';
         let isProcessing = false;
 
-        if (sourceNode.type === 'DATA_INPUT') {
-            outputData = sourceNode.content || '';
-        } else {
-            // Processing nodes
-            const inputSourceId = currentConnections.find(c => c.target === sourceId)?.source;
-            if (inputSourceId) {
-                const inputNode = newNodesMap.get(inputSourceId);
+        // --- SOURCE NODES (No input ports) ---
+        if (sourceNodeDef.inputPorts.length === 0) {
+            
+            if (sourceNode.type === 'DATA_INPUT') {
+                outputData = sourceNode.content || '';
+            } else if (sourceNode.type === 'KEY_GEN') {
                 
-                if (inputNode) {
-                    const inputData = inputNode.dataOutput || '';
-                    
-                    switch (sourceNode.type) {
-                        case 'OUTPUT_VIEWER':
-                            outputData = inputData;
-                            break;
-                            
-                        case 'HASH_FN':
-                            const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
-
-                            if (inputData) {
-                                isProcessing = true;
-                                // Perform the async calculation and update the node state
-                                calculateHash(inputData, algorithm).then(hashResult => {
-                                    setNodes(prevNodes => prevNodes.map(n => 
-                                        n.id === sourceId 
-                                            ? { ...n, dataOutput: hashResult, isProcessing: false } 
-                                            : n
-                                    ));
-                                }).catch(err => {
-                                    setNodes(prevNodes => prevNodes.map(n => 
-                                        n.id === sourceId 
-                                            ? { ...n, dataOutput: `Error Hash: ${err.message}`, isProcessing: false } 
-                                            : n
-                                    ));
-                                });
-                                // Temporarily set output while processing
-                                outputData = sourceNode.dataOutput || 'Calculando...';
-                            } else {
-                                outputData = 'Esperando datos válidos.';
-                            }
-                            break;
-
-                        // Unimplemented Processing Nodes (They return the placeholder)
-                        case 'SYM_ENC':
-                        case 'SYM_DEC':
-                        case 'ASYM_ENC':
-                        case 'ASYM_DEC':
-                        case 'XOR_OP':
-                        case 'SHIFT_OP':
-                        case 'KEY_GEN': 
-                            outputData = `Processed(PENDIENTE) by ${sourceNode.label}`;
-                            break;
-                            
-                        default:
-                            outputData = 'ERROR: Tipo de nodo no reconocido.';
+                if (sourceNode.key || sourceNode.generateKey) {
+                    isProcessing = true;
+                    // Only generate key if 'generateKey' flag is set (via button click) or if key is null
+                    if (!sourceNode.key || sourceNode.generateKey) {
+                         const algorithm = sourceNode.keyAlgorithm || 'AES-GCM';
+                         
+                         generateSymmetricKey(algorithm).then(({ keyObject, keyBase64 }) => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: keyBase64, key: keyObject, isProcessing: false, generateKey: false } 
+                                    : n
+                            ));
+                        }).catch(err => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: `ERROR: Key gen failed.`, isProcessing: false, generateKey: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutput || 'Generating Key...';
+                    } else {
+                        // Key already exists, just pass it through
+                        outputData = sourceNode.dataOutput || '';
+                        isProcessing = false;
                     }
 
                 } else {
-                    outputData = `Error: Input Source Missing (ID: ${inputSourceId})`;
+                    outputData = 'Click "Generate New Key"';
                 }
-            } else {
-                outputData = 'Esperando conexión de entrada';
             }
+        
+        // --- PROCESSING/SINK NODES (Have input ports) ---
+        } else {
+            // Collect all incoming connections to this target node
+            const incomingConns = currentConnections.filter(c => c.target === sourceId);
+            const inputSources = incomingConns.map(conn => newNodesMap.get(conn.source));
+
+            // Map inputs to data types for multi-input nodes
+            let dataInput = null;
+            let keyInput = null; 
+            
+            inputSources.forEach(input => {
+                const outputType = NODE_DEFINITIONS[input.type]?.outputPort?.type;
+                if (outputType === 'data' && !dataInput) {
+                    dataInput = input.dataOutput;
+                } else if (outputType === 'key' && !keyInput) {
+                    keyInput = input.dataOutput;
+                }
+            });
+
+
+            switch (sourceNode.type) {
+                case 'OUTPUT_VIEWER':
+                    outputData = dataInput || 'No connected input.';
+                    break;
+                    
+                case 'HASH_FN':
+                    const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
+
+                    if (dataInput) {
+                        isProcessing = true;
+                        calculateHash(dataInput, algorithm).then(hashResult => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: hashResult, isProcessing: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutput || 'Calculating...';
+                    } else {
+                        outputData = 'Waiting for data input.';
+                    }
+                    break;
+                    
+                case 'SYM_ENC':
+                    if (dataInput && keyInput) {
+                        isProcessing = true;
+                        const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
+
+                        symmetricEncrypt(dataInput, keyInput, algorithm).then(ciphertext => {
+                            setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: ciphertext, isProcessing: false } 
+                                    : n
+                            ));
+                        }).catch(err => {
+                             setNodes(prevNodes => prevNodes.map(n => 
+                                n.id === sourceId 
+                                    ? { ...n, dataOutput: `ERROR: Encrypt failed. ${err.message}`, isProcessing: false } 
+                                    : n
+                            ));
+                        });
+                        outputData = sourceNode.dataOutput || 'Encrypting...';
+                    } else if (dataInput && !keyInput) {
+                        outputData = 'Waiting for Key input.';
+                    } else if (!dataInput && keyInput) {
+                        outputData = 'Waiting for Data input.';
+                    } else {
+                        outputData = 'Waiting for Data and Key inputs.';
+                    }
+                    break;
+
+                // Unimplemented Processing Nodes (They return the placeholder)
+                case 'SYM_DEC':
+                case 'ASYM_ENC':
+                case 'ASYM_DEC':
+                case 'XOR_OP':
+                case 'SHIFT_OP':
+                    outputData = `Processed(PENDING) by ${sourceNode.label}`;
+                    break;
+                    
+                default:
+                    outputData = 'ERROR: Unrecognized Node Type.';
+            }
+
         }
         
         // Update the node's output and processing status
@@ -666,20 +922,20 @@ const App = () => {
     
     // Convert map back to array
     return Array.from(newNodesMap.values());
-  }, [setNodes]); // Added setNodes to dependencies because recalculateGraph now performs async state updates
+  }, [setNodes]);
   
   // --- Effects for Recalculation ---
   
-  // Recalculate graph whenever connections change
   useEffect(() => {
     setNodes(prevNodes => recalculateGraph(prevNodes, connections));
   }, [connections, recalculateGraph]);
 
-  // Recalculate graph whenever *only* content changes (must run after position/ID changes)
   const updateNodeContent = useCallback((id, field, value) => {
     setNodes(prevNodes => {
         const nextNodes = prevNodes.map(node =>
-            node.id === id ? { ...node, [field]: value } : node
+            node.id === id 
+                ? { ...node, [field]: value, generateKey: (field === 'generateKey' ? value : node.generateKey) } // Handle key gen button flag
+                : node
         );
         // Pass the changed node ID to ensure recalculation starts from that point.
         return recalculateGraph(nextNodes, connections, id);
@@ -705,8 +961,13 @@ const App = () => {
       initialContent.format = 'Text (UTF-8)';
     } else if (type === 'OUTPUT_VIEWER') {
       initialContent.viewFormat = 'Text (UTF-8)';
-    } else if (type === 'HASH_FN') { // Initialize hash algorithm
+    } else if (type === 'HASH_FN') { 
       initialContent.hashAlgorithm = 'SHA-256';
+    } else if (type === 'KEY_GEN') {
+      initialContent.keyAlgorithm = 'AES-GCM';
+      initialContent.key = null; // CryptoKey object
+    } else if (type === 'SYM_ENC') {
+      initialContent.symAlgorithm = 'AES-GCM';
     }
 
     setNodes(prevNodes => [
@@ -718,39 +979,33 @@ const App = () => {
         type: type, 
         color: color,
         dataOutput: '',
-        isProcessing: false, // New field for processing status
+        isProcessing: false, 
         ...initialContent 
       },
     ]);
   }, []);
 
-  // NEW: Start a connection from an Output Port
   const handleConnectStart = useCallback((nodeId) => {
     setConnectingNodeId(nodeId);
   }, []);
 
-  // NEW: End a connection at an Input Port
   const handleConnectEnd = useCallback((targetId) => {
-    // Check if connection attempt is valid
     if (connectingNodeId && targetId && connectingNodeId !== targetId) {
-      // 1. Check Constraint: Only one connection per Input Port (target node)
-      const isTargetAlreadyConnected = connections.some(c => c.target === targetId);
+      // 1. Check Constraint: If target has only ONE port, prevent connecting if already connected
+      // If the target has multiple ports (like Sym Encrypt), allow multiple connections.
+      const targetNodeDef = NODE_DEFINITIONS[nodes.find(n => n.id === targetId)?.type];
       
-      if (isTargetAlreadyConnected) {
+      if (targetNodeDef.inputPorts.length === 1 && connections.some(c => c.target === targetId)) {
         console.warn(`Cannot connect: Node ${targetId} (Input Port) is already connected.`);
-        // Note: No alert() used, just a console log
       } else {
-        // 2. Check Constraint: Must connect output (source) to input (target)
         const targetNode = nodes.find(n => n.id === targetId);
-        // Safety check if target node exists
         if (!targetNode) {
              console.warn(`Cannot connect: Target node ${targetId} not found.`);
              setConnectingNodeId(null);
              return;
         }
 
-        const targetDef = NODE_DEFINITIONS[targetNode.type];
-        if (targetDef && targetDef.hasInput) {
+        if (targetNodeDef && targetNodeDef.inputPorts.length > 0) {
              setConnections(prevConnections => [
               ...prevConnections, 
               { source: connectingNodeId, target: targetId }
@@ -760,18 +1015,15 @@ const App = () => {
         }
       }
     }
-    // Always reset the connecting state
     setConnectingNodeId(null);
   }, [connectingNodeId, connections, nodes]);
 
-  // NEW: Function to remove a connection by its source and target IDs
   const handleRemoveConnection = useCallback((sourceId, targetId) => {
     setConnections(prevConnections => 
         prevConnections.filter(c => !(c.source === sourceId && c.target === targetId))
     );
   }, []);
   
-  // Prepare connections data for SVG
   const connectionPaths = useMemo(() => {
     return connections.map(conn => {
       const sourceNode = nodes.find(n => n.id === conn.source);
@@ -800,9 +1052,8 @@ const App = () => {
       stroke-dasharray: 20 10;
       stroke-dashoffset: 1000;
       animation: dash 5s linear infinite;
-      transition: stroke-dashoffset 0.5s ease-out; /* Smooth transition */
+      transition: stroke-dashoffset 0.5s ease-out;
     }
-    /* Slow blink for target port candidate */
     @keyframes animate-pulse-slow {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -811,58 +1062,49 @@ const App = () => {
       animation: animate-pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
     .connection-line:hover {
-        stroke: #f87171 !important; /* Tailwind red-400 */
-        stroke-width: 6 !important; /* Make line thicker on hover */
+        stroke: #f87171 !important;
+        stroke-width: 6 !important;
         cursor: pointer;
     }
   `;
   
-  // Handle click on canvas background to cancel connection
   const handleCanvasClick = useCallback(() => {
     if (connectingNodeId) {
-      handleConnectEnd(null); // Cancel connection
+      handleConnectEnd(null);
     }
   }, [connectingNodeId, handleConnectEnd]);
 
   return (
-    // Outer container: Flex row layout, h-screen w-screen for full viewport
     <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
-      {/* Inject custom CSS for animation */}
       <style dangerouslySetInnerHTML={{ __html: animatedLineStyle }} />
 
-      {/* 1. Toolbar (Left Panel) */}
       <Toolbar addNode={addNode} />
 
-      {/* 2. Main Content Area (Flex Column to hold header and canvas) */}
       <div className="flex-grow flex flex-col p-4">
         
-        {/* Main Canvas Container - uses flex-grow to fill remaining vertical space. */}
         <div 
           ref={canvasRef}
           className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner overflow-hidden"
           onClick={handleCanvasClick}
         >
           
-          {/* SVG layer for the connection lines */}
           <svg className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0">
             {connectionPaths.map((conn, index) => (
               <path
                 key={`${conn.source}-${conn.target}`}
                 d={conn.path}
-                stroke="#059669" // Emerald 600
+                stroke="#059669"
                 strokeWidth="4"
                 fill="none"
-                className="animate-line connection-line" // Added connection-line class
-                // Enable click interaction on the line itself
+                className="animate-line connection-line"
                 onClick={(e) => { 
-                    e.stopPropagation(); // Prevent canvas click from cancelling connection mode
+                    e.stopPropagation();
                     handleRemoveConnection(conn.source, conn.target);
                 }}
               />
             ))}
           </svg>
 
-          {/* Render all Draggable Boxes (z-10 ensures they are above the SVG) */}
           {nodes.map(node => (
             <DraggableBox
               key={node.id}
@@ -873,7 +1115,7 @@ const App = () => {
               handleConnectStart={handleConnectStart}
               handleConnectEnd={handleConnectEnd}
               connectingNodeId={connectingNodeId}
-              connections={connections} // Pass connections to enforce the one-input constraint visually
+              connections={connections}
             />
           ))}
           
