@@ -61,7 +61,15 @@ const NODE_DEFINITIONS = {
 // Initial nodes on the canvas
 const INITIAL_NODES = [
   // Example initial nodes for demonstration
-  { id: 'start_a', label: 'Input Data', position: { x: 50, y: 50 }, type: 'DATA_INPUT', color: 'blue' },
+  { 
+    id: 'start_a', 
+    label: 'Input Data', 
+    position: { x: 50, y: 50 }, 
+    type: 'DATA_INPUT', 
+    color: 'blue', 
+    content: 'Hello World!', 
+    format: 'Text (UTF-8)' 
+  },
   { id: 'op_a', label: 'Sym Encrypt', position: { x: 250, y: 150 }, type: 'SYM_ENC', color: 'purple' },
   { id: 'op_b', label: 'Hash Function', position: { x: 500, y: 50 }, type: 'HASH_FN', color: 'gray' },
   { id: 'end_a', label: 'Output Viewer', position: { x: 700, y: 250 }, type: 'OUTPUT_VIEWER', color: 'red' },
@@ -93,14 +101,19 @@ const getLinePath = (pos1, pos2) => {
 
 // --- Component for the Draggable Box ---
 
-const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingNodeId }) => {
-  const { id, label, position, type, color } = node;
+const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingNodeId, updateNodeContent }) => {
+  // Destructure content and format for DATA_INPUT node
+  const { id, label, position, type, color, content, format } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
   const offset = useRef({ x: 0, y: 0 });
 
-  // NEW: Determine connection state for visual feedback
+  // Node specific flags
+  const isDataInput = type === 'DATA_INPUT';
+  const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
+
+  // Determine connection state for visual feedback
   const isConnectingSource = connectingNodeId === id;
   const isTargetCandidate = connectingNodeId && connectingNodeId !== id;
   
@@ -108,6 +121,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const handleDragStart = useCallback((e) => {
     // Only allow drag if not currently in a connection attempt mode
     if (connectingNodeId) return; 
+
+    // Allow drag only if the event didn't originate from an interactive form element (textarea/select)
+    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION'];
+    if (interactiveTags.includes(e.target.tagName)) {
+        return; // Don't start drag if interacting with form elements
+    }
 
     const clientX = e.clientX || (e.touches?.[0]?.clientX ?? 0);
     const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
@@ -162,7 +181,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     setIsDragging(false);
   }, []);
   
-  // NEW: Handle click for connection logic
+  // Handle click for connection logic
   const handleBoxClick = useCallback((e) => {
     if (isDragging) return; // Ignore click if it was part of a drag movement
 
@@ -236,15 +255,51 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         width: `${BOX_SIZE.width}px`,
         height: `${BOX_SIZE.height}px`,
       }} 
-      onMouseDown={handleDragStart}
-      onTouchStart={handleDragStart}
-      onClick={handleBoxClick} // NEW: Handle click for connection logic
+      onMouseDown={handleDragStart} // Keep drag start on the container
+      onTouchStart={handleDragStart} // Keep drag start on the container
+      onClick={handleBoxClick} // Keep box click logic
     >
-      {/* Refactored icon class usage */}
-      {definition.icon && <definition.icon className={`w-8 h-8 ${iconTextColorClass} mb-2`} />}
-      <span className="text-lg font-bold text-gray-800 text-center px-2">{label}</span>
-      {/* Refactored label class usage */}
-      <span className={`text-xs ${labelTextColorClass} mt-1`}>({definition.label})</span>
+      {/* Content wrapper: adjusted to use space more efficiently for input node */}
+      <div className="flex flex-col h-full w-full justify-start items-center p-2">
+        {/* Top Section: Icon and Main Label */}
+        <div className="flex flex-col justify-start items-center w-full flex-shrink-0">
+          {/* Icon size slightly smaller for input node to save space */}
+          {definition.icon && <definition.icon className={`w-${isDataInput ? 6 : 8} h-${isDataInput ? 6 : 8} ${iconTextColorClass} ${isDataInput ? 'mb-1' : 'mb-2'}`} />}
+          <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
+          {/* Standard Node Sub-label below main label if not input node */}
+          {!isDataInput && <span className={`text-xs ${labelTextColorClass} mt-1`}>({definition.label})</span>}
+        </div>
+        
+        {isDataInput && (
+          /* Data Input Specific Controls */
+          <div className="w-full flex flex-col items-center mt-2 flex-grow">
+            <textarea
+              className="w-full text-xs p-1 border border-gray-300 rounded-md shadow-inner resize-none mb-1 focus:ring-2 focus:ring-blue-300 outline-none transition duration-150"
+              rows="2"
+              placeholder="Enter data here..."
+              value={content || ''}
+              onChange={(e) => updateNodeContent(id, 'content', e.target.value)}
+              // Stop propagation to allow interaction
+              onMouseDown={(e) => e.stopPropagation()} 
+              onTouchStart={(e) => e.stopPropagation()} 
+              onClick={(e) => e.stopPropagation()}
+            />
+            <select
+              className="w-full text-xs p-1 border border-gray-300 rounded-md shadow-sm bg-gray-50 focus:ring-2 focus:ring-blue-300 outline-none cursor-pointer"
+              value={format || 'Text (UTF-8)'}
+              onChange={(e) => updateNodeContent(id, 'format', e.target.value)}
+              // Stop propagation to allow interaction
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {FORMATS.map(f => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -257,11 +312,8 @@ const Toolbar = ({ addNode }) => {
     <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
       {/* Logo Container at the top of the left tool bar */}
       <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex justify-center items-center bg-white">
-        <img 
-          src="VCL - Logo.png" // UPDATED: Using the user's requested relative path for external deployment
-          alt="VisualCryptoLab Logo and Name " 
-          className="w-full h-auto max-w-[180px]"
-        />
+        {/* Placeholder for the logo image */}
+        <div className="text-xl font-extrabold text-indigo-700">VisualCryptoLab</div>
       </div>
 
       {/* Node list container - REMOVED 'Add Nodes' H3. Added pt-4 for separation. */}
@@ -298,8 +350,8 @@ const Toolbar = ({ addNode }) => {
 
 const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
-  const [connections, setConnections] = useState([]); // NEW: State to store {source: id, target: id}
-  const [connectingNodeId, setConnectingNodeId] = useState(null); // NEW: State for connection source
+  const [connections, setConnections] = useState([]); // State to store {source: id, target: id}
+  const [connectingNodeId, setConnectingNodeId] = useState(null); // State for connection source
   const canvasRef = useRef(null);
 
   // Function to update the position of a specific box
@@ -308,12 +360,23 @@ const App = () => {
       node.id === id ? { ...node, position: newPos } : node
     ));
   }, []);
+  
+  // NEW: Function to update the data content or format of a specific node
+  const updateNodeContent = useCallback((id, field, value) => {
+    setNodes(prevNodes => prevNodes.map(node =>
+      node.id === id ? { ...node, [field]: value } : node
+    ));
+  }, []);
+
 
   // Function to add a new node
   const addNode = useCallback((type, label, color) => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
+    // Default content/format if it's a DATA_INPUT
+    const initialContent = type === 'DATA_INPUT' ? { content: '', format: 'Text (UTF-8)' } : {};
+
     setNodes(prevNodes => [
       ...prevNodes,
       { 
@@ -321,7 +384,8 @@ const App = () => {
         label: definition.label, 
         position: { x: 50 + Math.random() * 200, y: 50 + Math.random() * 200 }, // Random spawn near top-left
         type: type, 
-        color: color 
+        color: color,
+        ...initialContent // Add initial content/format if applicable
       },
     ]);
   }, []);
@@ -351,7 +415,7 @@ const App = () => {
     setConnectingNodeId(null);
   }, [connectingNodeId, connections]);
   
-  // NEW: Prepare connections data for SVG
+  // Prepare connections data for SVG
   const connectionPaths = connections.map(conn => {
     const sourceNode = nodes.find(n => n.id === conn.source);
     const targetNode = nodes.find(n => n.id === conn.target);
@@ -397,8 +461,6 @@ const App = () => {
       {/* 2. Main Content Area (Flex Column to hold header and canvas) */}
       <div className="flex-grow flex flex-col p-4">
         
-        {/* Header Container - REMOVED entirely, leaving only the canvas */}
-        
         {/* Main Canvas Container - uses flex-grow to fill remaining vertical space. Removed mt-4 for better fit. */}
         <div 
           ref={canvasRef}
@@ -426,10 +488,11 @@ const App = () => {
               key={node.id}
               node={node}
               setPosition={setPosition}
+              updateNodeContent={updateNodeContent} // NEW PROP
               canvasRef={canvasRef}
-              handleConnectStart={handleConnectStart} // NEW
-              handleConnectEnd={handleConnectEnd}     // NEW
-              connectingNodeId={connectingNodeId}     // NEW
+              handleConnectStart={handleConnectStart}
+              handleConnectEnd={handleConnectEnd}
+              connectingNodeId={connectingNodeId}
             />
           ))}
           
