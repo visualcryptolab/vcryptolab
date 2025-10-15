@@ -1,2 +1,2 @@
-# visualcryptolab.github.io
+# VisualCryptoLab
 A visual laboratory to learn cryptography
