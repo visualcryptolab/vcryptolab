@@ -42,6 +42,9 @@ const PORT_SIZE = 4; // w-4 h-4
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Rojo/Marrón para Entrada
 const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Verde para Salida
 
+// Supported Hash Algorithms (Limited to standard Web Crypto API for security and stability)
+const HASH_ALGORITHMS = ['SHA-256', 'SHA-512'];
+
 // Node definitions for the simple app
 const NODE_DEFINITIONS = {
   // --- Cryptography & Utility Nodes ---
@@ -50,7 +53,7 @@ const NODE_DEFINITIONS = {
   
   KEY_GEN: { label: 'Key Generator', color: 'orange', icon: Key, hasInput: false, hasOutput: true }, // Key generator generally acts as a source
   
-  SYM_ENC: { label: 'Sym Encrypt', color: 'purple', icon: Lock, hasInput: true, hasOutput: true },
+  SYM_ENC: { label: 'Sym Encrypt', color: 'red', icon: Lock, hasInput: true, hasOutput: true },
   SYM_DEC: { label: 'Sym Decrypt', color: 'pink', icon: Unlock, hasInput: true, hasOutput: true },
 
   ASYM_ENC: { label: 'Asym Encrypt', color: 'cyan', icon: Lock, hasInput: true, hasOutput: true },
@@ -75,8 +78,16 @@ const INITIAL_NODES = [
     format: 'Text (UTF-8)',
     dataOutput: '' // New field for calculated output
   },
-  { id: 'op_a', label: 'Sym Encrypt', position: { x: 250, y: 150 }, type: 'SYM_ENC', color: 'purple', dataOutput: '' },
-  { id: 'op_b', label: 'Hash Function', position: { x: 500, y: 50 }, type: 'HASH_FN', color: 'gray', dataOutput: '' },
+  { id: 'op_a', label: 'Sym Encrypt', position: { x: 250, y: 150 }, type: 'SYM_ENC', color: 'red', dataOutput: '' },
+  { 
+    id: 'op_b', 
+    label: 'Hash Function', 
+    position: { x: 500, y: 50 }, 
+    type: 'HASH_FN', 
+    color: 'gray', 
+    dataOutput: '',
+    hashAlgorithm: 'SHA-256', // NEW: Default Hash Algorithm
+  },
   { 
     id: 'end_a', 
     label: 'Output Viewer', 
@@ -113,6 +124,40 @@ const getLinePath = (sourceNode, targetNode) => {
   // Draw from p1 (Output Port) to p2 (Input Port)
   // Control points pull horizontally towards the center for a smooth arc
   return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
+};
+
+/**
+ * Calculates the hash of a given string using the Web Crypto API.
+ * @param {string} str The input string to hash.
+ * @param {string} algorithm The hashing algorithm (e.g., 'SHA-256').
+ * @returns {Promise<string>} The hexadecimal representation of the hash.
+ */
+const calculateHash = async (str, algorithm) => {
+  // FIX: Use the algorithm name directly as required by the Web Crypto API, 
+  // e.g., 'SHA-256' or 'SHA-512'.
+  const webCryptoAlgorithm = algorithm.toUpperCase(); 
+  
+  // Check for supported algorithm
+  if (!HASH_ALGORITHMS.includes(algorithm)) {
+      return `ERROR: Algoritmo no soportado (${algorithm}).`;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    // Use the dynamic algorithm name
+    const hashBuffer = await crypto.subtle.digest(webCryptoAlgorithm, data);
+    
+    // Convert ArrayBuffer to hex string
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    return hashHex;
+  } catch (error) {
+    // Log error for debugging, but return a user-friendly message
+    console.error(`Error calculating hash with ${algorithm}:`, error);
+    return `ERROR: Cálculo fallido con ${algorithm}. Por favor, revisa la consola para detalles.`;
+  }
 };
 
 
@@ -167,7 +212,7 @@ const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEn
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingNodeId, updateNodeContent, connections }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, viewFormat } = node; // Added viewFormat
+  const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm } = node; // Added hashAlgorithm
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
@@ -176,6 +221,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   // Node specific flags
   const isDataInput = type === 'DATA_INPUT';
   const isOutputViewer = type === 'OUTPUT_VIEWER';
+  const isHashFn = type === 'HASH_FN';
   const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
   
   // Constraint check: Check if this node's input port is already connected
@@ -297,6 +343,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   } else {
     specificClasses = `${BORDER_CLASSES[color]} ${HOVER_BORDER_CLASSES[color]} ${isDragging ? 'cursor-grabbing' : 'cursor-pointer hover:border-blue-500'}`;
   }
+  
+  // Add processing indicator class
+  if (isProcessing) {
+     specificClasses = `border-yellow-500 ring-4 ring-yellow-300 animate-pulse transition duration-200`; 
+  }
 
 
   // UPDATED: Base classes use w-48 and min-h-36, with h-auto and py-3 for padding
@@ -415,7 +466,34 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {!isDataInput && !isOutputViewer && (
+        {isHashFn && (
+             <div className="text-xs w-full text-center">
+                {/* New Algorithm Selector */}
+                <select
+                  className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                             bg-white appearance-none cursor-pointer text-gray-700 
+                             focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none transition duration-200"
+                  value={hashAlgorithm || 'SHA-256'}
+                  onChange={(e) => updateNodeContent(id, 'hashAlgorithm', e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {HASH_ALGORITHMS.map(alg => (
+                    <option key={alg} value={alg}>{alg}</option>
+                  ))}
+                </select>
+
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                    {isProcessing ? 'Calculando...' : `${hashAlgorithm || 'SHA-256'} Activo`}
+                </span>
+                <p className="mt-1 text-gray-500 break-all">
+                    {dataOutput ? `Hash: ${dataOutput.substring(0, 15)}...` : 'Esperando entrada...'}
+                </p>
+            </div>
+        )}
+
+        {!isDataInput && !isOutputViewer && !isHashFn && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Esperando conexión'}</p>
             </div>
@@ -483,79 +561,104 @@ const App = () => {
   
   // --- Core Logic: Graph Recalculation (Data Flow Engine Placeholder) ---
   
-  const recalculateGraph = useCallback((currentNodes, currentConnections) => {
-    const newNodes = new Map(currentNodes.map(n => [n.id, { ...n }]));
+  const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
+    const newNodesMap = new Map(currentNodes.map(n => [n.id, { ...n }]));
     
-    // 1. Identify DATA_INPUT nodes as starting points
-    const startingNodes = currentNodes.filter(n => n.type === 'DATA_INPUT').map(n => n.id);
-    const nodesToProcess = [...startingNodes];
+    // Nodes that need to be re-evaluated (starting with data inputs and the node that was just changed)
+    let initialQueue = new Set(currentNodes.filter(n => n.type === 'DATA_INPUT').map(n => n.id));
+    if (changedNodeId) initialQueue.add(changedNodeId);
+    
+    const nodesToProcess = Array.from(initialQueue);
     const processed = new Set();
     
-    // Simple Queue for topological sort-like processing
+    // Helper to traverse the graph: Finds all downstream nodes
+    const findAllTargets = (sourceId) => {
+        return currentConnections
+            .filter(c => c.source === sourceId)
+            .map(c => c.target)
+            .filter(targetId => !processed.has(targetId));
+    };
+
     while (nodesToProcess.length > 0) {
-      const sourceId = nodesToProcess.shift();
-      // Check if sourceId is a valid node and hasn't been processed
-      if (processed.has(sourceId) || !newNodes.has(sourceId)) continue; 
-      processed.add(sourceId);
+        const sourceId = nodesToProcess.shift();
+        if (processed.has(sourceId) || !newNodesMap.has(sourceId)) continue; 
 
-      const sourceNode = newNodes.get(sourceId);
-      
-      // Determine the data output of the source node
-      let outputData = '';
-      if (sourceNode.type === 'DATA_INPUT') {
-        // DATA_INPUT: output is the content itself
-        outputData = sourceNode.content || '';
-      } else {
-        // Other nodes: output is based on input
-        const inputSourceId = currentConnections.find(c => c.target === sourceId)?.source;
-        if (inputSourceId) {
-          const inputNode = newNodes.get(inputSourceId);
-          
-          if (inputNode) {
-            
-            // --- FIX: Logic for OUTPUT_VIEWER ---
-            if (sourceNode.type === 'OUTPUT_VIEWER') {
-                // OUTPUT_VIEWER (Sink) displays the raw data from its predecessor
-                outputData = inputNode.dataOutput || 'No data received from input source.';
-            } else {
-                // Placeholder for other processing nodes
-                outputData = `Processed(${inputNode.dataOutput ? inputNode.dataOutput.substring(0, 10) + '...' : 'Empty'}) by ${sourceNode.label}`;
-            }
-            // --- END FIX ---
+        const sourceNode = newNodesMap.get(sourceId);
+        
+        let outputData = '';
+        let isProcessing = false;
 
-          } else {
-            outputData = `Error: Input Source Missing (ID: ${inputSourceId})`;
-          }
+        if (sourceNode.type === 'DATA_INPUT') {
+            outputData = sourceNode.content || '';
         } else {
-            // No input source, but it's not a DATA_INPUT node.
-            outputData = 'Esperando conexión de entrada';
+            // Processing nodes
+            const inputSourceId = currentConnections.find(c => c.target === sourceId)?.source;
+            if (inputSourceId) {
+                const inputNode = newNodesMap.get(inputSourceId);
+                
+                if (inputNode) {
+                    const inputData = inputNode.dataOutput || '';
+                    
+                    if (sourceNode.type === 'OUTPUT_VIEWER') {
+                        outputData = inputData;
+                    } else if (sourceNode.type === 'HASH_FN') {
+                        // HASH_FN processing is ASYNCHRONOUS
+                        const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
+
+                        if (inputData) {
+                            isProcessing = true;
+                            // Perform the async calculation and update the node state
+                            calculateHash(inputData, algorithm).then(hashResult => {
+                                setNodes(prevNodes => prevNodes.map(n => 
+                                    n.id === sourceId 
+                                        ? { ...n, dataOutput: hashResult, isProcessing: false } 
+                                        : n
+                                ));
+                            }).catch(err => {
+                                setNodes(prevNodes => prevNodes.map(n => 
+                                    n.id === sourceId 
+                                        ? { ...n, dataOutput: `Error Hash: ${err.message}`, isProcessing: false } 
+                                        : n
+                                ));
+                            });
+                            // Temporarily set output while processing
+                            outputData = sourceNode.dataOutput || 'Calculando...';
+                        } else {
+                            outputData = 'Esperando datos válidos.';
+                        }
+                    } else {
+                        // Placeholder for other processing nodes
+                        outputData = `Processed(${inputData ? inputData.substring(0, 10) + '...' : 'Empty'}) by ${sourceNode.label}`;
+                    }
+                } else {
+                    outputData = `Error: Input Source Missing (ID: ${inputSourceId})`;
+                }
+            } else {
+                outputData = 'Esperando conexión de entrada';
+            }
         }
-      }
-      
-      // Update the node's output
-      sourceNode.dataOutput = outputData;
-      newNodes.set(sourceId, sourceNode);
+        
+        // Update the node's output and processing status
+        sourceNode.dataOutput = outputData;
+        sourceNode.isProcessing = isProcessing;
+        newNodesMap.set(sourceId, sourceNode);
+        processed.add(sourceId);
 
-      // Find all connected target nodes (downstream dependencies)
-      const targets = currentConnections
-        .filter(c => c.source === sourceId)
-        .map(c => c.target)
-        .filter(targetId => !processed.has(targetId)); // Avoid immediate cycles
-
-      // Add targets to the processing queue
-      nodesToProcess.push(...targets);
+        // Add targets to the processing queue (only if not already processed)
+        const targets = findAllTargets(sourceId);
+        nodesToProcess.push(...targets);
     }
     
     // Convert map back to array
-    return Array.from(newNodes.values());
-  }, []);
+    return Array.from(newNodesMap.values());
+  }, [setNodes]); // Added setNodes to dependencies because recalculateGraph now performs async state updates
   
   // --- Effects for Recalculation ---
   
-  // Recalculate graph whenever nodes (content/config) or connections change
+  // Recalculate graph whenever connections change
   useEffect(() => {
     setNodes(prevNodes => recalculateGraph(prevNodes, connections));
-  }, [connections, recalculateGraph]); // Nodes list is not a direct dependency here, as updateNodeContent triggers the next effect
+  }, [connections, recalculateGraph]);
 
   // Recalculate graph whenever *only* content changes (must run after position/ID changes)
   const updateNodeContent = useCallback((id, field, value) => {
@@ -563,8 +666,8 @@ const App = () => {
         const nextNodes = prevNodes.map(node =>
             node.id === id ? { ...node, [field]: value } : node
         );
-        // Recalculate immediately after content change
-        return recalculateGraph(nextNodes, connections);
+        // Pass the changed node ID to ensure recalculation starts from that point.
+        return recalculateGraph(nextNodes, connections, id);
     });
   }, [connections, recalculateGraph]);
   
@@ -587,6 +690,8 @@ const App = () => {
       initialContent.format = 'Text (UTF-8)';
     } else if (type === 'OUTPUT_VIEWER') {
       initialContent.viewFormat = 'Text (UTF-8)';
+    } else if (type === 'HASH_FN') { // Initialize hash algorithm
+      initialContent.hashAlgorithm = 'SHA-256';
     }
 
     setNodes(prevNodes => [
@@ -598,6 +703,7 @@ const App = () => {
         type: type, 
         color: color,
         dataOutput: '',
+        isProcessing: false, // New field for processing status
         ...initialContent 
       },
     ]);
