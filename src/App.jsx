@@ -599,37 +599,52 @@ const App = () => {
                 if (inputNode) {
                     const inputData = inputNode.dataOutput || '';
                     
-                    if (sourceNode.type === 'OUTPUT_VIEWER') {
-                        outputData = inputData;
-                    } else if (sourceNode.type === 'HASH_FN') {
-                        // HASH_FN processing is ASYNCHRONOUS
-                        const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
+                    switch (sourceNode.type) {
+                        case 'OUTPUT_VIEWER':
+                            outputData = inputData;
+                            break;
+                            
+                        case 'HASH_FN':
+                            const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
 
-                        if (inputData) {
-                            isProcessing = true;
-                            // Perform the async calculation and update the node state
-                            calculateHash(inputData, algorithm).then(hashResult => {
-                                setNodes(prevNodes => prevNodes.map(n => 
-                                    n.id === sourceId 
-                                        ? { ...n, dataOutput: hashResult, isProcessing: false } 
-                                        : n
-                                ));
-                            }).catch(err => {
-                                setNodes(prevNodes => prevNodes.map(n => 
-                                    n.id === sourceId 
-                                        ? { ...n, dataOutput: `Error Hash: ${err.message}`, isProcessing: false } 
-                                        : n
-                                ));
-                            });
-                            // Temporarily set output while processing
-                            outputData = sourceNode.dataOutput || 'Calculando...';
-                        } else {
-                            outputData = 'Esperando datos válidos.';
-                        }
-                    } else {
-                        // Placeholder for other processing nodes
-                        outputData = `Processed(${inputData ? inputData.substring(0, 10) + '...' : 'Empty'}) by ${sourceNode.label}`;
+                            if (inputData) {
+                                isProcessing = true;
+                                // Perform the async calculation and update the node state
+                                calculateHash(inputData, algorithm).then(hashResult => {
+                                    setNodes(prevNodes => prevNodes.map(n => 
+                                        n.id === sourceId 
+                                            ? { ...n, dataOutput: hashResult, isProcessing: false } 
+                                            : n
+                                    ));
+                                }).catch(err => {
+                                    setNodes(prevNodes => prevNodes.map(n => 
+                                        n.id === sourceId 
+                                            ? { ...n, dataOutput: `Error Hash: ${err.message}`, isProcessing: false } 
+                                            : n
+                                    ));
+                                });
+                                // Temporarily set output while processing
+                                outputData = sourceNode.dataOutput || 'Calculando...';
+                            } else {
+                                outputData = 'Esperando datos válidos.';
+                            }
+                            break;
+
+                        // Unimplemented Processing Nodes (They return the placeholder)
+                        case 'SYM_ENC':
+                        case 'SYM_DEC':
+                        case 'ASYM_ENC':
+                        case 'ASYM_DEC':
+                        case 'XOR_OP':
+                        case 'SHIFT_OP':
+                        case 'KEY_GEN': 
+                            outputData = `Processed(PENDIENTE) by ${sourceNode.label}`;
+                            break;
+                            
+                        default:
+                            outputData = 'ERROR: Tipo de nodo no reconocido.';
                     }
+
                 } else {
                     outputData = `Error: Input Source Missing (ID: ${inputSourceId})`;
                 }
