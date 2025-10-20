@@ -1,5 +1,48 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X } from 'lucide-react';
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight } from 'lucide-react'; 
+
+// --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
+const XORIcon = (props) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2.5" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className="w-6 h-6 absolute"
+    {...props}
+  >
+    {/* Circle part */}
+    <circle cx="12" cy="12" r="10" />
+    {/* Plus (XOR) part */}
+    <line x1="12" y1="8" x2="12" y2="16" />
+    <line x1="8" y1="12" x2="16" y2="12" />
+  </svg>
+);
+
+// --- Custom Bit Shift Icon Component (The $\rightleftharpoons$ symbol) ---
+const BitShiftIcon = (props) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2.5" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className="w-6 h-6 absolute"
+    {...props}
+  >
+    {/* Right Arrow (Top) */}
+    <polyline points="15 8 19 12 15 16" />
+    <line x1="19" y1="12" x2="5" y2="12" />
+    {/* Left Arrow (Bottom) - Flipped */}
+    <polyline points="9 16 5 12 9 8" />
+  </svg>
+);
+
 
 // =================================================================
 // 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS
@@ -29,7 +72,7 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
 
 // --- Port Configuration ---
 const PORT_SIZE = 4; // w-4 h-4
-const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels (w-4 is 16px, -left-2/ -right-2 is 8px offset from the box edge)
+const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
 const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input 
 const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Output
@@ -113,21 +156,20 @@ const NODE_DEFINITIONS = {
     inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
     outputPorts: [{ name: 'Hash Output', type: 'data', keyField: 'dataOutput' }] },
 
-  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, 
+  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: XORIcon, // Updated icon
     inputPorts: [
         { name: 'Input A', type: 'data', mandatory: true, id: 'dataA' }, 
         { name: 'Input B', type: 'data', mandatory: true, id: 'dataB' }
     ], 
     outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
     
-  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, 
+  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: BitShiftIcon, // Updated icon
     inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
     outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
 };
 
 // Initial nodes on the canvas
 const INITIAL_NODES = [
-  // Initialize a simple connected data flow
   { 
     id: 'input_1', 
     label: 'Data Input', 
@@ -138,26 +180,9 @@ const INITIAL_NODES = [
     format: 'Text (UTF-8)',
     dataOutput: 'Hello cryptographic world!'
   },
-  { 
-    id: 'viewer_1', 
-    label: 'Output Viewer', 
-    position: { x: 350, y: 150 }, 
-    type: 'OUTPUT_VIEWER', 
-    color: 'red', 
-    dataOutput: '', 
-    viewFormat: 'Text (UTF-8)'
-  },
 ];
 
-const INITIAL_CONNECTIONS = [
-    // Connects input_1 output (index 0, type 'data') to viewer_1 input (port 'data')
-    { 
-        source: 'input_1', 
-        sourcePortIndex: 0, 
-        target: 'viewer_1', 
-        targetPortId: 'data' 
-    }
-];
+const INITIAL_CONNECTIONS = []; // No initial connections
 
 const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
 
@@ -186,7 +211,7 @@ const base64ToArrayBuffer = (base64) => {
   return bytes.buffer;
 };
 
-// --- Data Format Conversion Functions ---
+// --- Data Format Conversion Functions (Still needed by other nodes) ---
 
 /** Converts ArrayBuffer to a hexadecimal string. */
 const arrayBufferToHex = (buffer) => {
@@ -217,32 +242,12 @@ const hexToArrayBuffer = (hex) => {
     return bytes.buffer;
 };
 
-/**
- * Determines the default output format of a node.
- * Used to know how to interpret 'dataOutput' before Viewer conversion.
- */
-const getOutputFormat = (nodeType) => {
-    switch (nodeType) {
-        case 'DATA_INPUT':
-        case 'SYM_DEC':
-        case 'ASYM_DEC':
-            return 'Text (UTF-8)';
-        case 'HASH_FN':
-            return 'Hexadecimal';
-        case 'SYM_ENC':
-        case 'ASYM_ENC':
-        case 'XOR_OP':
-        case 'SHIFT_OP':
-            return 'Base64';
-        default:
-            return 'Text (UTF-8)';
-    }
-};
-
 /** Converts a data string from a source format to a target format via ArrayBuffer. */
 const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
     if (!dataStr) return '';
-    if (sourceFormat === targetFormat) return dataStr;
+    
+    // Skip conversion if formats are the same OR if the source data is an error message
+    if (sourceFormat === targetFormat || dataStr.startsWith('ERROR')) return dataStr;
     
     let buffer;
     
@@ -254,6 +259,16 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
              buffer = base64ToArrayBuffer(dataStr);
         } else if (sourceFormat === 'Hexadecimal') {
              buffer = hexToArrayBuffer(dataStr);
+        } else if (sourceFormat === 'Binary') {
+             // Convert binary string (space separated) to ArrayBuffer
+             const binaryArray = dataStr.split(/\s+/).map(s => parseInt(s, 2));
+             const validBytes = binaryArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
+             buffer = new Uint8Array(validBytes).buffer;
+        } else if (sourceFormat === 'Decimal') {
+             // Convert decimal string (space separated) to ArrayBuffer
+             const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
+             const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
+             buffer = new Uint8Array(validBytes).buffer;
         } else {
              // Treat other source formats as raw text for simplicity and encode as UTF-8
              buffer = new TextEncoder().encode(dataStr).buffer;
@@ -284,7 +299,27 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
     }
 };
 
-// --- Existing Crypto Functions (Translated) ---
+/** Determines the output format based on the node type. */
+const getOutputFormat = (nodeType) => {
+    switch (nodeType) {
+        case 'DATA_INPUT':
+            // Handled by the 'format' property on the node itself
+            return 'Text (UTF-8)'; 
+        case 'KEY_GEN':
+        case 'SYM_ENC':
+        case 'XOR_OP':
+        case 'SHIFT_OP':
+        case 'ASYM_ENC':
+            return 'Base64';
+        case 'HASH_FN':
+            return 'Hexadecimal';
+        case 'SYM_DEC':
+        case 'ASYM_DEC':
+            return 'Text (UTF-8)';
+        default:
+            return 'Text (UTF-8)';
+    }
+}
 
 /** Performs XOR operation on two input strings. */
 const performBitwiseXor = (strA, strB) => {
@@ -664,16 +699,16 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, dataOutputPublic, dataOutputPrivate, publicExponent, rsaParameters, asymAlgorithm } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
   const offset = useRef({ x: 0, y: 0 });
-  const [copyStatus, setCopyStatus] = useState('Copy'); 
+  const [copyStatus, setCopyStatus] = useState('Copy'); // English for Copy
 
   // Node specific flags
   const isDataInput = type === 'DATA_INPUT';
-  const isOutputViewer = type === 'OUTPUT_VIEWER';
+  const isOutputViewer = type === 'OUTPUT_VIEWER'; 
   const isHashFn = type === 'HASH_FN';
   const isKeyGen = type === 'KEY_GEN';
   const isRSAKeyGen = type === 'RSA_KEY_GEN'; 
@@ -758,13 +793,14 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   }, [connectingPort, handleConnectEnd, isDragging]);
 
   // Handle Copy to Clipboard for Output Viewer
-  const handleCopyToClipboard = useCallback((e) => {
+  const handleCopyToClipboard = useCallback((e, textToCopy) => {
     e.stopPropagation();
-    if (!dataOutput) return;
+    
+    if (!textToCopy || textToCopy.startsWith('ERROR')) return;
 
     try {
         const tempTextArea = document.createElement('textarea');
-        tempTextArea.value = dataOutput;
+        tempTextArea.value = textToCopy;
         
         tempTextArea.style.position = 'fixed';
         tempTextArea.style.left = '-9999px';
@@ -773,10 +809,13 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
         document.body.appendChild(tempTextArea);
         
+        // FIX: Select and execute copy command
+        tempTextArea.select();
+        tempTextArea.setSelectionRange(0, 99999); // For mobile devices
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
-        setCopyStatus('Copied!');
+        setCopyStatus('Copied!'); 
         setTimeout(() => setCopyStatus('Copy'), 1500); 
         
     } catch (err) {
@@ -784,27 +823,30 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         setCopyStatus('Error');
         setTimeout(() => setCopyStatus('Copy'), 2000);
     }
-  }, [dataOutput]);
+  }, [setCopyStatus]);
 
 
   // Attach global event listeners for dragging
   useEffect(() => {
+    const handleUp = handleDragEnd;
+    const handleMove = handleDragMove;
+    
     if (isDragging) {
-      document.addEventListener('mousemove', handleDragMove);
-      document.addEventListener('mouseup', handleDragEnd);
-      document.addEventListener('touchmove', handleDragMove, { passive: false });
-      document.addEventListener('touchend', handleDragEnd);
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+      document.addEventListener('touchmove', handleMove, { passive: false });
+      document.addEventListener('touchend', handleUp);
     } else {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-      document.removeEventListener('touchmove', handleDragMove);
-      document.removeEventListener('touchend', handleDragEnd);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('touchend', handleUp);
     }
     return () => {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-      document.removeEventListener('touchmove', handleDragMove);
-      document.removeEventListener('touchend', handleDragEnd);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('touchend', handleUp);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
@@ -908,6 +950,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       style={{ 
         left: `${position.x}px`, 
         top: `${position.y}px`,
+        // Dynamic height adjustment for expanded viewer
+        minHeight: isOutputViewer && isConversionExpanded ? '280px' : `${BOX_SIZE.minHeight}px` 
       }} 
       onMouseDown={handleDragStart} 
       onTouchStart={handleDragStart} 
@@ -934,7 +978,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       <div className="flex flex-col h-full w-full justify-start items-center overflow-hidden">
         {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
-          {definition.icon && <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />}
+          {/* Custom icons need size and color applied to the container/SVG itself */}
+          {definition.icon && typeof definition.icon === 'function' ? (
+              <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
+          ) : (
+              definition.icon && <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
+          )}
           <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
           {/* Show algorithm name for functional nodes */}
           {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
@@ -949,7 +998,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
 
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -983,49 +1032,101 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </select>
           </div>
         )}
-
+        
+        {/* Output Viewer Display (Convert) */}
         {isOutputViewer && (
-            /* Output Viewer Display and Format Selector */
             <div className="w-full mt-1 flex flex-col items-center flex-grow text-xs text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded-lg shadow-inner overflow-y-auto">
-                <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RESULT</span>
+                <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RAW INPUT DATA</span>
                 
-                <div className="w-full flex-grow break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200 min-h-[4rem]">
-                    <p>{dataOutput || 'Not connected or no data.'}</p>
+                {/* Source Data Type Selector (Read-only representation of input data type) */}
+                <div className="w-full mb-1">
+                    <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">Source Data Type</label>
+                    <select
+                        className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+                                   bg-gray-100 cursor-default text-gray-700 appearance-none pointer-events-none"
+                        value={sourceFormat || 'N/A'}
+                        onChange={() => {}} // Disabled but functional selector
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        disabled
+                    >
+                        <option>{sourceFormat || 'N/A'}</option>
+                    </select>
                 </div>
 
+                {/* Primary Output Box (RAW UNCONVERTED Input Data - now using rawInputData state) */}
+                <div className="relative w-full flex-grow break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200 min-h-[4rem]">
+                    <p>{rawInputData || 'Not connected or no data.'}</p>
+                    
+                    {/* Copy Button for Primary Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, rawInputData)} // Copying raw input data
+                        disabled={!rawInputData || rawInputData.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-md 
+                                    ${rawInputData && !rawInputData.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+
+                {/* Conversion Button */}
                 <button
-                    onClick={handleCopyToClipboard}
-                    disabled={!dataOutput || dataOutput.startsWith('ERROR')}
-                    className={`mt-auto w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md 
-                                ${dataOutput && !dataOutput.startsWith('ERROR')
-                                    ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
-                                    : 'bg-red-300 cursor-not-allowed'}`}
+                    onClick={(e) => { 
+                        e.stopPropagation();
+                        updateNodeContent(id, 'isConversionExpanded', !isConversionExpanded);
+                    }}
+                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-red-500 hover:bg-red-600`}
                 >
-                    <Clipboard className="w-4 h-4" />
-                    <span>{copyStatus}</span>
+                    <span>{isConversionExpanded ? 'Hide Conversion' : 'Convert Type'}</span>
                 </button>
-                
-                {/* View Format Selector */}
-                <span className="text-[10px] font-semibold text-gray-600 mt-2 flex-shrink-0 w-full text-left">
-                    VIEW FORMAT
-                </span>
-                <select
-                  className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm
-                             bg-white appearance-none cursor-pointer text-gray-700 
-                             focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
-                  value={viewFormat || 'Text (UTF-8)'}
-                  onChange={(e) => updateNodeContent(id, 'viewFormat', e.target.value)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {FORMATS.map(f => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </select>
+
+
+                {/* Secondary Output/Conversion Section (Conditionally rendered) */}
+                {isConversionExpanded && (
+                    <div className="w-full mt-2 pt-2 border-t border-gray-200 flex flex-col space-y-2">
+                        <span className="text-center font-bold text-red-600 text-[10px] flex-shrink-0">CONVERTED VIEW</span>
+
+                        {/* Converted Output Box */}
+                        <div className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md overflow-y-auto border border-gray-200 min-h-[4rem]">
+                            <p>{convertedData || 'Select conversion type...'}</p>
+
+                            {/* Copy Button for Converted Output */}
+                            <button
+                                onClick={(e) => handleCopyToClipboard(e, convertedData)}
+                                disabled={!convertedData || convertedData.startsWith('ERROR')}
+                                className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-md 
+                                            ${convertedData && !convertedData.startsWith('ERROR')
+                                                ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                                : 'bg-gray-300 cursor-not-allowed'}`}
+                                title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                            >
+                                <Clipboard className="w-3 h-3" />
+                            </button>
+                        </div>
+
+                        {/* Converted Format Selector */}
+                        <select
+                            className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+                                        bg-white appearance-none cursor-pointer text-gray-700 
+                                        focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
+                            value={convertedFormat || 'Base64'}
+                            onChange={(e) => updateNodeContent(id, 'convertedFormat', e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {FORMATS.map(f => (
+                                <option key={f} value={f}>{f}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
         )}
-
+        
         {isHashFn && (
              <div className="text-xs w-full text-center">
                 {/* Algorithm Selector */}
@@ -1047,9 +1148,23 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
                     {isProcessing ? 'Calculating...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Hash (Hex): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Hash (Hex): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                    </p>
+                    {/* Copy Button for Hash Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
         
@@ -1082,9 +1197,23 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className={`font-semibold mt-2 ${dataOutput ? 'text-orange-600' : 'text-gray-500'}`}>
                     {isProcessing ? 'Generating...' : dataOutput ? 'Key Ready' : 'Click to Generate'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Key (Base64): ${dataOutput.substring(0, 15)}...` : 'No key generated.'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Key (Base64): ${dataOutput.substring(0, 15)}...` : 'No key generated.'}
+                    </p>
+                    {/* Copy Button for Key Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
 
@@ -1161,61 +1290,137 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
         
+        {/* Sym Encrypt */}
         {isSymEnc && (
             <div className="text-xs w-full text-center">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
                     {isProcessing ? 'Encrypting...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Key...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Key...'}
+                    </p>
+                    {/* Copy Button for Ciphertext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
 
+        {/* Sym Decrypt */}
         {isSymDec && (
              <div className="text-xs w-full text-center">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
                     {isProcessing ? 'Decrypting...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Key...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Key...'}
+                    </p>
+                    {/* Copy Button for Plaintext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
 
+        {/* Asym Encrypt */}
         {isAsymEnc && (
              <div className="text-xs w-full text-center">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
                     {isProcessing ? 'Encrypting (RSA-OAEP)...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Public Key...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Public Key...'}
+                    </p>
+                    {/* Copy Button for Ciphertext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
 
+        {/* Asym Decrypt */}
         {isAsymDec && (
              <div className="text-xs w-full text-center">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
                     {isProcessing ? 'Decrypting (RSA-OAEP)...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Private Key...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Private Key...'}
+                    </p>
+                    {/* Copy Button for Plaintext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
         
+        {/* XOR Operation */}
         {type === 'XOR_OP' && (
              <div className="text-xs w-full text-center">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-lime-600'}`}>
                     {isProcessing ? 'Calculating XOR...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for two data inputs...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for two data inputs...'}
+                    </p>
+                    {/* Copy Button for XOR Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
 
+        {/* Bit Shift */}
         {isBitShift && (
              <div className="text-xs w-full text-center">
                 <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT AMOUNT (BYTES)</span>
@@ -1249,13 +1454,28 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'}`}>
                     {isProcessing ? 'Shifting...' : 'Active'}
                 </span>
-                <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
-                </p>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                    </p>
+                    {/* Copy Button for Bit Shift Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
         )}
 
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && (
+        {/* Generic Output Preview */}
+        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -1271,7 +1491,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 const Toolbar = ({ addNode }) => {
   return (
     <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
-      {/* Title/Logo Container - Updated to use PNG image */}
+      {/* Title/Logo Container */}
       <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
         <img 
           src="VCL - Horizonal logo + name.png"
@@ -1300,7 +1520,12 @@ const Toolbar = ({ addNode }) => {
                                 bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
                                 transition duration-150 text-gray-700 rounded-lg shadow-sm`}
                 >
-                    {def.icon && <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />}
+                    {/* Render the custom icon component or the default Lucide icon */}
+                    {def.icon && typeof def.icon === 'function' ? (
+                        <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
+                    ) : (
+                        def.icon && <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
+                    )}
                     <span className="font-medium text-left">{def.label}</span>
                 </button>
             );
@@ -1316,26 +1541,36 @@ const Toolbar = ({ addNode }) => {
 
 const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
-  const [connections, setConnections] = useState(INITIAL_CONNECTIONS); // Initialized with connection
+  const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
   const [connectingPort, setConnectingPort] = useState(null); 
   const canvasRef = useRef(null);
   
   // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
-    const newNodesMap = new Map(currentNodes.map(n => [n.id, { ...n }]));
+    // FIX: Re-initialize newNodesMap correctly to ensure integrity and reset calculation fields.
+    const newNodesMap = new Map(currentNodes.map(n => {
+        const newNode = { ...n };
+        // Reset fields relevant to calculation output/status
+        newNode.isProcessing = false;
+        if (newNode.type === 'OUTPUT_VIEWER') {
+             // Keep state of conversion feature
+             newNode.convertedData = newNode.convertedData || ''; 
+             newNode.convertedFormat = newNode.convertedFormat || 'Base64';
+             newNode.isConversionExpanded = newNode.isConversionExpanded || false;
+             newNode.sourceFormat = newNode.sourceFormat || ''; // New field for source format
+             newNode.rawInputData = newNode.rawInputData || ''; // New field to store UNCONVERTED input
+        }
+        return [n.id, newNode];
+    })); 
     
-    // Initial nodes to process: Data sources and the node that was just changed
     let initialQueue = new Set(currentNodes.filter(n => {
         const def = NODE_DEFINITIONS[n.type];
-        // Source nodes (no input ports)
         return def && def.inputPorts && def.inputPorts.length === 0;
     }).map(n => n.id));
     
-    // Add all nodes that receive input from the changed node, or the changed node itself
     if (changedNodeId) {
         initialQueue.add(changedNodeId);
-        // Find immediate targets of the changed node
         currentConnections
             .filter(c => c.source === changedNodeId)
             .forEach(c => initialQueue.add(c.target));
@@ -1344,7 +1579,6 @@ const App = () => {
     const nodesToProcess = Array.from(initialQueue);
     const processed = new Set();
     
-    // Helper to traverse the graph: Finds all downstream nodes
     const findAllTargets = (sourceId) => {
         return currentConnections
             .filter(c => c.source === sourceId)
@@ -1442,64 +1676,77 @@ const App = () => {
             // Collect all incoming connections to this target node
             const incomingConns = currentConnections.filter(c => c.target === sourceId);
             let inputs = {};
-            let sourceNodeFormat = sourceNode.format || 'Text (UTF-8)'; // Default to Text for non-input nodes
             
             // Step 1: Gather inputs from all upstream nodes
             incomingConns.forEach(conn => {
                 const inputSourceNode = newNodesMap.get(conn.source);
                 if (!inputSourceNode) return;
 
-                let dataToUse = inputSourceNode.dataOutput;
+                let dataToUse;
                 const sourceDef = NODE_DEFINITIONS[inputSourceNode.type];
                 
-                // Determine which data field to use from the source node (e.g., dataOutput vs dataOutputPrivate)
+                // Determine which data field to use from the source node
                 if (sourceDef && sourceDef.outputPorts.length > conn.sourcePortIndex) {
                     const keyField = sourceDef.outputPorts[conn.sourcePortIndex].keyField;
                     dataToUse = inputSourceNode[keyField];
+                } else {
+                    dataToUse = inputSourceNode.dataOutput; // Fallback for simple nodes
                 }
 
                 // Store the data using the input port ID ('data', 'key', 'dataA', etc.)
-                inputs[conn.targetPortId] = dataToUse;
-                
-                // If it is the Output Viewer, track the source node's default output format
-                if (sourceNode.type === 'OUTPUT_VIEWER' && conn.targetPortId === 'data') {
-                    sourceNodeFormat = getOutputFormat(inputSourceNode.type);
+                // FIX: Only accept the FIRST connection for a port ID for single-input ports
+                if (!inputs[conn.targetPortId]) { 
+                    inputs[conn.targetPortId] = dataToUse;
                 }
             });
-
-            // Step 2: Map inputs to local variables (This is where the bug was likely occurring for OUTPUT_VIEWER)
-            const dataInput = inputs['data'] || inputs['cipher']; 
-            const keyInput = inputs['key']; 
-            const publicKeyInput = inputs['publicKey']; 
-            const privateKeyInput = inputs['privateKey']; 
-            const dataInputA = inputs['dataA']; 
-            const dataInputB = inputs['dataB']; 
-
-            // Step 3: Execute node logic
+            
+            // Step 2: Execute node logic (using direct inputs lookup)
             switch (sourceNode.type) {
                 case 'OUTPUT_VIEWER':
-                    const rawDataInput = dataInput || '';
-                    const targetFormat = sourceNode.viewFormat || 'Text (UTF-8)';
+                    const rawInput = inputs['data']; 
+                    let convertedDataOutput = sourceNode.convertedData || '';
+                    let calculatedSourceFormat = ''; 
                     
-                    if (rawDataInput) {
-                        if (typeof rawDataInput === 'string' && rawDataInput.startsWith('ERROR')) {
-                             outputData = rawDataInput; // Propagate the error without trying to convert
+                    if (rawInput !== undefined && rawInput !== null && rawInput !== '') {
+                        
+                        // 1. Store Raw Input Data (as requested)
+                        const sourceNodeId = incomingConns.find(c => c.targetPortId === 'data')?.source;
+                        const upstreamNode = newNodesMap.get(sourceNodeId);
+                        
+                        // Determine source format: use format property for DATA_INPUT, else infer from node type
+                        calculatedSourceFormat = upstreamNode?.type === 'DATA_INPUT' 
+                            ? upstreamNode.format || 'Text (UTF-8)' 
+                            : (upstreamNode ? getOutputFormat(upstreamNode.type) : 'Text (UTF-8)');
+                        
+                        // FIX: Primary output (dataOutput) is the RAW UNCONVERTED input
+                        outputData = rawInput; 
+                        
+                        // 2. Calculate Secondary (Converted) Output if Expanded
+                        if (sourceNode.isConversionExpanded) {
+                            // Use calculatedSourceFormat for conversion
+                            convertedDataOutput = convertDataFormat(rawInput, calculatedSourceFormat, sourceNode.convertedFormat || 'Base64');
                         } else {
-                             // Perform the conversion
-                             // Source format is derived from the *connected* node's default output
-                             outputData = convertDataFormat(rawDataInput, sourceNodeFormat, targetFormat);
+                            convertedDataOutput = '';
                         }
                     } else {
                         outputData = 'Not connected or no data.';
+                        convertedDataOutput = '';
+                        calculatedSourceFormat = 'N/A';
                     }
+                    
+                    // Update the node's state fields (must happen here as we are inside the graph engine)
+                    sourceNode.convertedData = convertedDataOutput;
+                    sourceNode.sourceFormat = calculatedSourceFormat; // Set the determined source format
+                    sourceNode.rawInputData = outputData; // Store the raw input data separately
                     break;
                     
                 case 'HASH_FN':
-                    if (dataInput) { 
+                    const hashInput = inputs['data'];
+                    if (hashInput) { 
                         isProcessing = true; 
                         const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
 
-                        calculateHash(dataInput, algorithm).then(hashResult => {
+                        calculateHash(hashInput, algorithm).then(hashResult => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
                                     ? { ...n, dataOutput: hashResult, isProcessing: false } 
@@ -1513,6 +1760,9 @@ const App = () => {
                     break;
                 
                 case 'XOR_OP':
+                    const dataInputA = inputs['dataA']; 
+                    const dataInputB = inputs['dataB']; 
+
                     if (dataInputA && dataInputB) { 
                         isProcessing = true; 
                         outputData = performBitwiseXor(dataInputA, dataInputB); 
@@ -1527,11 +1777,12 @@ const App = () => {
                     break;
                 
                 case 'SHIFT_OP':
+                    const shiftDataInput = inputs['data'];
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
-                    if (dataInput) { 
+                    if (shiftDataInput) { 
                         isProcessing = true; 
-                        outputData = performByteShiftOperation(dataInput, shiftType, shiftAmount); 
+                        outputData = performByteShiftOperation(shiftDataInput, shiftType, shiftAmount); 
                         isProcessing = false; 
                     } else { 
                         outputData = 'Waiting for data input.'; 
@@ -1539,10 +1790,13 @@ const App = () => {
                     break;
 
                 case 'SYM_ENC':
-                    if (dataInput && keyInput) {
+                    const encDataInput = inputs['data'];
+                    const encKeyInput = inputs['key'];
+
+                    if (encDataInput && encKeyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
-                        symmetricEncrypt(dataInput, keyInput, algorithm).then(ciphertext => {
+                        symmetricEncrypt(encDataInput, encKeyInput, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n
                             ));
@@ -1552,10 +1806,13 @@ const App = () => {
                     break;
                 
                 case 'SYM_DEC': 
-                    if (dataInput && keyInput) {
+                    const decCipherInput = inputs['cipher'];
+                    const decKeyInput = inputs['key'];
+
+                    if (decCipherInput && decKeyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
-                        symmetricDecrypt(dataInput, keyInput, algorithm).then(plaintext => {
+                        symmetricDecrypt(decCipherInput, decKeyInput, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n
                             ));
@@ -1565,10 +1822,13 @@ const App = () => {
                     break;
 
                 case 'ASYM_ENC':
-                    if (dataInput && publicKeyInput) {
+                    const asymEncDataInput = inputs['data'];
+                    const asymEncPublicKeyInput = inputs['publicKey'];
+
+                    if (asymEncDataInput && asymEncPublicKeyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
-                        asymmetricEncrypt(dataInput, publicKeyInput, algorithm).then(ciphertext => {
+                        asymmetricEncrypt(asymEncDataInput, asymEncPublicKeyInput, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n
                             ));
@@ -1578,10 +1838,13 @@ const App = () => {
                     break;
 
                 case 'ASYM_DEC':
-                    if (dataInput && privateKeyInput) {
+                    const asymDecCipherInput = inputs['cipher'];
+                    const asymDecPrivateKeyInput = inputs['privateKey'];
+
+                    if (asymDecCipherInput && asymDecPrivateKeyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
-                        asymmetricDecrypt(dataInput, privateKeyInput, algorithm).then(plaintext => {
+                        asymmetricDecrypt(asymDecCipherInput, asymDecPrivateKeyInput, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n
                             ));
@@ -1596,11 +1859,20 @@ const App = () => {
 
         }
         
-        // Update the node's primary output field
+        // Update the node's output field(s) and processing status
+        
         const primaryOutputPort = sourceNodeDef.outputPorts?.[0];
-        if (primaryOutputPort) {
-            sourceNode[primaryOutputPort.keyField] = outputData;
+        if (primaryOutputPort && primaryOutputPort.keyField === 'dataOutput') {
+            sourceNode.dataOutput = outputData; 
+        } else if (!primaryOutputPort) {
+            // Manually set dataOutput for SINK nodes (viewers)
+            // NOTE: For OUTPUT_VIEWER, dataOutput now holds the RAW INPUT, set above.
+            // We only need to ensure the async update of dataOutput for non-viewer nodes.
+            if (sourceNode.type !== 'OUTPUT_VIEWER') {
+                sourceNode.dataOutput = outputData;
+            }
         }
+
         sourceNode.isProcessing = isProcessing;
         newNodesMap.set(sourceId, sourceNode);
         processed.add(sourceId);
@@ -1615,15 +1887,15 @@ const App = () => {
   // --- Effects for Recalculation ---
   
   useEffect(() => {
-    // This effect ensures the graph recalculates whenever connections or nodes change
+    // Initial calculation or on connection change
     setNodes(prevNodes => recalculateGraph(prevNodes, connections));
-  }, [connections, recalculateGraph]); // Removed nodes as a dependency to prevent infinite loops
+  }, [connections, recalculateGraph]); 
 
   const updateNodeContent = useCallback((id, field, value) => {
     setNodes(prevNodes => {
-        const nextNodes = prevNodes.map(node =>
-            node.id === id 
-                ? { 
+        const nextNodes = prevNodes.map(node => {
+            if (node.id === id) {
+                const updatedNode = { 
                     ...node, 
                     [field]: value, 
                     generateKey: (field === 'generateKey' ? value : node.generateKey), 
@@ -1631,10 +1903,16 @@ const App = () => {
                     publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
                     shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
-                    isProcessing: (node.type === 'OUTPUT_VIEWER' && field === 'viewFormat') ? false : node.isProcessing,
-                  } 
-                : node
-        );
+                    // Conversion Feature State:
+                    isConversionExpanded: (field === 'isConversionExpanded' ? value : node.isConversionExpanded),
+                    convertedFormat: (field === 'convertedFormat' ? value : node.convertedFormat),
+                    viewFormat: (field === 'viewFormat' ? value : node.viewFormat),
+                    isProcessing: node.isProcessing,
+                };
+                return updatedNode;
+            }
+            return node;
+        });
         // Recalculate immediately after content update
         return recalculateGraph(nextNodes, connections, id);
     });
@@ -1657,8 +1935,14 @@ const App = () => {
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
       initialContent.format = 'Text (UTF-8)';
-    } else if (type === 'OUTPUT_VIEWER') {
-      initialContent.viewFormat = 'Text (UTF-8)';
+    } else if (type === 'OUTPUT_VIEWER') { 
+      initialContent.dataOutput = ''; // Will hold RAW input string
+      initialContent.rawInputData = ''; // New field
+      initialContent.viewFormat = 'Text (UTF-8)'; 
+      initialContent.isConversionExpanded = false; // New state
+      initialContent.convertedData = ''; // New state
+      initialContent.convertedFormat = 'Base64'; // New state
+      initialContent.sourceFormat = '';
     } else if (type === 'HASH_FN') { 
       initialContent.hashAlgorithm = 'SHA-256';
     } else if (type === 'KEY_GEN') {
