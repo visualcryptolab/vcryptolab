@@ -514,7 +514,7 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
         const cipherBuffer = base64ToArrayBuffer(base64Ciphertext);
 
         const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: algorithm }, privateKey, cipherBuffer
+            { name: algorithm, iv: new Uint8Array(iv) }, privateKey, cipherBuffer
         );
         
         const decoder = new TextDecoder();
@@ -599,6 +599,37 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
 };
 
 
+// --- Input Validation and Auto-Conversion Helper ---
+
+/**
+ * Checks content compatibility with numeric formats.
+ * @param {string} content The user input string.
+ * @param {string} targetFormat The format to check against ('Binary', 'Decimal', 'Hexadecimal', 'Text (UTF-8)').
+ * @returns {boolean} True if content is compatible with the target format.
+ */
+const isContentCompatible = (content, targetFormat) => {
+    if (targetFormat === 'Text (UTF-8)') return true;
+    
+    // Remove spaces for robust numeric/hex checking
+    const cleanedContent = content.replace(/\s+/g, '');
+    if (!cleanedContent) return true; // Empty content is always compatible
+
+    if (targetFormat === 'Binary') {
+        // Must only contain 0s and 1s
+        return /^[01]*$/.test(cleanedContent);
+    }
+    if (targetFormat === 'Decimal') {
+        // Must only contain 0-9 digits
+        return /^\d*$/.test(cleanedContent);
+    }
+    if (targetFormat === 'Hexadecimal') {
+        // Must only contain 0-9, a-f, A-F
+        return /^[0-9a-fA-F]*$/.test(cleanedContent);
+    }
+    return true;
+};
+
+
 // =================================================================
 // 3. UI COMPONENTS & GRAPH LOGIC
 // =================================================================
@@ -647,7 +678,7 @@ const getLinePath = (sourceNode, targetNode, connection) => {
 
 
 // --- Sub-Component for Ports (Visual and Interaction) ---
-const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, isMandatory, portId, portIndex, outputType }) => {
+const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, isMandatory, portId, portIndex, outputType, nodes }) => {
     let interactionClasses = "";
     let clickHandler = () => {};
     
@@ -663,8 +694,20 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
             ? 'ring-4 ring-emerald-300 animate-pulse' 
             : 'hover:ring-4 hover:ring-emerald-300 transition duration-150';
     } else if (type === 'input') {
+        // --- FIX: Ensure validation works for multi-input nodes like XOR ---
+        
+        // Find the full node definition
+        const targetNode = nodes.find(n => n.id === nodeId);
+        const targetNodeDef = NODE_DEFINITIONS[targetNode?.type];
+        
+        // Find the specific port definition by ID to get its type (e.g., 'data', 'key')
+        const inputPortDef = targetNodeDef.inputPorts.find(p => p.id === portId);
+        const inputPortType = inputPortDef?.type;
+        
         // A port is a target candidate if an output port is active AND port types match
-        const isTargetCandidate = isConnecting && isConnecting.sourceId !== nodeId && isConnecting.outputType === portId.split('-')[0]; 
+        const isTargetCandidate = isConnecting && 
+                                  isConnecting.sourceId !== nodeId && 
+                                  isConnecting.outputType === inputPortType; 
         
         if (isTargetCandidate) {
             clickHandler = (e) => { 
@@ -697,7 +740,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 // --- Component for the Draggable Box ---
 
-const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode }) => {
+const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes }) => {
   // Destructure node props and look up definition
   const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData } = node; 
   const definition = NODE_DEFINITIONS[type];
@@ -811,7 +854,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         
         // FIX: Select and execute copy command
         tempTextArea.select();
-        tempTextArea.setSelectionRange(0, 99999); // For mobile devices
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
@@ -882,6 +924,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     title={`${portDef.name} (${portDef.mandatory ? 'Mandatory' : 'Optional'}) - Type: ${portDef.type}`}
                     isMandatory={portDef.mandatory}
                     isInputConnected={isInputConnected}
+                    nodes={nodes} // PASSING NODES PROP TO PORT FOR VALIDATION
                 />
             </div>
         );
@@ -915,6 +958,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     onEnd={handleConnectEnd}
                     title={`${portDef.name} - Type: ${portDef.type}`}
                     isMandatory={true} 
+                    nodes={nodes} // PASSING NODES PROP TO PORT FOR VALIDATION
                 />
             </div>
         );
@@ -1011,7 +1055,40 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
               rows="4" 
               placeholder="Enter data here..."
               value={content || ''}
-              onChange={(e) => updateNodeContent(id, 'content', e.target.value)}
+              // FIX: Handle content change with format detection
+              onChange={(e) => {
+                  const newContent = e.target.value;
+                  let newFormat = format;
+                  
+                  // --- Auto-switch logic (only if current format is restrictive) ---
+                  if (format !== 'Text (UTF-8)') {
+                      
+                      if (format === 'Binary' && !isContentCompatible(newContent, 'Binary')) {
+                          if (isContentCompatible(newContent, 'Decimal')) {
+                              newFormat = 'Decimal';
+                          } else if (isContentCompatible(newContent, 'Hexadecimal')) {
+                              newFormat = 'Hexadecimal';
+                          } else {
+                              newFormat = 'Text (UTF-8)';
+                          }
+                      } else if (format === 'Decimal' && !isContentCompatible(newContent, 'Decimal')) {
+                          if (isContentCompatible(newContent, 'Hexadecimal')) {
+                              newFormat = 'Hexadecimal';
+                          } else {
+                              newFormat = 'Text (UTF-8)';
+                          }
+                      } else if (format === 'Hexadecimal' && !isContentCompatible(newContent, 'Hexadecimal')) {
+                          newFormat = 'Text (UTF-8)';
+                      }
+                  }
+                  // If format is 'Text (UTF-8)', it is preserved, meeting the user's requirement.
+
+                  // Apply changes
+                  if (newFormat !== format) {
+                      updateNodeContent(id, 'format', newFormat);
+                  }
+                  updateNodeContent(id, 'content', newContent);
+              }}
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => e.stopPropagation()} 
               onClick={(e) => e.stopPropagation()}
@@ -1021,7 +1098,31 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                          bg-white appearance-none cursor-pointer text-gray-700 
                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
               value={format || 'Text (UTF-8)'}
-              onChange={(e) => updateNodeContent(id, 'format', e.target.value)}
+              // FIX: Add auto-correction logic when user manually selects an incompatible format
+              onChange={(e) => {
+                e.stopPropagation();
+                const selectedFormat = e.target.value;
+                const currentContent = content || '';
+                let finalFormat = selectedFormat;
+
+                if (!isContentCompatible(currentContent, selectedFormat)) {
+                    // If the selected format is NOT compatible with the current content,
+                    // calculate the safest compatible format based on the content.
+                    
+                    if (isContentCompatible(currentContent, 'Binary')) {
+                        finalFormat = 'Binary';
+                    } else if (isContentCompatible(currentContent, 'Decimal')) {
+                        finalFormat = 'Decimal';
+                    } else if (isContentCompatible(currentContent, 'Hexadecimal')) {
+                        finalFormat = 'Hexadecimal';
+                    } else {
+                        // Safest fallback
+                        finalFormat = 'Text (UTF-8)';
+                    }
+                }
+
+                updateNodeContent(id, 'format', finalFormat);
+              }}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
@@ -2276,6 +2377,7 @@ const App = () => {
               connectingPort={connectingPort}
               connections={connections}
               handleDeleteNode={handleDeleteNode}
+              nodes={nodes} // PASSING NODES PROP
             />
           ))}
           
