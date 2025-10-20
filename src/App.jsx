@@ -2281,6 +2281,11 @@ const App = () => {
           
         </div>
       </div>
+      {/* This is a workaround to load the external html2canvas library needed for 
+        the image download feature, as external scripts cannot be loaded through 
+        standard React imports in this environment.
+      */}
+      <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     </div>
   );
 };
