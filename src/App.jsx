@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight } from 'lucide-react'; 
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera } from 'lucide-react'; 
 
 // --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
 const XORIcon = (props) => (
@@ -841,7 +841,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       document.removeEventListener('mouseup', handleUp);
       document.removeEventListener('touchmove', handleMove);
       document.removeEventListener('touchend', handleUp);
-    }
+    };
     return () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
@@ -1485,10 +1485,49 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   );
 };
 
+// --- Helper Component for Toolbar Actions ---
+const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInput }) => {
+    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[color] || 'hover:border-gray-400';
+    const iconTextColorClass = TEXT_ICON_CLASSES[color] || 'text-gray-600';
+    const inputRef = useRef(null);
+
+    const handleClick = () => {
+        if (isFileInput) {
+            inputRef.current.click();
+        } else if (onClick) {
+            onClick();
+        }
+    };
+
+    return (
+        <div className="relative flex-shrink">
+            <button 
+                onClick={handleClick}
+                className={`w-full p-2 flex items-center justify-center // Simplified size and layout
+                            bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
+                            transition duration-150 text-gray-700 rounded-lg shadow-sm`}
+                title={label} // Use label as tooltip
+            >
+                {Icon && <Icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />}
+            </button>
+            
+            {isFileInput && (
+                <input 
+                    type="file" 
+                    ref={inputRef} 
+                    onChange={onChange} 
+                    accept=".json"
+                    className="hidden"
+                />
+            )}
+        </div>
+    );
+};
+
 
 // --- Toolbar Component ---
 
-const Toolbar = ({ addNode }) => {
+const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage }) => {
   return (
     <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
       {/* Title/Logo Container */}
@@ -1506,7 +1545,7 @@ const Toolbar = ({ addNode }) => {
         />
       </div>
 
-      <div className="flex flex-col space-y-1 p-3 overflow-y-auto pt-4">
+      <div className="flex flex-col space-y-1 p-3 overflow-y-auto pt-4 flex-grow">
         
         {Object.entries(NODE_DEFINITIONS).map(([type, def]) => {
             const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
@@ -1530,7 +1569,33 @@ const Toolbar = ({ addNode }) => {
                 </button>
             );
         })}
-
+        
+      </div>
+      
+      {/* New Action Buttons Section at the bottom - NOW HORIZONTAL */}
+      <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
+          
+          <ToolbarButton 
+            icon={Download} 
+            label="Download Project (JSON)" 
+            color="blue" 
+            onClick={onDownloadProject}
+          />
+          
+          <ToolbarButton 
+            icon={Upload} 
+            label="Upload Project (JSON)" 
+            color="orange" 
+            onChange={onUploadProject}
+            isFileInput={true} 
+          />
+          
+          <ToolbarButton 
+            icon={Camera} 
+            label="Download Diagram (JPG)" 
+            color="teal" 
+            onClick={onDownloadImage}
+          />
       </div>
     </div>
   );
@@ -1544,6 +1609,84 @@ const App = () => {
   const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
   const [connectingPort, setConnectingPort] = useState(null); 
   const canvasRef = useRef(null);
+  
+  // --- Project Management Handlers ---
+  
+  const downloadFile = (data, filename, type) => {
+    const blob = new Blob([data], { type: type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadProject = useCallback(() => {
+    const projectData = {
+        nodes: nodes,
+        connections: connections
+    };
+    const data = JSON.stringify(projectData, null, 2);
+    downloadFile(data, 'visual_crypto_project.json', 'application/json');
+  }, [nodes, connections]);
+
+  const handleUploadProject = useCallback((event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          try {
+              const projectData = JSON.parse(e.target.result);
+              if (projectData.nodes && projectData.connections) {
+                  setNodes(projectData.nodes);
+                  setConnections(projectData.connections);
+                  // Recalculation is triggered by the useEffect hook watching nodes/connections
+              } else {
+                  console.error("Invalid project file format.");
+                  // Non-blocking user feedback needed here, but for now, console log.
+              }
+          } catch (error) {
+              console.error("Error parsing project file:", error);
+          }
+      };
+      reader.readAsText(file);
+      // Clear file input value after reading
+      event.target.value = ''; 
+  }, []);
+
+  const handleDownloadImage = useCallback(() => {
+      // NOTE: This feature requires the 'html2canvas' library to be loaded externally (e.g., via a <script> tag).
+      // Since external dependencies cannot be included in this single React file, a check and error message is provided.
+      if (typeof window.html2canvas !== 'function') {
+          console.error("Image download failed: html2canvas library is required for canvas capture.");
+          // Using console.error instead of alert as per instructions
+          return;
+      }
+      
+      const element = canvasRef.current;
+      if (element) {
+          window.html2canvas(element, { 
+              useCORS: true, 
+              allowTaint: true, 
+              backgroundColor: '#ffffff'
+          }).then(canvas => {
+              const imageURL = canvas.toDataURL('image/jpeg', 0.9);
+              
+              const a = document.createElement('a');
+              a.href = imageURL;
+              a.download = 'visual_crypto_diagram.jpg';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+          }).catch(err => {
+              console.error("Error capturing canvas image:", err);
+          });
+      }
+  }, []);
   
   // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
@@ -1709,7 +1852,7 @@ const App = () => {
                     
                     if (rawInput !== undefined && rawInput !== null && rawInput !== '') {
                         
-                        // 1. Store Raw Input Data (as requested)
+                        // 1. Store Raw Input Data 
                         const sourceNodeId = incomingConns.find(c => c.targetPortId === 'data')?.source;
                         const upstreamNode = newNodesMap.get(sourceNodeId);
                         
@@ -1718,7 +1861,7 @@ const App = () => {
                             ? upstreamNode.format || 'Text (UTF-8)' 
                             : (upstreamNode ? getOutputFormat(upstreamNode.type) : 'Text (UTF-8)');
                         
-                        // FIX: Primary output (dataOutput) is the RAW UNCONVERTED input
+                        // FIX: Primary output (outputData) is the RAW UNCONVERTED input
                         outputData = rawInput; 
                         
                         // 2. Calculate Secondary (Converted) Output if Expanded
@@ -1866,8 +2009,8 @@ const App = () => {
             sourceNode.dataOutput = outputData; 
         } else if (!primaryOutputPort) {
             // Manually set dataOutput for SINK nodes (viewers)
-            // NOTE: For OUTPUT_VIEWER, dataOutput now holds the RAW INPUT, set above.
-            // We only need to ensure the async update of dataOutput for non-viewer nodes.
+            // NOTE: For OUTPUT_VIEWER, rawInputData holds the RAW INPUT, set above.
+            // We ensure the async update of dataOutput is only for processing nodes.
             if (sourceNode.type !== 'OUTPUT_VIEWER') {
                 sourceNode.dataOutput = outputData;
             }
@@ -2088,7 +2231,12 @@ const App = () => {
     <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
       <style dangerouslySetInnerHTML={{ __html: animatedLineStyle }} />
 
-      <Toolbar addNode={addNode} />
+      <Toolbar 
+        addNode={addNode} 
+        onDownloadProject={handleDownloadProject}
+        onUploadProject={handleUploadProject}
+        onDownloadImage={handleDownloadImage}
+      />
 
       <div className="flex-grow flex flex-col p-4">
         
