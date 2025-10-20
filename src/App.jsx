@@ -242,6 +242,39 @@ const hexToArrayBuffer = (hex) => {
     return bytes.buffer;
 };
 
+/** * Converts a data string and its format into a Uint8Array.
+ * This is crucial for bitwise and shift operations that need byte-level data.
+ */
+const convertToUint8Array = (dataStr, sourceFormat) => {
+    if (!dataStr) return new Uint8Array(0);
+
+    try {
+        if (sourceFormat === 'Text (UTF-8)') {
+             return new TextEncoder().encode(dataStr);
+        } else if (sourceFormat === 'Base64') {
+             return new Uint8Array(base64ToArrayBuffer(dataStr));
+        } else if (sourceFormat === 'Hexadecimal') {
+             return new Uint8Array(hexToArrayBuffer(dataStr));
+        } else if (sourceFormat === 'Binary') {
+             // Convert space-separated binary string to bytes
+             const binaryArray = dataStr.replace(/\s+/g, '').match(/.{1,8}/g) || []; // Group into 8-bit chunks
+             const validBytes = binaryArray.map(s => parseInt(s, 2)).filter(b => !isNaN(b));
+             return new Uint8Array(validBytes);
+        } else if (sourceFormat === 'Decimal') {
+             // Convert space-separated decimal string to bytes
+             const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
+             const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
+             return new Uint8Array(validBytes);
+        } else {
+             // Default to UTF-8 encoding for safety
+             return new TextEncoder().encode(dataStr);
+        }
+    } catch (e) {
+         console.error(`Conversion to Uint8Array failed for format ${sourceFormat}:`, e);
+         return new Uint8Array(0);
+    }
+};
+
 /** Converts a data string from a source format to a target format via ArrayBuffer. */
 const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
     if (!dataStr) return '';
@@ -321,22 +354,20 @@ const getOutputFormat = (nodeType) => {
     }
 }
 
-/** Performs XOR operation on two input strings. */
-const performBitwiseXor = (strA, strB) => {
-    if (!strA || !strB) {
-        return "ERROR: Missing one or both inputs.";
+/** * Performs XOR operation on two input byte arrays.
+ * Returns the result as a Base64 string (standard output format for operations).
+ */
+const performBitwiseXor = (bytesA, bytesB) => {
+    if (bytesA.length === 0 || bytesB.length === 0) {
+        return "ERROR: Missing one or both inputs or inputs failed conversion to bytes.";
     }
 
     try {
-        const encoder = new TextEncoder();
-        const bufferA = encoder.encode(strA);
-        const bufferB = encoder.encode(strB);
-
-        const len = Math.min(bufferA.length, bufferB.length);
+        const len = Math.min(bytesA.length, bytesB.length);
         const result = new Uint8Array(len);
 
         for (let i = 0; i < len; i++) {
-            result[i] = bufferA[i] ^ bufferB[i];
+            result[i] = bytesA[i] ^ bytesB[i];
         }
 
         return arrayBufferToBase64(result.buffer);
@@ -346,15 +377,15 @@ const performBitwiseXor = (strA, strB) => {
     }
 };
 
-/** Performs a byte shift operation on the input string. */
-const performByteShiftOperation = (dataStr, shiftType, shiftAmount) => {
-    if (!dataStr) return "ERROR: Missing data input.";
+/** * Performs a byte shift operation on the input byte array.
+ * Returns the result as a Base64 string.
+ */
+const performByteShiftOperation = (bytes, shiftType, shiftAmount) => {
+    if (bytes.length === 0) return "ERROR: Missing data input or input failed conversion to bytes.";
     const byteAmount = Math.max(0, parseInt(shiftAmount) || 0);
 
     try {
-        const encoder = new TextEncoder();
-        const buffer = encoder.encode(dataStr);
-        const numBytes = buffer.length;
+        const numBytes = bytes.length;
         const result = new Uint8Array(numBytes);
 
         if (byteAmount >= numBytes) {
@@ -362,9 +393,11 @@ const performByteShiftOperation = (dataStr, shiftType, shiftAmount) => {
         }
         
         if (shiftType === 'Left') {
-            result.set(buffer.slice(byteAmount), 0);
+            // Shift Left: [A, B, C, D] -> [C, D, 0, 0] (amount 2)
+            result.set(bytes.slice(byteAmount), 0);
         } else if (shiftType === 'Right') {
-            result.set(buffer.slice(0, numBytes - byteAmount), byteAmount);
+            // Shift Right: [A, B, C, D] -> [0, 0, A, B] (amount 2)
+            result.set(bytes.slice(0, numBytes - byteAmount), byteAmount);
         } else {
             return "ERROR: Invalid shift type.";
         }
@@ -1921,7 +1954,7 @@ const App = () => {
             const incomingConns = currentConnections.filter(c => c.target === sourceId);
             let inputs = {};
             
-            // Step 1: Gather inputs from all upstream nodes
+            // Step 1: Gather inputs and their formats from all upstream nodes
             incomingConns.forEach(conn => {
                 const inputSourceNode = newNodesMap.get(conn.source);
                 if (!inputSourceNode) return;
@@ -1937,30 +1970,28 @@ const App = () => {
                     dataToUse = inputSourceNode.dataOutput; // Fallback for simple nodes
                 }
 
-                // Store the data using the input port ID ('data', 'key', 'dataA', etc.)
-                // FIX: Only accept the FIRST connection for a port ID for single-input ports
+                // Determine the format of the output data
+                const sourceFormat = inputSourceNode.type === 'DATA_INPUT' ? inputSourceNode.format : getOutputFormat(inputSourceNode.type);
+
+                // Store the data and format using the input port ID
                 if (!inputs[conn.targetPortId]) { 
-                    inputs[conn.targetPortId] = dataToUse;
+                    inputs[conn.targetPortId] = { 
+                        data: dataToUse, 
+                        format: sourceFormat,
+                        nodeId: inputSourceNode.id
+                    };
                 }
             });
             
             // Step 2: Execute node logic (using direct inputs lookup)
             switch (sourceNode.type) {
                 case 'OUTPUT_VIEWER':
-                    const rawInput = inputs['data']; 
+                    const inputObj = inputs['data'];
+                    const rawInput = inputObj?.data; 
                     let convertedDataOutput = sourceNode.convertedData || '';
-                    let calculatedSourceFormat = ''; 
+                    let calculatedSourceFormat = inputObj?.format || 'N/A';
                     
-                    if (rawInput !== undefined && rawInput !== null && rawInput !== '') {
-                        
-                        // 1. Store Raw Input Data 
-                        const sourceNodeId = incomingConns.find(c => c.targetPortId === 'data')?.source;
-                        const upstreamNode = newNodesMap.get(sourceNodeId);
-                        
-                        // Determine source format: use format property for DATA_INPUT, else infer from node type
-                        calculatedSourceFormat = upstreamNode?.type === 'DATA_INPUT' 
-                            ? upstreamNode.format || 'Text (UTF-8)' 
-                            : (upstreamNode ? getOutputFormat(upstreamNode.type) : 'Text (UTF-8)');
+                    if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput.startsWith('ERROR')) {
                         
                         // FIX: Primary output (outputData) is the RAW UNCONVERTED input
                         outputData = rawInput; 
@@ -1985,7 +2016,7 @@ const App = () => {
                     break;
                     
                 case 'HASH_FN':
-                    const hashInput = inputs['data'];
+                    const hashInput = inputs['data']?.data;
                     if (hashInput) { 
                         isProcessing = true; 
                         const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
@@ -2004,12 +2035,18 @@ const App = () => {
                     break;
                 
                 case 'XOR_OP':
-                    const dataInputA = inputs['dataA']; 
-                    const dataInputB = inputs['dataB']; 
+                    const dataInputA = inputs['dataA']?.data; 
+                    const dataInputB = inputs['dataB']?.data; 
+                    const formatA = inputs['dataA']?.format;
+                    const formatB = inputs['dataB']?.format;
 
                     if (dataInputA && dataInputB) { 
+                        // FIX: Convert inputs to Uint8Array before XORing
+                        const bytesA = convertToUint8Array(dataInputA, formatA);
+                        const bytesB = convertToUint8Array(dataInputB, formatB);
+
                         isProcessing = true; 
-                        outputData = performBitwiseXor(dataInputA, dataInputB); 
+                        outputData = performBitwiseXor(bytesA, bytesB); 
                         isProcessing = false; 
                     } else if (dataInputA && !dataInputB) {
                         outputData = 'Waiting for Input B.';
@@ -2021,12 +2058,17 @@ const App = () => {
                     break;
                 
                 case 'SHIFT_OP':
-                    const shiftDataInput = inputs['data'];
+                    const shiftDataInput = inputs['data']?.data;
+                    const shiftFormat = inputs['data']?.format;
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
+                    
                     if (shiftDataInput) { 
+                        // FIX: Convert input to Uint8Array before shifting
+                        const bytes = convertToUint8Array(shiftDataInput, shiftFormat);
+                        
                         isProcessing = true; 
-                        outputData = performByteShiftOperation(shiftDataInput, shiftType, shiftAmount); 
+                        outputData = performByteShiftOperation(bytes, shiftType, shiftAmount); 
                         isProcessing = false; 
                     } else { 
                         outputData = 'Waiting for data input.'; 
@@ -2034,8 +2076,8 @@ const App = () => {
                     break;
 
                 case 'SYM_ENC':
-                    const encDataInput = inputs['data'];
-                    const encKeyInput = inputs['key'];
+                    const encDataInput = inputs['data']?.data;
+                    const encKeyInput = inputs['key']?.data;
 
                     if (encDataInput && encKeyInput) {
                         isProcessing = true;
@@ -2050,8 +2092,8 @@ const App = () => {
                     break;
                 
                 case 'SYM_DEC': 
-                    const decCipherInput = inputs['cipher'];
-                    const decKeyInput = inputs['key'];
+                    const decCipherInput = inputs['cipher']?.data;
+                    const decKeyInput = inputs['key']?.data;
 
                     if (decCipherInput && decKeyInput) {
                         isProcessing = true;
@@ -2066,8 +2108,8 @@ const App = () => {
                     break;
 
                 case 'ASYM_ENC':
-                    const asymEncDataInput = inputs['data'];
-                    const asymEncPublicKeyInput = inputs['publicKey'];
+                    const asymEncDataInput = inputs['data']?.data;
+                    const asymEncPublicKeyInput = inputs['publicKey']?.data;
 
                     if (asymEncDataInput && asymEncPublicKeyInput) {
                         isProcessing = true;
@@ -2082,8 +2124,8 @@ const App = () => {
                     break;
 
                 case 'ASYM_DEC':
-                    const asymDecCipherInput = inputs['cipher'];
-                    const asymDecPrivateKeyInput = inputs['privateKey'];
+                    const asymDecCipherInput = inputs['cipher']?.data;
+                    const asymDecPrivateKeyInput = inputs['privateKey']?.data;
 
                     if (asymDecCipherInput && asymDecPrivateKeyInput) {
                         isProcessing = true;
