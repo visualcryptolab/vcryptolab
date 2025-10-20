@@ -411,6 +411,7 @@ const performByteShiftOperation = (bytes, shiftType, shiftAmount) => {
 
 /** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
+  if (!str) return 'ERROR: Missing data input.';
   const webCryptoAlgorithm = algorithm.toUpperCase(); 
   
   if (!HASH_ALGORITHMS.includes(algorithm)) {
@@ -547,7 +548,10 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
         const cipherBuffer = base64ToArrayBuffer(base64Ciphertext);
 
         const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: algorithm, iv: new Uint8Array(iv) }, privateKey, cipherBuffer
+            // NOTE: The Web Crypto API for RSA-OAEP decrypt does not take an IV parameter.
+            { name: algorithm }, // Corrected for RSA-OAEP
+            privateKey, 
+            cipherBuffer
         );
         
         const decoder = new TextDecoder();
@@ -1795,9 +1799,10 @@ const App = () => {
   const handleDownloadImage = useCallback(() => {
       // NOTE: This feature requires the 'html2canvas' library to be loaded externally (e.g., via a <script> tag).
       // Since external dependencies cannot be included in this single React file, a check and error message is provided.
+      // This function will now rely on external configuration in index.html to load html2canvas.
+      
       if (typeof window.html2canvas !== 'function') {
-          console.error("Image download failed: html2canvas library is required for canvas capture.");
-          // Using console.error instead of alert as per instructions
+          console.error("Image download failed: html2canvas library is required for canvas capture. Please ensure the <script> tag for html2canvas is loaded globally in your index.html file.");
           return;
       }
       
@@ -2425,11 +2430,6 @@ const App = () => {
           
         </div>
       </div>
-      {/* This is a workaround to load the external html2canvas library needed for 
-        the image download feature, as external scripts cannot be loaded through 
-        standard React imports in this environment.
-      */}
-      <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     </div>
   );
 };
