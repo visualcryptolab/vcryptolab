@@ -340,8 +340,7 @@ const getOutputFormat = (nodeType) => {
             return 'Text (UTF-8)'; 
         case 'KEY_GEN':
         case 'SYM_ENC':
-        case 'XOR_OP':
-        case 'SHIFT_OP':
+        // REMOVED XOR_OP, SHIFT_OP from here as they are dynamic
         case 'ASYM_ENC':
             return 'Base64';
         case 'HASH_FN':
@@ -1540,7 +1539,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for two data inputs...'}
+                        {/* Display dynamic output format */}
+                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput.substring(0, 15)}...` : 'Waiting for two data inputs...'}
                     </p>
                     {/* Copy Button for XOR Output */}
                     <button
@@ -1594,7 +1594,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Result (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                        {/* Display dynamic output format */}
+                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
                     </p>
                     {/* Copy Button for Bit Shift Output */}
                     <button
@@ -1976,7 +1977,7 @@ const App = () => {
                 }
 
                 // Determine the format of the output data
-                const sourceFormat = inputSourceNode.type === 'DATA_INPUT' ? inputSourceNode.format : getOutputFormat(inputSourceNode.type);
+                const sourceFormat = inputSourceNode.type === 'DATA_INPUT' ? inputSourceNode.format : (inputSourceNode.outputFormat || getOutputFormat(inputSourceNode.type)); // FIX: Use node.outputFormat if set
 
                 // Store the data and format using the input port ID
                 if (!inputs[conn.targetPortId]) { 
@@ -2042,41 +2043,63 @@ const App = () => {
                 case 'XOR_OP':
                     const dataInputA = inputs['dataA']?.data; 
                     const dataInputB = inputs['dataB']?.data; 
-                    const formatA = inputs['dataA']?.format;
+                    const formatA = inputs['dataA']?.format; // Primary input format
                     const formatB = inputs['dataB']?.format;
 
                     if (dataInputA && dataInputB) { 
-                        // FIX: Convert inputs to Uint8Array before XORing
+                        // Step 1: Convert inputs to Uint8Array before XORing
                         const bytesA = convertToUint8Array(dataInputA, formatA);
                         const bytesB = convertToUint8Array(dataInputB, formatB);
 
                         isProcessing = true; 
-                        outputData = performBitwiseXor(bytesA, bytesB); 
+                        
+                        // Step 2: Perform XOR (returns Base64 string)
+                        const base64Result = performBitwiseXor(bytesA, bytesB); 
+                        
+                        // Step 3: Convert Base64 result back to the input format (formatA is chosen as primary output format)
+                        outputData = convertDataFormat(base64Result, 'Base64', formatA);
+                        
+                        // FIX: Store the dynamic output format for UI display and subsequent nodes
+                        sourceNode.outputFormat = formatA; 
+
                         isProcessing = false; 
                     } else if (dataInputA && !dataInputB) {
                         outputData = 'Waiting for Input B.';
+                        sourceNode.outputFormat = formatA || ''; // Maintain format if A is connected
                     } else if (!dataInputA && dataInputB) {
                         outputData = 'Waiting for Input A.';
+                        sourceNode.outputFormat = formatB || ''; // Maintain format if B is connected
                     } else {
                         outputData = 'Waiting for two data inputs.'; 
+                        sourceNode.outputFormat = '';
                     }
                     break;
                 
                 case 'SHIFT_OP':
                     const shiftDataInput = inputs['data']?.data;
-                    const shiftFormat = inputs['data']?.format;
+                    const shiftFormat = inputs['data']?.format; // Primary input format
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
                     
                     if (shiftDataInput) { 
-                        // FIX: Convert input to Uint8Array before shifting
+                        // Step 1: Convert input to Uint8Array before shifting
                         const bytes = convertToUint8Array(shiftDataInput, shiftFormat);
                         
                         isProcessing = true; 
-                        outputData = performByteShiftOperation(bytes, shiftType, shiftAmount); 
+                        
+                        // Step 2: Perform Shift (returns Base64 string)
+                        const base64Result = performByteShiftOperation(bytes, shiftType, shiftAmount); 
+                        
+                        // Step 3: Convert Base64 result back to the input format
+                        outputData = convertDataFormat(base64Result, 'Base64', shiftFormat);
+
+                        // FIX: Store the dynamic output format for UI display and subsequent nodes
+                        sourceNode.outputFormat = shiftFormat; 
+                        
                         isProcessing = false; 
                     } else { 
                         outputData = 'Waiting for data input.'; 
+                        sourceNode.outputFormat = '';
                     }
                     break;
 
@@ -2093,6 +2116,7 @@ const App = () => {
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type); // Fixed Base64
                     } else { outputData = 'Waiting for Data and Key inputs.'; }
                     break;
                 
@@ -2109,6 +2133,7 @@ const App = () => {
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type); // Fixed Text (UTF-8)
                     } else { outputData = 'Waiting for Cipher and Key inputs.'; }
                     break;
 
@@ -2125,6 +2150,7 @@ const App = () => {
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type); // Fixed Base64
                     } else { outputData = 'Waiting for Data and Public Key.'; }
                     break;
 
@@ -2141,6 +2167,7 @@ const App = () => {
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type); // Fixed Text (UTF-8)
                     } else { outputData = 'Waiting for Cipher and Private Key.'; }
                     break;
 
@@ -2221,7 +2248,7 @@ const App = () => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
-    const initialContent = { dataOutput: '', isProcessing: false };
+    const initialContent = { dataOutput: '', isProcessing: false, outputFormat: getOutputFormat(type) };
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
@@ -2254,6 +2281,9 @@ const App = () => {
     } else if (type === 'SHIFT_OP') {
       initialContent.shiftType = 'Left';
       initialContent.shiftAmount = 1;
+      initialContent.outputFormat = ''; // Dynamic output format
+    } else if (type === 'XOR_OP') {
+      initialContent.outputFormat = ''; // Dynamic output format
     }
 
     setNodes(prevNodes => [
