@@ -169,18 +169,7 @@ const NODE_DEFINITIONS = {
 };
 
 // Initial nodes on the canvas
-const INITIAL_NODES = [
-  { 
-    id: 'input_1', 
-    label: 'Data Input', 
-    position: { x: 50, y: 150 }, 
-    type: 'DATA_INPUT', 
-    color: 'blue', 
-    content: 'Hello cryptographic world!', 
-    format: 'Text (UTF-8)',
-    dataOutput: 'Hello cryptographic world!'
-  },
-];
+const INITIAL_NODES = []; // Set to empty array to start clean
 
 const INITIAL_CONNECTIONS = []; // No initial connections
 
@@ -1234,7 +1223,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                             <button
                                 onClick={(e) => handleCopyToClipboard(e, convertedData)}
                                 disabled={!convertedData || convertedData.startsWith('ERROR')}
-                                className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-md 
+                                className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
                                             ${convertedData && !convertedData.startsWith('ERROR')
                                                 ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
                                                 : 'bg-gray-300 cursor-not-allowed'}`}
