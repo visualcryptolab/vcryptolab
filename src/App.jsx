@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Database, Zap, Settings, Lock, Unlock, Hash, ArrowRight, ArrowLeft, Clipboard, Code } from 'lucide-react';
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X } from 'lucide-react';
 
 // =================================================================
 // 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS
@@ -22,11 +22,6 @@ const TEXT_ICON_CLASSES = {
   teal: 'text-teal-600', gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
 };
 
-const TEXT_LABEL_CLASSES = {
-  blue: 'text-blue-500', red: 'text-red-500', orange: 'text-orange-500', cyan: 'text-cyan-500', pink: 'text-pink-500', 
-  teal: 'text-teal-500', gray: 'text-gray-500', lime: 'text-lime-500', indigo: 'text-indigo-500',
-};
-
 const HOVER_BORDER_TOOLBAR_CLASSES = {
   blue: 'hover:border-blue-400', red: 'hover:border-red-400', orange: 'hover:border-orange-400', cyan: 'hover:border-cyan-400', pink: 'hover:border-pink-400', 
   teal: 'hover:border-teal-400', gray: 'hover:border-gray-400', lime: 'hover:border-lime-400', indigo: 'hover:border-indigo-400',
@@ -34,39 +29,39 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
 
 // --- Port Configuration ---
 const PORT_SIZE = 4; // w-4 h-4
+const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels (w-4 is 16px, -left-2/ -right-2 is 8px offset from the box edge)
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
-const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input (for future use)
+const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input 
 const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Output
 
-// Supported Hash Algorithms
+// Supported Algorithms
 const HASH_ALGORITHMS = ['SHA-256', 'SHA-512'];
-
-// Supported Symmetric Algorithms
 const SYM_ALGORITHMS = ['AES-GCM']; 
-
-// Supported Asymmetric Algorithms
 const ASYM_ALGORITHMS = ['RSA-OAEP']; 
 const RSA_MODULUS_LENGTHS = [1024, 2048, 4096];
 
+// Supported Data Formats
+const ALL_FORMATS = ['Text (UTF-8)', 'Base64', 'Hexadecimal', 'Binary', 'Decimal'];
+
 // --- Node Definitions with detailed Port structure ---
-// Note: All nodes now use 'outputPorts' array. keyField specifies which node property holds the output data.
 
 const NODE_DEFINITIONS = {
   // --- Core Nodes ---
-  DATA_INPUT: { label: 'Input Data', color: 'blue', icon: LayoutGrid, inputPorts: [], outputPorts: [{ name: 'Data Out', type: 'data', keyField: 'dataOutput' }] },
-  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPorts: [] },
+  DATA_INPUT: { label: 'Data Input', color: 'blue', icon: LayoutGrid, inputPorts: [], outputPorts: [{ name: 'Data Output', type: 'data', keyField: 'dataOutput' }] },
+  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, 
+    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], outputPorts: [] },
   
   // --- Key Generators ---
-  KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Out (AES)', type: 'key', keyField: 'dataOutput' }] }, 
+  KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] }, 
 
   RSA_KEY_GEN: { 
     label: 'RSA Key Generator', 
-    color: 'cyan', // Changed color to cyan
-    icon: Key, // Changed icon to Key
+    color: 'cyan', 
+    icon: Key, 
     inputPorts: [], 
     outputPorts: [
-        { name: 'Public Key', type: 'public', keyField: 'dataOutputPublic' },
-        { name: 'Private Key', type: 'private', keyField: 'dataOutputPrivate' }
+        { name: 'Public Key', type: 'public', keyField: 'dataOutputPublic' }, // index 0
+        { name: 'Private Key', type: 'private', keyField: 'dataOutputPrivate' } // index 1
     ]
   },
   
@@ -76,8 +71,8 @@ const NODE_DEFINITIONS = {
     color: 'red', 
     icon: Lock, 
     inputPorts: [
-        { name: 'Data In', type: 'data', mandatory: true, id: 'data' },
-        { name: 'Key In', type: 'key', mandatory: true, id: 'key' }
+        { name: 'Data Input', type: 'data', mandatory: true, id: 'data' },
+        { name: 'Key Input', type: 'key', mandatory: true, id: 'key' }
     ], 
     outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }]
   },
@@ -86,19 +81,19 @@ const NODE_DEFINITIONS = {
     color: 'pink', 
     icon: Unlock, 
     inputPorts: [
-        { name: 'Cipher In', type: 'data', mandatory: true, id: 'cipher' }, 
-        { name: 'Key In', type: 'key', mandatory: true, id: 'key' }
+        { name: 'Cipher Input', type: 'data', mandatory: true, id: 'cipher' }, 
+        { name: 'Key Input', type: 'key', mandatory: true, id: 'key' }
     ], 
     outputPorts: [{ name: 'Plaintext', type: 'data', keyField: 'dataOutput' }] 
   },
 
   ASYM_ENC: { 
     label: 'Asym Encrypt', 
-    color: 'cyan', // Changed color to cyan
+    color: 'cyan', 
     icon: Lock, 
     inputPorts: [
-        { name: 'Data In', type: 'data', mandatory: true }, 
-        { name: 'Public Key In', type: 'public', mandatory: true }
+        { name: 'Data Input', type: 'data', mandatory: true, id: 'data' }, 
+        { name: 'Public Key', type: 'public', mandatory: true, id: 'publicKey' }
     ], 
     outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }] 
   },
@@ -107,62 +102,61 @@ const NODE_DEFINITIONS = {
     color: 'teal', 
     icon: Unlock, 
     inputPorts: [
-        { name: 'Cipher In', type: 'data', mandatory: true }, 
-        { name: 'Private Key In', type: 'private', mandatory: true }
+        { name: 'Cipher Input', type: 'data', mandatory: true, id: 'cipher' }, 
+        { name: 'Private Key', type: 'private', mandatory: true, id: 'privateKey' }
     ], 
     outputPorts: [{ name: 'Plaintext', type: 'data', keyField: 'dataOutput' }]
   },
 
   // --- Utility Nodes ---
-  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPorts: [{ name: 'Hash Out', type: 'data', keyField: 'dataOutput' }] },
+  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, 
+    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
+    outputPorts: [{ name: 'Hash Output', type: 'data', keyField: 'dataOutput' }] },
 
-  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, inputPorts: [{ name: 'Input A', type: 'data', mandatory: true }, { name: 'Input B', type: 'data', mandatory: true }], outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
-  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, inputPorts: [{ name: 'Data In', type: 'data', mandatory: true }], outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
+  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: Cpu, 
+    inputPorts: [
+        { name: 'Input A', type: 'data', mandatory: true, id: 'dataA' }, 
+        { name: 'Input B', type: 'data', mandatory: true, id: 'dataB' }
+    ], 
+    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
+    
+  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: Settings, 
+    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
+    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
 };
 
 // Initial nodes on the canvas
 const INITIAL_NODES = [
-  // Example initial nodes for demonstration
+  // Initialize a simple connected data flow
   { 
-    id: 'start_key', 
-    label: 'Sym Key Generator', 
-    position: { x: 50, y: 50 }, 
-    type: 'KEY_GEN', 
-    color: 'orange', 
-    dataOutput: '', 
-    keyAlgorithm: 'AES-GCM',
-    key: null, // Stores the actual CryptoKey object
-  },
-  { 
-    id: 'start_a', 
-    label: 'Input Data', 
-    position: { x: 50, y: 250 }, 
+    id: 'input_1', 
+    label: 'Data Input', 
+    position: { x: 50, y: 150 }, 
     type: 'DATA_INPUT', 
     color: 'blue', 
-    content: 'Secret Message', 
+    content: 'Hello cryptographic world!', 
     format: 'Text (UTF-8)',
-    dataOutput: 'Secret Message'
+    dataOutput: 'Hello cryptographic world!'
   },
   { 
-    id: 'op_a', 
-    label: 'Sym Encrypt', 
-    position: { x: 300, y: 150 }, 
-    type: 'SYM_ENC', 
-    color: 'red', 
-    dataOutput: '',
-    symAlgorithm: 'AES-GCM', // Sym Encrypt settings
-    key: null,
-    iv: null,
-  },
-  { 
-    id: 'end_a', 
+    id: 'viewer_1', 
     label: 'Output Viewer', 
-    position: { x: 700, y: 250 }, 
+    position: { x: 350, y: 150 }, 
     type: 'OUTPUT_VIEWER', 
     color: 'red', 
     dataOutput: '', 
     viewFormat: 'Text (UTF-8)'
   },
+];
+
+const INITIAL_CONNECTIONS = [
+    // Connects input_1 output (index 0, type 'data') to viewer_1 input (port 'data')
+    { 
+        source: 'input_1', 
+        sourcePortIndex: 0, 
+        target: 'viewer_1', 
+        targetPortId: 'data' 
+    }
 ];
 
 const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
@@ -192,11 +186,107 @@ const base64ToArrayBuffer = (base64) => {
   return bytes.buffer;
 };
 
+// --- Data Format Conversion Functions ---
+
+/** Converts ArrayBuffer to a hexadecimal string. */
+const arrayBufferToHex = (buffer) => {
+    const byteArray = new Uint8Array(buffer);
+    return Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('');
+};
+
+/** Converts ArrayBuffer to a binary string (space separated by byte). */
+const arrayBufferToBinary = (buffer) => {
+    const byteArray = new Uint8Array(buffer);
+    return Array.from(byteArray).map(byte => byte.toString(2).padStart(8, '0')).join(' ');
+};
+
+/** Converts a hexadecimal string to ArrayBuffer. */
+const hexToArrayBuffer = (hex) => {
+    // Clean the hex string from spaces or non-hex characters
+    const cleanedHex = hex.replace(/[^0-9a-fA-F]/g, '');
+    if (cleanedHex.length === 0) return new ArrayBuffer(0);
+
+    // Ensure it has an even length, padding with 0 if necessary
+    const paddedHex = cleanedHex.length % 2 !== 0 ? '0' + cleanedHex : cleanedHex;
+
+    const len = paddedHex.length / 2;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = parseInt(paddedHex.substring(i * 2, i * 2 + 2), 16);
+    }
+    return bytes.buffer;
+};
+
 /**
- * Performs XOR operation on two input strings (converted to Uint8Array).
- * The result is truncated to the length of the shorter input.
- * Returns result as a Base64 string.
+ * Determines the default output format of a node.
+ * Used to know how to interpret 'dataOutput' before Viewer conversion.
  */
+const getOutputFormat = (nodeType) => {
+    switch (nodeType) {
+        case 'DATA_INPUT':
+        case 'SYM_DEC':
+        case 'ASYM_DEC':
+            return 'Text (UTF-8)';
+        case 'HASH_FN':
+            return 'Hexadecimal';
+        case 'SYM_ENC':
+        case 'ASYM_ENC':
+        case 'XOR_OP':
+        case 'SHIFT_OP':
+            return 'Base64';
+        default:
+            return 'Text (UTF-8)';
+    }
+};
+
+/** Converts a data string from a source format to a target format via ArrayBuffer. */
+const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
+    if (!dataStr) return '';
+    if (sourceFormat === targetFormat) return dataStr;
+    
+    let buffer;
+    
+    // 1. Convert from source format to ArrayBuffer
+    try {
+        if (sourceFormat === 'Text (UTF-8)') {
+             buffer = new TextEncoder().encode(dataStr).buffer;
+        } else if (sourceFormat === 'Base64') {
+             buffer = base64ToArrayBuffer(dataStr);
+        } else if (sourceFormat === 'Hexadecimal') {
+             buffer = hexToArrayBuffer(dataStr);
+        } else {
+             // Treat other source formats as raw text for simplicity and encode as UTF-8
+             buffer = new TextEncoder().encode(dataStr).buffer;
+        }
+    } catch (e) {
+         return `DECODING ERROR: Failed source format (${sourceFormat}).`;
+    }
+
+    // 2. Convert from ArrayBuffer to target format
+    try {
+        if (targetFormat === 'Text (UTF-8)') {
+            return new TextDecoder().decode(buffer);
+        } else if (targetFormat === 'Base64') {
+            return arrayBufferToBase64(buffer);
+        } else if (targetFormat === 'Hexadecimal') {
+            return arrayBufferToHex(buffer);
+        } else if (targetFormat === 'Binary') {
+            return arrayBufferToBinary(buffer);
+        } else if (targetFormat === 'Decimal') {
+             // Convert to decimal byte representation (space separated)
+            const byteArray = new Uint8Array(buffer);
+            return Array.from(byteArray).join(' ');
+        } else {
+             return `ERROR: Unsupported target format (${targetFormat})`;
+        }
+    } catch (e) {
+        return `ENCODING ERROR: Failed conversion to ${targetFormat}.`;
+    }
+};
+
+// --- Existing Crypto Functions (Translated) ---
+
+/** Performs XOR operation on two input strings. */
 const performBitwiseXor = (strA, strB) => {
     if (!strA || !strB) {
         return "ERROR: Missing one or both inputs.";
@@ -221,14 +311,9 @@ const performBitwiseXor = (strA, strB) => {
     }
 };
 
-/**
- * Performs a byte shift operation on the input string (converted to Uint8Array).
- * For simplicity, shiftAmount is treated as number of BYTES to shift.
- * Returns result as a Base64 string.
- */
+/** Performs a byte shift operation on the input string. */
 const performByteShiftOperation = (dataStr, shiftType, shiftAmount) => {
     if (!dataStr) return "ERROR: Missing data input.";
-    // Ensure shiftAmount is a safe integer
     const byteAmount = Math.max(0, parseInt(shiftAmount) || 0);
 
     try {
@@ -238,17 +323,12 @@ const performByteShiftOperation = (dataStr, shiftType, shiftAmount) => {
         const result = new Uint8Array(numBytes);
 
         if (byteAmount >= numBytes) {
-            // If shift amount is >= array length, the result is all zeros
             return arrayBufferToBase64(result.buffer); 
         }
         
         if (shiftType === 'Left') {
-            // Shift Left: [A, B, C, D] -> [C, D, 0, 0] (amount 2)
-            // Copy remaining bytes to the start, fill end with zeros (default behavior of Uint8Array.set)
             result.set(buffer.slice(byteAmount), 0);
         } else if (shiftType === 'Right') {
-            // Shift Right: [A, B, C, D] -> [0, 0, A, B] (amount 2)
-            // Copy starting bytes to the shifted position
             result.set(buffer.slice(0, numBytes - byteAmount), byteAmount);
         } else {
             return "ERROR: Invalid shift type.";
@@ -260,7 +340,6 @@ const performByteShiftOperation = (dataStr, shiftType, shiftAmount) => {
         return `ERROR: Byte Shift failed. ${error.message}`;
     }
 };
-
 
 /** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
@@ -275,18 +354,15 @@ const calculateHash = async (str, algorithm) => {
     const data = encoder.encode(str);
     const hashBuffer = await crypto.subtle.digest(webCryptoAlgorithm, data);
     
-    // Convert ArrayBuffer to hex string
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    return hashHex;
+    // Returns Hexadecimal
+    return arrayBufferToHex(hashBuffer);
   } catch (error) {
     console.error(`Error calculating hash with ${algorithm}:`, error);
     return `ERROR: Calculation failed with ${algorithm}. Check console for details.`;
   }
 };
 
-/** Generates an AES-GCM Key and returns it as a CryptoKey object and Base64 string. */
+/** Generates an AES-GCM Symmetric Key. */
 const generateSymmetricKey = async (algorithm) => {
     try {
         const key = await crypto.subtle.generateKey(
@@ -309,10 +385,7 @@ const generateSymmetricKey = async (algorithm) => {
 const generateAsymmetricKeyPair = async (algorithm, modulusLength, publicExponentDecimal) => {
     
     let publicExponentArray;
-    
-    // Standard public exponent 65537 (0x10001) in byte form
     publicExponentArray = new Uint8Array([0x01, 0x00, 0x01]); 
-
     const hashAlgorithm = "SHA-256";
     const exponentValue = publicExponentDecimal || 65537;
 
@@ -332,23 +405,16 @@ const generateAsymmetricKeyPair = async (algorithm, modulusLength, publicExponen
             ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
         );
         
-        // Export public key to SPKI format (Base64) - Standard for transport
         const publicKey = await crypto.subtle.exportKey('spki', keyPair.publicKey);
         const base64PublicKey = arrayBufferToBase64(publicKey);
         
-        // Export private key to PKCS#8 format (Base64) - Standard for transport
         const privateKey = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
         const base64PrivateKey = arrayBufferToBase64(privateKey);
         
-        // Export PRIVATE key in JWK format to extract internal parameters (p, q, d, n) for visualization
         const privateKeyJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
         
         const rsaParams = {
-            n: privateKeyJwk.n, // Modulus (public)
-            e: privateKeyJwk.e, // Public Exponent (public)
-            d: privateKeyJwk.d, // Private Exponent (private)
-            p: privateKeyJwk.p, // First Prime Factor (private)
-            q: privateKeyJwk.q, // Second Prime Factor (private)
+            n: privateKeyJwk.n, e: privateKeyJwk.e, d: privateKeyJwk.d, p: privateKeyJwk.p, q: privateKeyJwk.q, 
         };
         
         return { 
@@ -377,26 +443,17 @@ const asymmetricEncrypt = async (dataStr, base64PublicKey, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64PublicKey);
         
-        // Import Public Key (SPKI format)
         const publicKey = await crypto.subtle.importKey(
-            'spki',
-            keyBuffer,
-            { name: algorithm, hash: "SHA-256" },
-            true, // extractable
-            ['encrypt']
+            'spki', keyBuffer, { name: algorithm, hash: "SHA-256" }, true, ['encrypt']
         );
         
         const encoder = new TextEncoder();
         const dataBuffer = encoder.encode(dataStr);
 
-        // Encrypt
         const encryptedBuffer = await crypto.subtle.encrypt(
-            { name: algorithm },
-            publicKey,
-            dataBuffer
+            { name: algorithm }, publicKey, dataBuffer
         );
         
-        // Convert encrypted buffer to Base64 for transport
         return arrayBufferToBase64(encryptedBuffer);
 
     } catch (error) {
@@ -415,26 +472,16 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
     try {
         const keyBuffer = base64ToArrayBuffer(base64PrivateKey);
         
-        // Import Private Key (PKCS#8 format)
         const privateKey = await crypto.subtle.importKey(
-            'pkcs8',
-            keyBuffer,
-            { name: algorithm, hash: "SHA-256" },
-            true, // extractable
-            ['decrypt']
+            'pkcs8', keyBuffer, { name: algorithm, hash: "SHA-256" }, true, ['decrypt']
         );
         
-        // Decode ciphertext
         const cipherBuffer = base64ToArrayBuffer(base64Ciphertext);
 
-        // Decrypt
         const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: algorithm },
-            privateKey,
-            cipherBuffer
+            { name: algorithm }, privateKey, cipherBuffer
         );
         
-        // Convert ArrayBuffer back to text
         const decoder = new TextDecoder();
         return decoder.decode(decryptedBuffer);
 
@@ -445,7 +492,7 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
 };
 
 
-/** Encrypts data using an AES-GCM key. */
+/** Encrypts data using an AES-GCM key (Symmetric). */
 const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     if (!dataStr) return 'Missing Data Input.';
     if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
@@ -455,29 +502,19 @@ const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64Key);
         
-        // Import Key
         const key = await crypto.subtle.importKey(
-            'raw',
-            keyBuffer,
-            { name: algorithm, length: 256 },
-            true, // extractable
-            ['encrypt', 'decrypt']
+            'raw', keyBuffer, { name: algorithm, length: 256 }, true, ['encrypt', 'decrypt']
         );
         
-        // Generate a random Initialization Vector (IV)
         const iv = crypto.getRandomValues(new Uint8Array(12)); 
         
         const encoder = new TextEncoder();
         const dataBuffer = encoder.encode(dataStr);
 
-        // Encrypt
         const encryptedBuffer = await crypto.subtle.encrypt(
-            { name: algorithm, iv: iv },
-            key,
-            dataBuffer
+            { name: algorithm, iv: iv }, key, dataBuffer
         );
         
-        // Concatenate IV and Ciphertext, then convert to Base64 for transport
         const fullCipher = new Uint8Array(iv.byteLength + encryptedBuffer.byteLength);
         fullCipher.set(new Uint8Array(iv), 0);
         fullCipher.set(new Uint8Array(encryptedBuffer), iv.byteLength);
@@ -490,7 +527,7 @@ const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     }
 };
 
-/** Decrypts data using an AES-GCM key. */
+/** Decrypts data using an AES-GCM key (Symmetric). */
 const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
     if (!base64Ciphertext) return 'Missing Ciphertext Input.';
     if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
@@ -500,35 +537,23 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64Key);
         
-        // Import Key
         const key = await crypto.subtle.importKey(
-            'raw',
-            keyBuffer,
-            { name: algorithm, length: 256 },
-            true, 
-            ['encrypt', 'decrypt']
+            'raw', keyBuffer, { name: algorithm, length: 256 }, true, ['encrypt', 'decrypt']
         );
         
-        // Decode the full ciphertext (IV + Encrypted Data)
         const fullCipherBuffer = base64ToArrayBuffer(base64Ciphertext);
         
-        // Check if buffer is large enough for IV (12 bytes for AES-GCM)
         if (fullCipherBuffer.byteLength < 12) {
              throw new Error('Ciphertext is too short to contain IV.');
         }
 
-        // Separate IV (first 12 bytes for AES-GCM) and Ciphertext
         const iv = fullCipherBuffer.slice(0, 12);
         const ciphertext = fullCipherBuffer.slice(12);
 
-        // Decrypt
         const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: algorithm, iv: new Uint8Array(iv) },
-            key,
-            ciphertext
+            { name: algorithm, iv: new Uint8Array(iv) }, key, ciphertext
         );
         
-        // Convert ArrayBuffer back to text
         const decoder = new TextDecoder();
         return decoder.decode(decryptedBuffer);
 
@@ -543,66 +568,92 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
 // 3. UI COMPONENTS & GRAPH LOGIC
 // =================================================================
 
-// Calculates the path for the line connecting two ports (right of source to left of target)
-const getLinePath = (sourceNode, targetNode) => {
-  
-  // Calculate port positions exactly on the edge
-  // We use BOX_SIZE.minHeight / 2 as the vertical offset since Ports are styled with top: 50%
-  const p1 = { 
-    x: sourceNode.position.x + BOX_SIZE.width, 
-    y: sourceNode.position.y + BOX_SIZE.minHeight / 2 
-  }; 
-  
-  const p2 = { 
-    x: targetNode.position.x, 
-    y: targetNode.position.y + BOX_SIZE.minHeight / 2 
-  }; 
-  
-  // Use a smooth Bezier curve that flows horizontally
-  const midX = (p1.x + p2.x) / 2;
-  
-  // Control points pull horizontally towards the center for a smooth arc
-  return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
+/**
+ * Calculates the SVG path for the line connecting two specific ports.
+ * The connection is calculated to go from the center of the source port to the center of the target port.
+ */
+const getLinePath = (sourceNode, targetNode, connection) => {
+    const sourceDef = NODE_DEFINITIONS[sourceNode.type];
+    const targetDef = NODE_DEFINITIONS[targetNode.type];
+    
+    // 1. Calculate vertical position based on port index and node height
+    const getVerticalPosition = (nodeDef, index, isInput) => {
+        const numPorts = isInput ? nodeDef.inputPorts.length : nodeDef.outputPorts.length;
+        const step = BOX_SIZE.minHeight / (numPorts + 1); 
+        return (index + 1) * step;
+    };
+
+    // Calculate vertical position for Source Output Port
+    const sourceVerticalPos = getVerticalPosition(sourceDef, connection.sourcePortIndex, false);
+    
+    // Find the index of the targetPortId in the target node's inputPorts array
+    const targetPortIndex = targetDef.inputPorts.findIndex(p => p.id === connection.targetPortId);
+    // Calculate vertical position for Target Input Port
+    const targetVerticalPos = getVerticalPosition(targetDef, targetPortIndex, true);
+
+    // P1: Source connection point (Node right edge + visual offset for the port center)
+    const p1 = { 
+      x: sourceNode.position.x + BOX_SIZE.width + PORT_VISUAL_OFFSET_PX, 
+      y: sourceNode.position.y + sourceVerticalPos 
+    }; 
+    
+    // P2: Target connection point (Node left edge - visual offset for the port center)
+    const p2 = { 
+      x: targetNode.position.x - PORT_VISUAL_OFFSET_PX, 
+      y: targetNode.position.y + targetVerticalPos
+    }; 
+    
+    // Use a smooth Bezier curve that flows horizontally
+    const midX = (p1.x + p2.x) / 2;
+    
+    // Control points pull horizontally towards the center for a smooth arc
+    return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
 };
 
 
 // --- Sub-Component for Ports (Visual and Interaction) ---
-const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEnd, title, portStyle, isMandatory, isInputConnected }) => {
+const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, isMandatory, portId, portIndex, outputType }) => {
     let interactionClasses = "";
     let clickHandler = () => {};
     
-    const portColor = isMandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR;
+    const portColor = type === 'output' ? OUTPUT_PORT_COLOR : (isMandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR);
 
     if (type === 'output') {
-        clickHandler = (e) => { e.stopPropagation(); onStart(nodeId); };
-        interactionClasses = isConnecting === nodeId 
+        clickHandler = (e) => { 
+            e.stopPropagation(); 
+            // Pass the node ID, port index, and output data type
+            onStart(nodeId, portIndex, outputType); 
+        };
+        interactionClasses = isConnecting?.sourceId === nodeId 
             ? 'ring-4 ring-emerald-300 animate-pulse' 
             : 'hover:ring-4 hover:ring-emerald-300 transition duration-150';
     } else if (type === 'input') {
-        const isTargetCandidate = isConnecting && isConnecting !== nodeId;
+        // A port is a target candidate if an output port is active AND port types match
+        const isTargetCandidate = isConnecting && isConnecting.sourceId !== nodeId && isConnecting.outputType === portId.split('-')[0]; 
         
         if (isTargetCandidate) {
-            clickHandler = (e) => { e.stopPropagation(); onEnd(nodeId); };
+            clickHandler = (e) => { 
+                e.stopPropagation(); 
+                // Pass the node ID and the input port ID
+                onEnd(nodeId, portId); 
+            };
             interactionClasses = 'ring-4 ring-yellow-300 cursor-pointer animate-pulse-slow';
         } else {
-             // FIX: The port is disabled only if it's already connected AND the node only accepts one connection
-             // Since we allow multiple connections now (e.g., Sym Encrypt), we only disable the click if 
-             // it's NOT a target candidate, otherwise it should be available for connection.
              interactionClasses = 'hover:ring-4 hover:ring-stone-300 transition duration-150';
-            clickHandler = (e) => { e.stopPropagation(); }; 
+             clickHandler = (e) => { e.stopPropagation(); }; 
         }
     }
     
     const stopPropagation = (e) => e.stopPropagation();
 
+    // Port styles rely on absolute positioning determined by the parent DraggableBox
     return (
         <div 
-            className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${type === 'output' ? OUTPUT_PORT_COLOR : portColor} absolute transform -translate-x-1/2 -translate-y-1/2 
+            className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${portColor} absolute transform -translate-x-1/2 -translate-y-1/2 
                         shadow-md border-2 border-white cursor-pointer ${interactionClasses}`}
             onClick={clickHandler}
             onMouseDown={stopPropagation}
             onTouchStart={stopPropagation}
-            style={portStyle}
             title={title}
         />
     );
@@ -611,7 +662,7 @@ const Port = React.memo(({ nodeId, type, colorClass, isConnecting, onStart, onEn
 
 // --- Component for the Draggable Box ---
 
-const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingNodeId, updateNodeContent, connections }) => {
+const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode }) => {
   // Destructure node props and look up definition
   const { id, label, position, type, color, content, format, dataOutput, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, dataOutputPublic, dataOutputPrivate, publicExponent, rsaParameters, asymAlgorithm } = node; 
   const definition = NODE_DEFINITIONS[type];
@@ -628,26 +679,25 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isRSAKeyGen = type === 'RSA_KEY_GEN'; 
   const isSymEnc = type === 'SYM_ENC';
   const isSymDec = type === 'SYM_DEC';
-  const isAsymEnc = type === 'ASYM_ENC'; // NEW FLAG
-  const isAsymDec = type === 'ASYM_DEC'; // NEW FLAG
-  const isBitShift = type === 'SHIFT_OP'; // NEW FLAG
+  const isAsymEnc = type === 'ASYM_ENC'; 
+  const isAsymDec = type === 'ASYM_DEC'; 
+  const isBitShift = type === 'SHIFT_OP'; 
   
-  const FORMATS = ['Text (UTF-8)', 'Binary', 'Decimal', 'Hexadecimal'];
+  const FORMATS = ALL_FORMATS;
   
-  // Get all connections where this node is the target (i.e., this node receives input)
-  const incomingConnections = connections.filter(conn => conn.target === id);
-  // Check if this node is currently the source of an outgoing connection attempt
-  const isPortSource = connectingNodeId === id;
+  const isPortSource = connectingPort?.sourceId === id;
   
   
   // --- Drag Handlers (standard) ---
   const handleDragStart = useCallback((e) => {
-    if (connectingNodeId) return; 
-    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'DIV', 'BUTTON', 'INPUT']; 
+    if (connectingPort) return; 
+    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'BUTTON', 'INPUT']; 
+    // Check if a port was clicked to prevent drag
     if (e.target.tagName === 'DIV' && e.target.classList.contains('w-4') && e.target.classList.contains('h-4')) {
-        return; // Clicked on a port, prevent drag
+        return; 
     }
-    if (interactiveTags.includes(e.target.tagName) && e.target.tagName !== 'DIV') {
+    // Allow interaction inside form elements
+    if (interactiveTags.includes(e.target.tagName)) {
         return; 
     }
 
@@ -668,7 +718,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       setIsDragging(true);
       e.preventDefault(); 
     }
-  }, [canvasRef, position.x, position.y, connectingNodeId]);
+  }, [canvasRef, position.x, position.y, connectingPort]);
 
   const handleDragMove = useCallback((e) => {
     if (!isDragging) return;
@@ -701,11 +751,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   
   const handleBoxClick = useCallback((e) => {
     if (isDragging) return; 
-    if (connectingNodeId) {
+    if (connectingPort) {
         handleConnectEnd(null); // Cancel connection if canvas clicked
     }
     e.stopPropagation();
-  }, [connectingNodeId, handleConnectEnd, isDragging]);
+  }, [connectingPort, handleConnectEnd, isDragging]);
 
   // Handle Copy to Clipboard for Output Viewer
   const handleCopyToClipboard = useCallback((e) => {
@@ -722,9 +772,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         tempTextArea.style.opacity = '0'; 
 
         document.body.appendChild(tempTextArea);
-        
-        tempTextArea.select();
-        tempTextArea.setSelectionRange(0, 99999); 
         
         document.execCommand('copy');
         
@@ -773,24 +820,26 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
     return definition.inputPorts.map((portDef, index) => {
         const topPosition = (index + 1) * step;
+        const portId = portDef.id;
         
+        const isInputConnected = connections.some(c => c.target === id && c.targetPortId === portId);
+
         return (
             <div 
-                key={portDef.name}
+                key={portId}
                 className="absolute -left-2 transform -translate-y-1/2 z-20"
                 style={{ top: `${topPosition}%` }}
             >
                 <Port 
                     nodeId={id} 
                     type="input"
-                    // Use standard input color, but visually differentiate mandatory/optional via title
-                    colorClass={portDef.mandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR} 
-                    isConnecting={connectingNodeId}
+                    portId={portId} 
+                    isConnecting={connectingPort}
                     onStart={handleConnectStart} 
-                    // When not a target candidate, click action is still allowed to initiate target process
                     onEnd={handleConnectEnd} 
-                    title={`${portDef.name} (${portDef.mandatory ? 'Mandatory' : 'Optional'})`}
+                    title={`${portDef.name} (${portDef.mandatory ? 'Mandatory' : 'Optional'}) - Type: ${portDef.type}`}
                     isMandatory={portDef.mandatory}
+                    isInputConnected={isInputConnected}
                 />
             </div>
         );
@@ -806,7 +855,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
     return definition.outputPorts.map((portDef, index) => {
         const topPosition = (index + 1) * step;
-
+        
         return (
             <div 
                 key={portDef.name}
@@ -816,12 +865,14 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <Port 
                     nodeId={id} 
                     type="output"
-                    colorClass={OUTPUT_PORT_COLOR} 
-                    isConnecting={connectingNodeId}
+                    portId={`${portDef.type}-${index}`} 
+                    portIndex={index} 
+                    outputType={portDef.type} 
+                    isConnecting={connectingPort}
                     onStart={handleConnectStart}
                     onEnd={handleConnectEnd}
-                    title={portDef.name}
-                    isMandatory={true} // Output is always considered essential for flow
+                    title={`${portDef.name} - Type: ${portDef.type}`}
+                    isMandatory={true} 
                 />
             </div>
         );
@@ -831,7 +882,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   // --- Class Lookups ---
   const iconTextColorClass = TEXT_ICON_CLASSES[color] || 'text-gray-600';
 
-  let specificClasses = `${BORDER_CLASSES[color]} ${HOVER_BORDER_CLASSES[color]} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`;
+  let specificClasses = '';
 
   if (isPortSource) {
     specificClasses = `border-emerald-500 ring-4 ring-emerald-300 cursor-pointer animate-pulse transition duration-200`; 
@@ -863,9 +914,21 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       onClick={handleBoxClick} 
     >
       
+      {/* Delete Button */}
+      <button
+        className="absolute top-1 right-1 p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 z-30 transition duration-150"
+        onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteNode(id);
+        }}
+        title="Delete Node"
+      >
+        <X className="w-3 h-3" />
+      </button>
+
       {/* -------------------- PORTS -------------------- */}
       {renderInputPorts()}
-      {renderOutputPorts()} {/* RENDER PORTS ARRAY */}
+      {renderOutputPorts()} 
 
       {/* -------------------- CONTENT -------------------- */}
       <div className="flex flex-col h-full w-full justify-start items-center overflow-hidden">
@@ -922,7 +985,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {isOutputViewer && (
-            /* Output Viewer Display */
+            /* Output Viewer Display and Format Selector */
             <div className="w-full mt-1 flex flex-col items-center flex-grow text-xs text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded-lg shadow-inner overflow-y-auto">
                 <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RESULT</span>
                 
@@ -932,19 +995,34 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
                 <button
                     onClick={handleCopyToClipboard}
-                    disabled={!dataOutput}
+                    disabled={!dataOutput || dataOutput.startsWith('ERROR')}
                     className={`mt-auto w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md 
-                                ${dataOutput 
+                                ${dataOutput && !dataOutput.startsWith('ERROR')
                                     ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
                                     : 'bg-red-300 cursor-not-allowed'}`}
                 >
                     <Clipboard className="w-4 h-4" />
                     <span>{copyStatus}</span>
                 </button>
-
-                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">
-                    Current View: <span className="font-semibold text-gray-700">{viewFormat || 'Text (UTF-8)'}</span>
+                
+                {/* View Format Selector */}
+                <span className="text-[10px] font-semibold text-gray-600 mt-2 flex-shrink-0 w-full text-left">
+                    VIEW FORMAT
                 </span>
+                <select
+                  className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm
+                             bg-white appearance-none cursor-pointer text-gray-700 
+                             focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
+                  value={viewFormat || 'Text (UTF-8)'}
+                  onChange={(e) => updateNodeContent(id, 'viewFormat', e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {FORMATS.map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
             </div>
         )}
 
@@ -970,7 +1048,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Calculating...' : 'Active'}
                 </span>
                 <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Hash: ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                    {dataOutput ? `Hash (Hex): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
                 </p>
             </div>
         )}
@@ -1016,7 +1094,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 
                 {/* Modulus Length (n size) */}
                 <div className="w-full mb-1">
-                    <label className="block text-left text-[10px] font-semibold text-gray-600">Modulus Length (Size of n)</label>
+                    <label className="block text-left text-[10px] font-semibold text-gray-600">Modulus Length (bits)</label>
                     <select
                       className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
                                  bg-white appearance-none cursor-pointer text-gray-700 
@@ -1061,7 +1139,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
 
                 <div className="w-full mt-1 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-2">
-                    <label className="block text-[10px] font-semibold text-gray-600">Extracted Key Parameters (Derived Secrets)</label>
+                    <label className="block text-[10px] font-semibold text-gray-600">Extracted Key Parameters (Read Only)</label>
                     
                     {/* READ-ONLY PARAMETERS */}
                     {['n', 'd', 'p', 'q'].map(param => (
@@ -1089,7 +1167,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Encrypting...' : 'Active'}
                 </span>
                 <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Ciphertext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Key...'}
+                    {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Key...'}
                 </p>
             </div>
         )}
@@ -1100,7 +1178,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Decrypting...' : 'Active'}
                 </span>
                 <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Plaintext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Key...'}
+                    {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Key...'}
                 </p>
             </div>
         )}
@@ -1111,7 +1189,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Encrypting (RSA-OAEP)...' : 'Active'}
                 </span>
                 <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Ciphertext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Public Key...'}
+                    {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Public Key...'}
                 </p>
             </div>
         )}
@@ -1122,7 +1200,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Decrypting (RSA-OAEP)...' : 'Active'}
                 </span>
                 <p className="mt-1 text-gray-500 break-all">
-                    {dataOutput ? `Plaintext: ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Private Key...'}
+                    {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Private Key...'}
                 </p>
             </div>
         )}
@@ -1188,17 +1266,23 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 };
 
 
-// --- Toolbar Component (Standard) ---
+// --- Toolbar Component ---
 
 const Toolbar = ({ addNode }) => {
   return (
     <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
-      {/* Logo Container at the top of the left tool bar */}
-      <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex justify-center items-center bg-white">
+      {/* Title/Logo Container - Updated to use PNG image */}
+      <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
         <img 
-          src="VCL - Logo and Name.png"
+          src="VCL - Horizonal logo + name.png"
           alt="VisualCryptoLab Logo and Name" 
           className="w-full h-auto max-w-[180px]"
+          // Fallback if image fails to load
+          onError={(e) => {
+              e.target.onerror = null; 
+              e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
+              e.target.alt = "VisualCryptoLab Logo Placeholder";
+          }}
         />
       </div>
 
@@ -1232,8 +1316,8 @@ const Toolbar = ({ addNode }) => {
 
 const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
-  const [connections, setConnections] = useState([]); 
-  const [connectingNodeId, setConnectingNodeId] = useState(null); 
+  const [connections, setConnections] = useState(INITIAL_CONNECTIONS); // Initialized with connection
+  const [connectingPort, setConnectingPort] = useState(null); 
   const canvasRef = useRef(null);
   
   // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
@@ -1241,15 +1325,21 @@ const App = () => {
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
     const newNodesMap = new Map(currentNodes.map(n => [n.id, { ...n }]));
     
-    // FIX: Use NODE_DEFINITIONS to safely check if a node is a source (has no input ports)
-    // Initial nodes to process: Data sources (inputs, keygens) and the node that was just changed
+    // Initial nodes to process: Data sources and the node that was just changed
     let initialQueue = new Set(currentNodes.filter(n => {
         const def = NODE_DEFINITIONS[n.type];
-        // Check if definition exists and if its inputPorts array is empty
+        // Source nodes (no input ports)
         return def && def.inputPorts && def.inputPorts.length === 0;
     }).map(n => n.id));
     
-    if (changedNodeId) initialQueue.add(changedNodeId);
+    // Add all nodes that receive input from the changed node, or the changed node itself
+    if (changedNodeId) {
+        initialQueue.add(changedNodeId);
+        // Find immediate targets of the changed node
+        currentConnections
+            .filter(c => c.source === changedNodeId)
+            .forEach(c => initialQueue.add(c.target));
+    }
     
     const nodesToProcess = Array.from(initialQueue);
     const processed = new Set();
@@ -1269,19 +1359,18 @@ const App = () => {
         const sourceNode = newNodesMap.get(sourceId);
         const sourceNodeDef = NODE_DEFINITIONS[sourceNode.type];
 
-        let outputData = '';
+        let outputData = sourceNode.dataOutput || '';
         let isProcessing = false;
-
-        // --- SOURCE NODES (No input ports) ---
+        
+        // --- Source Nodes (No input ports) ---
         if (sourceNodeDef.inputPorts.length === 0) {
             
             if (sourceNode.type === 'DATA_INPUT') {
-                outputData = sourceNode.content || '';
+                outputData = sourceNode.content || ''; 
             } else if (sourceNode.type === 'KEY_GEN') {
                 
                 if (sourceNode.key || sourceNode.generateKey) {
                     isProcessing = true;
-                    // Only generate key if 'generateKey' flag is set (via button click) or if key is null
                     if (!sourceNode.key || sourceNode.generateKey) {
                          const algorithm = sourceNode.keyAlgorithm || 'AES-GCM';
                          
@@ -1294,13 +1383,12 @@ const App = () => {
                         }).catch(err => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
-                                    ? { ...n, dataOutput: `ERROR: Key gen failed.`, isProcessing: false, generateKey: false } 
+                                    ? { ...n, dataOutput: `ERROR: Key generation failed.`, isProcessing: false, generateKey: false } 
                                     : n
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Generating Key...';
                     } else {
-                        // Key already exists, just pass it through
                         outputData = sourceNode.dataOutput || '';
                         isProcessing = false;
                     }
@@ -1314,7 +1402,7 @@ const App = () => {
                     isProcessing = true;
                     
                     if (!sourceNode.keyPairObject || sourceNode.generateKey) {
-                         const algorithm = ASYM_ALGORITHMS[0]; // RSA-OAEP
+                         const algorithm = ASYM_ALGORITHMS[0]; 
                          const modulusLength = sourceNode.modulusLength || 2048;
                          const publicExponent = sourceNode.publicExponent || 65537;
                          
@@ -1341,7 +1429,6 @@ const App = () => {
                         });
                         outputData = sourceNode.dataOutputPublic || 'Generating Keys...';
                     } else {
-                        // Keys already exist, just pass it through (Output Public is the main dataOutput)
                         outputData = sourceNode.dataOutputPublic || '';
                         isProcessing = false;
                     }
@@ -1350,60 +1437,68 @@ const App = () => {
                 }
             }
         
-        // --- PROCESSING/SINK NODES (Have input ports) ---
+        // --- Processing/Sink Nodes (Have input ports) ---
         } else {
             // Collect all incoming connections to this target node
             const incomingConns = currentConnections.filter(c => c.target === sourceId);
-            const inputSources = incomingConns.map(conn => newNodesMap.get(conn.source));
-
-            // Map inputs to data types for multi-input nodes
-            let dataInput = null; // Data or Ciphertext
-            let keyInput = null; // Symmetric Key
-            let publicKeyInput = null; // RSA Public Key
-            let privateKeyInput = null; // RSA Private Key
-            let dataInputA = null; // XOR Input A
-            let dataInputB = null; // XOR Input B
+            let inputs = {};
+            let sourceNodeFormat = sourceNode.format || 'Text (UTF-8)'; // Default to Text for non-input nodes
             
-            inputSources.forEach(input => {
-                const outputType = NODE_DEFINITIONS[input.type]?.outputPorts?.[0]?.type; 
+            // Step 1: Gather inputs from all upstream nodes
+            incomingConns.forEach(conn => {
+                const inputSourceNode = newNodesMap.get(conn.source);
+                if (!inputSourceNode) return;
+
+                let dataToUse = inputSourceNode.dataOutput;
+                const sourceDef = NODE_DEFINITIONS[inputSourceNode.type];
                 
-                if (input.type === 'RSA_KEY_GEN') {
-                    const targetInputPorts = sourceNodeDef.inputPorts.map(p => p.type);
-                    
-                    if (targetInputPorts.includes('public')) {
-                        if (!publicKeyInput) publicKeyInput = input.dataOutputPublic;
-                    }
-                    if (targetInputPorts.includes('private')) {
-                        if (!privateKeyInput) privateKeyInput = input.dataOutputPrivate;
-                    }
-                    
-                } else if (outputType === 'data') {
-                    // Handle XOR inputs specially since they both are 'data' type
-                    if (sourceNode.type === 'XOR_OP') {
-                        if (!dataInputA) {
-                            dataInputA = input.dataOutput;
-                        } else if (!dataInputB) {
-                            dataInputB = input.dataOutput;
-                        }
-                    } else if (!dataInput) {
-                        dataInput = input.dataOutput;
-                    }
-                } else if (outputType === 'key' && !keyInput) {
-                    keyInput = input.dataOutput;
-                } 
+                // Determine which data field to use from the source node (e.g., dataOutput vs dataOutputPrivate)
+                if (sourceDef && sourceDef.outputPorts.length > conn.sourcePortIndex) {
+                    const keyField = sourceDef.outputPorts[conn.sourcePortIndex].keyField;
+                    dataToUse = inputSourceNode[keyField];
+                }
+
+                // Store the data using the input port ID ('data', 'key', 'dataA', etc.)
+                inputs[conn.targetPortId] = dataToUse;
+                
+                // If it is the Output Viewer, track the source node's default output format
+                if (sourceNode.type === 'OUTPUT_VIEWER' && conn.targetPortId === 'data') {
+                    sourceNodeFormat = getOutputFormat(inputSourceNode.type);
+                }
             });
 
+            // Step 2: Map inputs to local variables (This is where the bug was likely occurring for OUTPUT_VIEWER)
+            const dataInput = inputs['data'] || inputs['cipher']; 
+            const keyInput = inputs['key']; 
+            const publicKeyInput = inputs['publicKey']; 
+            const privateKeyInput = inputs['privateKey']; 
+            const dataInputA = inputs['dataA']; 
+            const dataInputB = inputs['dataB']; 
 
+            // Step 3: Execute node logic
             switch (sourceNode.type) {
                 case 'OUTPUT_VIEWER':
-                    outputData = dataInput || 'No connected input.';
+                    const rawDataInput = dataInput || '';
+                    const targetFormat = sourceNode.viewFormat || 'Text (UTF-8)';
+                    
+                    if (rawDataInput) {
+                        if (typeof rawDataInput === 'string' && rawDataInput.startsWith('ERROR')) {
+                             outputData = rawDataInput; // Propagate the error without trying to convert
+                        } else {
+                             // Perform the conversion
+                             // Source format is derived from the *connected* node's default output
+                             outputData = convertDataFormat(rawDataInput, sourceNodeFormat, targetFormat);
+                        }
+                    } else {
+                        outputData = 'Not connected or no data.';
+                    }
                     break;
                     
                 case 'HASH_FN':
-                    const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
+                    if (dataInput) { 
+                        isProcessing = true; 
+                        const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
 
-                    if (dataInput) {
-                        isProcessing = true;
                         calculateHash(dataInput, algorithm).then(hashResult => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
@@ -1412,37 +1507,34 @@ const App = () => {
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Calculating...';
-                    } else {
-                        outputData = 'Waiting for data input.';
+                    } else { 
+                        outputData = 'Waiting for data input.'; 
                     }
                     break;
                 
                 case 'XOR_OP':
-                    if (dataInputA && dataInputB) {
-                         isProcessing = true;
-                         // XOR is sync, so we update the state directly
-                         outputData = performBitwiseXor(dataInputA, dataInputB);
-                         isProcessing = false;
+                    if (dataInputA && dataInputB) { 
+                        isProcessing = true; 
+                        outputData = performBitwiseXor(dataInputA, dataInputB); 
+                        isProcessing = false; 
                     } else if (dataInputA && !dataInputB) {
                         outputData = 'Waiting for Input B.';
                     } else if (!dataInputA && dataInputB) {
                         outputData = 'Waiting for Input A.';
                     } else {
-                        outputData = 'Waiting for two data inputs.';
+                        outputData = 'Waiting for two data inputs.'; 
                     }
                     break;
                 
                 case 'SHIFT_OP':
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
-
-                    if (dataInput) {
-                        isProcessing = true;
-                        // Shift is sync, so we update the state directly
-                        outputData = performByteShiftOperation(dataInput, shiftType, shiftAmount);
-                        isProcessing = false;
-                    } else {
-                        outputData = 'Waiting for data input.';
+                    if (dataInput) { 
+                        isProcessing = true; 
+                        outputData = performByteShiftOperation(dataInput, shiftType, shiftAmount); 
+                        isProcessing = false; 
+                    } else { 
+                        outputData = 'Waiting for data input.'; 
                     }
                     break;
 
@@ -1450,145 +1542,82 @@ const App = () => {
                     if (dataInput && keyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
-
                         symmetricEncrypt(dataInput, keyInput, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: ciphertext, isProcessing: false } 
-                                    : n
-                            ));
-                        }).catch(err => {
-                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: `ERROR: Encrypt failed. ${err.message}`, isProcessing: false } 
-                                    : n
+                                n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
-                    } else if (dataInput && !keyInput) {
-                        outputData = 'Waiting for Key input.';
-                    } else if (!dataInput && keyInput) {
-                        outputData = 'Waiting for Data input.';
-                    } else {
-                        outputData = 'Waiting for Data and Key inputs.';
-                    }
+                    } else { outputData = 'Waiting for Data and Key inputs.'; }
                     break;
                 
                 case 'SYM_DEC': 
                     if (dataInput && keyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
-
                         symmetricDecrypt(dataInput, keyInput, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: plaintext, isProcessing: false } 
-                                    : n
-                            ));
-                        }).catch(err => {
-                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: `ERROR: Decrypt failed. ${err.message}`, isProcessing: false } 
-                                    : n
+                                n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
-                    } else if (dataInput && !keyInput) {
-                        outputData = 'Waiting for Key input.';
-                    } else if (!dataInput && keyInput) {
-                        outputData = 'Waiting for Ciphertext input.';
-                    } else {
-                        outputData = 'Waiting for Cipher and Key inputs.';
-                    }
+                    } else { outputData = 'Waiting for Cipher and Key inputs.'; }
                     break;
 
                 case 'ASYM_ENC':
                     if (dataInput && publicKeyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
-
                         asymmetricEncrypt(dataInput, publicKeyInput, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: ciphertext, isProcessing: false } 
-                                    : n
-                            ));
-                        }).catch(err => {
-                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: `ERROR: Encrypt failed. ${err.message}`, isProcessing: false } 
-                                    : n
+                                n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
-                    } else if (dataInput && !publicKeyInput) {
-                        outputData = 'Waiting for Public Key input.';
-                    } else if (!dataInput && publicKeyInput) {
-                        outputData = 'Waiting for Data input.';
-                    } else {
-                        outputData = 'Waiting for Data and Public Key inputs.';
-                    }
+                    } else { outputData = 'Waiting for Data and Public Key.'; }
                     break;
 
                 case 'ASYM_DEC':
                     if (dataInput && privateKeyInput) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
-
                         asymmetricDecrypt(dataInput, privateKeyInput, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: plaintext, isProcessing: false } 
-                                    : n
-                            ));
-                        }).catch(err => {
-                             setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: `ERROR: Decrypt failed. ${err.message}`, isProcessing: false } 
-                                    : n
+                                n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
-                    } else if (dataInput && !privateKeyInput) {
-                        outputData = 'Waiting for Private Key input.';
-                    } else if (!dataInput && privateKeyInput) {
-                        outputData = 'Waiting for Ciphertext input.';
-                    } else {
-                        outputData = 'Waiting for Ciphertext and Private Key inputs.';
-                    }
+                    } else { outputData = 'Waiting for Cipher and Private Key.'; }
                     break;
 
-
-                // Unimplemented Processing Nodes (They return the placeholder)
-                // Removed SHIFT_OP since it is now implemented.
-                    
                 default:
                     outputData = 'ERROR: Unrecognized Node Type.';
             }
 
         }
         
-        // Update the node's output and processing status
-        // For RSA_KEY_GEN, dataOutput is just the public key preview, but we update both in the state
-        sourceNode.dataOutput = outputData; 
+        // Update the node's primary output field
+        const primaryOutputPort = sourceNodeDef.outputPorts?.[0];
+        if (primaryOutputPort) {
+            sourceNode[primaryOutputPort.keyField] = outputData;
+        }
         sourceNode.isProcessing = isProcessing;
         newNodesMap.set(sourceId, sourceNode);
         processed.add(sourceId);
 
-        // Add targets to the processing queue (only if not already processed)
         const targets = findAllTargets(sourceId);
         nodesToProcess.push(...targets);
     }
     
-    // Convert map back to array
     return Array.from(newNodesMap.values());
   }, [setNodes]);
   
   // --- Effects for Recalculation ---
   
   useEffect(() => {
+    // This effect ensures the graph recalculates whenever connections or nodes change
     setNodes(prevNodes => recalculateGraph(prevNodes, connections));
-  }, [connections, recalculateGraph]);
+  }, [connections, recalculateGraph]); // Removed nodes as a dependency to prevent infinite loops
 
   const updateNodeContent = useCallback((id, field, value) => {
     setNodes(prevNodes => {
@@ -1601,11 +1630,12 @@ const App = () => {
                     modulusLength: (field === 'modulusLength' ? value : node.modulusLength), 
                     publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
-                    shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount)
+                    shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
+                    isProcessing: (node.type === 'OUTPUT_VIEWER' && field === 'viewFormat') ? false : node.isProcessing,
                   } 
                 : node
         );
-        // Pass the changed node ID to ensure recalculation starts from that point.
+        // Recalculate immediately after content update
         return recalculateGraph(nextNodes, connections, id);
     });
   }, [connections, recalculateGraph]);
@@ -1633,15 +1663,14 @@ const App = () => {
       initialContent.hashAlgorithm = 'SHA-256';
     } else if (type === 'KEY_GEN') {
       initialContent.keyAlgorithm = 'AES-GCM';
-      initialContent.key = null; // CryptoKey object
-    } else if (type === 'RSA_KEY_GEN') { // RSA INITIALIZATION
+      initialContent.key = null; 
+    } else if (type === 'RSA_KEY_GEN') { 
       initialContent.keyAlgorithm = 'RSA-OAEP';
       initialContent.modulusLength = 2048;
-      initialContent.publicExponent = 65537; // Default value for e
+      initialContent.publicExponent = 65537; 
       initialContent.dataOutputPublic = '';
       initialContent.dataOutputPrivate = '';
       initialContent.keyPairObject = null;
-      // Initialize new parameter object
       initialContent.rsaParameters = { n: '', d: '', p: '', q: '', e: 65537 }; 
     } else if (type === 'SYM_ENC' || type === 'SYM_DEC') {
       initialContent.symAlgorithm = 'AES-GCM';
@@ -1664,43 +1693,69 @@ const App = () => {
       },
     ]);
   }, []);
-
-  const handleConnectStart = useCallback((nodeId) => {
-    setConnectingNodeId(nodeId);
+  
+  const handleDeleteNode = useCallback((nodeIdToDelete) => {
+      setNodes(prevNodes => prevNodes.filter(n => n.id !== nodeIdToDelete));
+      setConnections(prevConnections => 
+          prevConnections.filter(c => c.source !== nodeIdToDelete && c.target !== nodeIdToDelete)
+      );
   }, []);
 
-  const handleConnectEnd = useCallback((targetId) => {
-    if (connectingNodeId && targetId && connectingNodeId !== targetId) {
-      // 1. Check Constraint: If target has only ONE port, prevent connecting if already connected
-      // If the target has multiple ports (like Sym Encrypt), allow multiple connections.
-      const targetNodeDef = NODE_DEFINITIONS[nodes.find(n => n.id === targetId)?.type];
+  const handleConnectStart = useCallback((nodeId, portIndex, outputType) => {
+    setConnectingPort({ sourceId: nodeId, sourcePortIndex: portIndex, outputType: outputType });
+  }, []);
+
+  const handleConnectEnd = useCallback((targetId, targetPortId) => {
+    if (connectingPort && targetId && connectingPort.sourceId !== targetId) {
       
-      if (targetNodeDef.inputPorts.length === 1 && connections.some(c => c.target === targetId)) {
-        console.warn(`Cannot connect: Node ${targetId} (Input Port) is already connected.`);
+      const { sourceId, sourcePortIndex } = connectingPort;
+      
+      const isDuplicate = connections.some(c => 
+          c.source === sourceId && 
+          c.sourcePortIndex === sourcePortIndex && 
+          c.target === targetId && 
+          c.targetPortId === targetPortId
+      );
+
+      const isInputPortAlreadyConnected = connections.some(c => 
+          c.target === targetId && 
+          c.targetPortId === targetPortId
+      );
+      
+      if (isDuplicate) {
+          console.warn('Duplicate connection detected and prevented.');
+      } else if (isInputPortAlreadyConnected) {
+          console.warn(`Input port (${targetPortId}) on node ${targetId} is already connected. Only one connection per input port is allowed.`);
       } else {
         const targetNode = nodes.find(n => n.id === targetId);
-        if (!targetNode) {
-             console.warn(`Cannot connect: Target node ${targetId} not found.`);
-             setConnectingNodeId(null);
-             return;
-        }
-
-        if (targetNodeDef && targetNodeDef.inputPorts.length > 0) {
+        const targetNodeDef = NODE_DEFINITIONS[targetNode?.type];
+        
+        if (targetNodeDef && targetNodeDef.inputPorts.some(p => p.id === targetPortId)) {
              setConnections(prevConnections => [
               ...prevConnections, 
-              { source: connectingNodeId, target: targetId }
+              { 
+                  source: sourceId, 
+                  sourcePortIndex: sourcePortIndex, 
+                  target: targetId,
+                  targetPortId: targetPortId 
+              }
             ]);
         } else {
-             console.warn(`Cannot connect: Node ${targetId} is not configured to receive input.`);
+             console.warn(`Cannot connect: Node ${targetId} is not configured to receive input at port ${targetPortId}.`);
         }
       }
     }
-    setConnectingNodeId(null);
-  }, [connectingNodeId, connections, nodes]);
+    setConnectingPort(null); 
+  }, [connectingPort, connections, nodes]);
 
-  const handleRemoveConnection = useCallback((sourceId, targetId) => {
+  const handleRemoveConnection = useCallback((sourceId, targetId, sourcePortIndex, targetPortId) => {
     setConnections(prevConnections => 
-        prevConnections.filter(c => !(c.source === sourceId && c.target === targetId))
+        prevConnections.filter(c => !(
+            c.source === sourceId && 
+            c.target === targetId &&
+            c.sourcePortIndex === sourcePortIndex &&
+            c.targetPortId === targetPortId
+        ))
     );
   }, []);
   
@@ -1711,9 +1766,11 @@ const App = () => {
       
       if (sourceNode && targetNode) {
         return {
-            path: getLinePath(sourceNode, targetNode),
+            path: getLinePath(sourceNode, targetNode, conn), // Passes connection object for precise path calculation
             source: conn.source,
-            target: conn.target
+            target: conn.target,
+            sourcePortIndex: conn.sourcePortIndex,
+            targetPortId: conn.targetPortId,
         };
       }
       return null;
@@ -1721,19 +1778,8 @@ const App = () => {
   }, [connections, nodes]);
 
 
-  // Define the CSS for the line animation as a string for injection
+  // Define the CSS for the line animation (removed dashed animation)
   const animatedLineStyle = `
-    @keyframes dash {
-      to {
-        stroke-dashoffset: 0;
-      }
-    }
-    .animate-line {
-      stroke-dasharray: 20 10;
-      stroke-dashoffset: 1000;
-      animation: dash 5s linear infinite;
-      transition: stroke-dashoffset 0.5s ease-out;
-    }
     @keyframes animate-pulse-slow {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -1749,10 +1795,10 @@ const App = () => {
   `;
   
   const handleCanvasClick = useCallback(() => {
-    if (connectingNodeId) {
+    if (connectingPort) {
       handleConnectEnd(null);
     }
-  }, [connectingNodeId, handleConnectEnd]);
+  }, [connectingPort, handleConnectEnd]);
 
   return (
     <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
@@ -1771,15 +1817,16 @@ const App = () => {
           <svg className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0">
             {connectionPaths.map((conn, index) => (
               <path
-                key={`${conn.source}-${conn.target}`}
+                key={`${conn.source}-${conn.target}-${conn.sourcePortIndex}-${conn.targetPortId}`}
                 d={conn.path}
                 stroke="#059669"
                 strokeWidth="4"
                 fill="none"
-                className="animate-line connection-line"
+                // Removed animate-line class here:
+                className="connection-line"
                 onClick={(e) => { 
                     e.stopPropagation();
-                    handleRemoveConnection(conn.source, conn.target);
+                    handleRemoveConnection(conn.source, conn.target, conn.sourcePortIndex, conn.targetPortId);
                 }}
               />
             ))}
@@ -1794,8 +1841,9 @@ const App = () => {
               canvasRef={canvasRef}
               handleConnectStart={handleConnectStart}
               handleConnectEnd={handleConnectEnd}
-              connectingNodeId={connectingNodeId}
+              connectingPort={connectingPort}
               connections={connections}
+              handleDeleteNode={handleDeleteNode}
             />
           ))}
           
