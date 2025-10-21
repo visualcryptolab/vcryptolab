@@ -232,7 +232,6 @@ const INITIAL_NODES = []; // Set to empty array to start clean
 const INITIAL_CONNECTIONS = []; // No initial connections
 
 const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
-const COLLAPSED_HEIGHT = 64; // h-16 is 64px
 
 // =================================================================
 // 2. CRYPTO & UTILITY FUNCTIONS
@@ -821,14 +820,7 @@ const getLinePath = (sourceNode, targetNode, connection) => {
     // 1. Calculate vertical position based on port index and node height
     const getVerticalPosition = (nodeDef, index, isInput) => {
         const numPorts = isInput ? nodeDef.inputPorts.length : nodeDef.outputPorts.length;
-        // The total height of the interactive area *could* vary if the node is not collapsed,
-        // but since ports are relative to the *initial* minHeight, we use that for positioning.
-        // However, if the node is collapsed, the effective height for port spacing is COLLAPSED_HEIGHT.
-        const effectiveHeight = sourceNode.isCollapsed ? COLLAPSED_HEIGHT : BOX_SIZE.minHeight; 
-        
-        // Use ratio of current height relative to the minHeight to scale the position, 
-        // ensuring ports remain centered vertically on the collapsed bar.
-        const step = effectiveHeight / (numPorts + 1); 
+        const step = BOX_SIZE.minHeight / (numPorts + 1); 
         return (index + 1) * step;
     };
 
@@ -925,7 +917,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, isCollapsed } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
@@ -1167,12 +1159,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   }
 
   const baseClasses = 
-    `w-[${BOX_SIZE.width}px] h-auto flex flex-col justify-start items-center p-3 
+    `w-[${BOX_SIZE.width}px] min-h-[${BOX_SIZE.minHeight}px] h-auto flex flex-col justify-start items-center p-3 
     bg-white shadow-xl rounded-xl border-4 transition duration-150 ease-in-out 
     hover:shadow-2xl absolute select-none z-10`;
-    
-    // Set dynamic height based on collapse state
-    const nodeHeightStyle = isCollapsed ? { height: `${COLLAPSED_HEIGHT}px`, minHeight: `${COLLAPSED_HEIGHT}px` } : { minHeight: `${BOX_SIZE.minHeight}px` };
 
   // --- Render ---
   return (
@@ -1183,25 +1172,16 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       style={{ 
         left: `${position.x}px`, 
         top: `${position.y}px`,
-        ...nodeHeightStyle,
-        overflow: 'hidden' // Hide overflow when collapsed
+        // Dynamic height adjustment for expanded viewer
+        minHeight: isOutputViewer && isConversionExpanded ? '280px' : `${BOX_SIZE.minHeight}px` 
       }} 
       onMouseDown={handleDragStart} 
       onTouchStart={handleDragStart} 
       onClick={handleBoxClick} 
     >
       
-      {/* Collapse/Expand Button */}
-      <button
-        className={`absolute top-1 left-1 p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 z-30 transition duration-150 ${isCollapsed ? 'rotate-180' : ''}`}
-        onClick={(e) => {
-            e.stopPropagation();
-            updateNodeContent(id, 'isCollapsed', !isCollapsed);
-        }}
-        title={isCollapsed ? "Expand Node" : "Collapse Node"}
-      >
-        <ChevronUp className="w-3 h-3 transition duration-300" />
-      </button>
+      {/* Information Button (for Simple RSA Nodes) */}
+      {/* REMOVED INFO BUTTON LOGIC */}
 
       {/* Delete Button */}
       <button
@@ -1220,12 +1200,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       {renderOutputPorts()} 
 
       {/* -------------------- CONTENT -------------------- */}
-      {/* This container ensures content scrolls/hides correctly */}
-      <div className={`flex flex-col h-full w-full justify-start items-center transition-opacity duration-300 ${isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-           style={{ paddingTop: '1.5rem', marginTop: '-1.5rem' }} // Offset for collapse button space
-      >
+      <div className="flex flex-col h-full w-full justify-start items-center overflow-hidden">
+        {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
-          {/* Top Section: Icon and Main Label */}
+          {/* Custom icons need size and color applied to the container/SVG itself */}
           {definition.icon && typeof definition.icon === 'function' ? (
               <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
           ) : (
@@ -1256,9 +1234,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
           {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
-
-        {/* --- Node Content Area (Visible when NOT collapsed) --- */}
-        <div className="w-full flex flex-col justify-start items-center overflow-y-auto overflow-x-hidden p-1 flex-grow">
         
         {isDataInput && (
           /* Data Input Specific Controls */
@@ -1349,6 +1324,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           </div>
         )}
         
+        {/* Output Viewer Display (Convert) */}
         {isOutputViewer && (
             <div className="w-full mt-1 flex flex-col items-center flex-grow text-xs text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded-lg shadow-inner overflow-y-auto">
                 <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RAW INPUT DATA</span>
@@ -1815,7 +1791,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
       </div>
-      </div>
     </div>
   );
 };
@@ -1863,87 +1838,113 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
 // --- Toolbar Component ---
 
 const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage }) => {
-  return (
-    <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
-      {/* Title/Logo Container */}
-      <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
-        <img 
-          src="VCL - Horizonal logo + name.png"
-          alt="VisualCryptoLab Logo and Name" 
-          className="w-full h-auto max-w-[180px]"
-          // Fallback if image fails to load
-          onError={(e) => {
-              e.target.onerror = null; 
-              e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
-              e.target.alt = "VisualCryptoLab Logo Placeholder";
-          }}
-        />
-      </div>
+    const [collapsedGroups, setCollapsedGroups] = useState(() => {
+        // Initialize all groups to open (false)
+        return ORDERED_NODE_GROUPS.reduce((acc, group) => {
+            acc[group.name] = false;
+            return acc;
+        }, {});
+    });
 
-      <div className="flex flex-col space-y-3 p-3 overflow-y-auto pt-4 flex-grow">
-        
-        {ORDERED_NODE_GROUPS.map((group, groupIndex) => (
-            <React.Fragment key={group.name}>
-                {/* Group Label */}
-                <div className="text-xs font-bold uppercase text-gray-500 pt-2 pb-1 border-b border-gray-200">{group.name}</div>
+    const toggleGroup = useCallback((groupName) => {
+        setCollapsedGroups(prev => ({
+            ...prev,
+            [groupName]: !prev[groupName]
+        }));
+    }, []);
+
+    return (
+        <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
+            {/* Title/Logo Container */}
+            <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
+                <img 
+                    src="VCL - Horizonal logo + name.png"
+                    alt="VisualCryptoLab Logo and Name" 
+                    className="w-full h-auto max-w-[180px]"
+                    // Fallback if image fails to load
+                    onError={(e) => {
+                        e.target.onerror = null; 
+                        e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
+                        e.target.alt = "VisualCryptoLab Logo Placeholder";
+                    }}
+                />
+            </div>
+
+            <div className="flex flex-col space-y-3 p-3 overflow-y-auto pt-4 flex-grow">
                 
-                {group.types.map((type) => {
-                    const def = NODE_DEFINITIONS[type];
-                    if (!def) return null; // Safety check
-                    
-                    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
-                    const iconTextColorClass = TEXT_ICON_CLASSES[def.color] || 'text-gray-600';
-
-                    return (
-                        <button 
-                            key={type}
-                            onClick={() => addNode(type, def.label, def.color)}
-                            className={`w-full py-3 px-4 flex items-center justify-start space-x-3 
-                                        bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
-                                        transition duration-150 text-gray-700 rounded-lg shadow-sm`}
+                {ORDERED_NODE_GROUPS.map((group, groupIndex) => (
+                    <React.Fragment key={group.name}>
+                        {/* Group Header (Clickable) */}
+                        <div 
+                            className="flex justify-between items-center text-xs font-bold uppercase text-gray-500 pt-2 pb-1 border-b border-gray-200 cursor-pointer hover:text-gray-700 transition"
+                            onClick={() => toggleGroup(group.name)}
                         >
-                            {/* Render the custom icon component or the default Lucide icon */}
-                            {def.icon && typeof def.icon === 'function' ? (
-                                <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
-                            ) : (
-                                def.icon && <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
-                            )}
-                            <span className="font-medium text-left">{def.label}</span>
-                        </button>
-                    );
-                })}
-            </React.Fragment>
-        ))}
-        
-      </div>
-      
-      {/* New Action Buttons Section at the bottom - NOW HORIZONTAL */}
-      <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
-          
-          <ToolbarButton 
-            icon={Download} 
-            label="Download Project (JSON)" 
-            color="blue" 
-            onClick={onDownloadProject}
-          />
-          
-          <ToolbarButton 
-            icon={Upload} 
-            label="Upload Project (JSON)" 
-            color="orange" 
-            onChange={onUploadProject}
-            isFileInput={true} 
-          />
-          
-          <ToolbarButton 
-            icon={Camera} 
-            label="Download Diagram (JPG)" 
-            color="teal" 
-            onClick={onDownloadImage}
-          />
-      </div>
-    </div>
-  );
+                            <span>{group.name}</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsedGroups[group.name] ? 'rotate-180' : ''}`} />
+                        </div>
+                        
+                        {/* Group Content (Conditionally Rendered/Collapsed) */}
+                        {!collapsedGroups[group.name] && (
+                            <div className="space-y-1">
+                                {group.types.map((type) => {
+                                    const def = NODE_DEFINITIONS[type];
+                                    if (!def) return null; // Safety check
+                                    
+                                    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
+                                    const iconTextColorClass = TEXT_ICON_CLASSES[def.color] || 'text-gray-600';
+
+                                    return (
+                                        <button 
+                                            key={type}
+                                            onClick={() => addNode(type, def.label, def.color)}
+                                            className={`w-full py-3 px-4 flex items-center justify-start space-x-3 
+                                                        bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
+                                                        transition duration-150 text-gray-700 rounded-lg shadow-sm`}
+                                        >
+                                            {/* Render the custom icon component or the default Lucide icon */}
+                                            {def.icon && typeof def.icon === 'function' ? (
+                                                <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
+                                            ) : (
+                                                def.icon && <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
+                                            )}
+                                            <span className="font-medium text-left">{def.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </React.Fragment>
+                ))}
+                
+            </div>
+            
+            {/* New Action Buttons Section at the bottom - NOW HORIZONTAL */}
+            <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
+                
+                <ToolbarButton 
+                    icon={Download} 
+                    label="Download Project (JSON)" 
+                    color="blue" 
+                    onClick={onDownloadProject}
+                />
+                
+                <ToolbarButton 
+                    icon={Upload} 
+                    label="Upload Project (JSON)" 
+                    color="orange" 
+                    onChange={onUploadProject}
+                    isFileInput={true} 
+                />
+                
+                <ToolbarButton 
+                    icon={Camera} 
+                    label="Download Diagram (JPG)" 
+                    color="teal" 
+                    onClick={onDownloadImage}
+                />
+            </div>
+        </div>
+    );
 }
 
 // --- Main Application Component ---
@@ -2541,7 +2542,6 @@ const App = () => {
                     publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
                     shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
-                    isCollapsed: (field === 'isCollapsed' ? value : node.isCollapsed), // Handle collapse state
                     // Simple RSA specific
                     p: (field === 'p' ? value : node.p),
                     q: (field === 'q' ? value : node.q),
@@ -2573,8 +2573,7 @@ const App = () => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
-    // Initialize isCollapsed state
-    const initialContent = { dataOutput: '', isProcessing: false, outputFormat: getOutputFormat(type), isCollapsed: false };
+    const initialContent = { dataOutput: '', isProcessing: false, outputFormat: getOutputFormat(type) };
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
