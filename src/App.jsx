@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp } from 'lucide-react'; 
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature } from 'lucide-react'; 
 
 // --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
 const XORIcon = (props) => (
@@ -58,6 +58,7 @@ const BORDER_CLASSES = {
   rose: 'border-pink-700', // Simple RSA Decrypt
   amber: 'border-amber-500', // Caesar Cipher
   yellow: 'border-yellow-400', // Vigenere Cipher
+  fuchsia: 'border-fuchsia-600', // RSA Signature
 };
 
 const HOVER_BORDER_CLASSES = {
@@ -68,6 +69,7 @@ const HOVER_BORDER_CLASSES = {
   rose: 'hover:border-pink-600',
   amber: 'hover:border-amber-400',
   yellow: 'hover:border-yellow-300',
+  fuchsia: 'hover:border-fuchsia-500',
 };
 
 const TEXT_ICON_CLASSES = {
@@ -78,6 +80,7 @@ const TEXT_ICON_CLASSES = {
   rose: 'text-pink-700',
   amber: 'text-amber-500',
   yellow: 'text-yellow-400',
+  fuchsia: 'text-fuchsia-600',
 };
 
 const HOVER_BORDER_TOOLBAR_CLASSES = {
@@ -88,6 +91,7 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
   rose: 'hover:border-pink-600',
   amber: 'hover:border-amber-400',
   yellow: 'hover:border-yellow-300',
+  fuchsia: 'hover:border-fuchsia-400',
 };
 
 // --- Port Configuration ---
@@ -100,6 +104,7 @@ const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Data Output
 // New Specific Key Port Colors
 const PUBLIC_KEY_COLOR = 'bg-lime-500'; // Light Green/Lime for Public Key
 const PRIVATE_KEY_COLOR = 'bg-red-800'; // Dark Red/Maroon for Private Key (Warning)
+const SIGNATURE_COLOR = 'bg-fuchsia-500'; // Fuchsia for Signature Output
 
 
 // Supported Algorithms
@@ -192,6 +197,30 @@ const NODE_DEFINITIONS = {
     outputPorts: [{ name: 'Plaintext (m)', type: 'number', keyField: 'dataOutput' }]
   },
 
+  // --- Simple RSA Signature Nodes ---
+  SIMPLE_RSA_SIGN: {
+      label: 'Simple RSA Sign',
+      color: 'fuchsia',
+      icon: Signature, // Changed to Signature icon
+      inputPorts: [
+          { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
+          { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
+      ],
+      outputPorts: [{ name: 'Signature (s)', type: 'signature', keyField: 'dataOutput' }]
+  },
+
+  SIMPLE_RSA_VERIFY: {
+      label: 'Simple RSA Verify',
+      color: 'fuchsia',
+      icon: CheckCheck,
+      inputPorts: [
+          { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
+          { name: 'Signature (s)', type: 'signature', mandatory: true, id: 'signature' },
+          { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
+      ],
+      outputPorts: [{ name: 'Verification Result', type: 'data', keyField: 'dataOutput' }]
+  },
+  
   // --- Cipher Nodes (Web Crypto API) ---
   SYM_ENC: { 
     label: 'Sym Encrypt', 
@@ -256,7 +285,7 @@ const NODE_DEFINITIONS = {
 const ORDERED_NODE_GROUPS = [
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, // Vigenere added
-    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC'] }, 
+    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
     { name: 'SYMMETRIC (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },
     { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
     { name: 'BITWISE & HASH', types: ['HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
@@ -625,7 +654,10 @@ const getOutputFormat = (nodeType) => {
         // Simple RSA operations output single large decimal numbers
         case 'SIMPLE_RSA_ENC':
         case 'SIMPLE_RSA_DEC':
+        case 'SIMPLE_RSA_SIGN': // Signature is a large decimal number
             return 'Decimal'; 
+        case 'SIMPLE_RSA_VERIFY':
+            return 'Text (UTF-8)'; // Verification result is always a status message
         default:
             return 'Text (UTF-8)';
     }
@@ -1016,6 +1048,10 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     if (type === 'output' && outputType === 'key') {
          portColor = TEXT_ICON_CLASSES['orange'].replace('text', 'bg'); // Use orange background for symmetric key output
     }
+    // Change Output Port Color for 'signature' type
+    if (type === 'output' && outputType === 'signature') {
+         portColor = SIGNATURE_COLOR.replace('border', 'bg'); 
+    }
     
     if (type === 'output') {
         clickHandler = (e) => { 
@@ -1091,6 +1127,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isRSAKeyGen = type === 'RSA_KEY_GEN'; 
   const isSimpleRSAEnc = type === 'SIMPLE_RSA_ENC'; // New Flag
   const isSimpleRSADec = type === 'SIMPLE_RSA_DEC'; // New Flag
+  const isSimpleRSASign = type === 'SIMPLE_RSA_SIGN'; // New Flag
+  const isSimpleRSAVerify = type === 'SIMPLE_RSA_VERIFY'; // New Flag
   const isSymEnc = type === 'SYM_ENC';
   const isSymDec = type === 'SYM_DEC';
   const isAsymEnc = type === 'ASYM_ENC'; 
@@ -1374,6 +1412,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           
           {isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>k = {node.shiftKey || 0}</span>}
           {isVigenereCipher && <span className={`text-xs text-gray-500 mt-1`}>Keyword: {node.keyword || 'None'}</span>}
+          {isSimpleRSASign && <span className={`text-xs text-gray-500 mt-1`}>Signing (m^d mod n)</span>}
+          {isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>Verifying (s^e mod n)</span>}
 
 
           {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
@@ -1392,7 +1432,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
 
-          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -1792,6 +1832,48 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
             </div>
         )}
+        
+        {/* Simple RSA Sign */}
+        {isSimpleRSASign && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
+                    {isProcessing ? 'Signing...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Signature (s): ${dataOutput}` : 'Waiting for m and Private Key...'}
+                    </p>
+                    {/* Copy Button for Signature Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+                <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
+            </div>
+        )}
+
+        {/* Simple RSA Verify */}
+        {isSimpleRSAVerify && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
+                    {isProcessing ? 'Verifying...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className={`text-left text-[10px] break-all p-1 rounded min-h-[3rem] overflow-auto 
+                                  ${dataOutput.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput.includes('FAILURE') || dataOutput.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
+                        {dataOutput || 'Waiting for m, s, and Public Key...'}
+                    </p>
+                </div>
+            </div>
+        )}
 
 
         {/* Advanced RSA Key Generator */}
@@ -1967,6 +2049,48 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
         
+        {/* Simple RSA Sign */}
+        {isSimpleRSASign && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
+                    {isProcessing ? 'Signing...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                        {dataOutput ? `Signature (s): ${dataOutput}` : 'Waiting for m and Private Key...'}
+                    </p>
+                    {/* Copy Button for Signature Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+                <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
+            </div>
+        )}
+
+        {/* Simple RSA Verify */}
+        {isSimpleRSAVerify && (
+             <div className="text-xs w-full text-center">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
+                    {isProcessing ? 'Verifying...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className={`text-left text-[10px] break-all p-1 rounded min-h-[3rem] overflow-auto 
+                                  ${dataOutput.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput.includes('FAILURE') || dataOutput.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
+                        {dataOutput || 'Waiting for m, s, and Public Key...'}
+                    </p>
+                </div>
+            </div>
+        )}
+        
         {/* XOR Operation (Skipped for brevity) */}
         {type === 'XOR_OP' && (
              <div className="text-xs w-full text-center">
@@ -2046,7 +2170,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {/* Generic Output Preview */}
-        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && (
+        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -2691,6 +2815,87 @@ const App = () => {
                          outputData = `ERROR: Decryption failed. Check if Public Key was generated correctly. ${err.message}`;
                     }
                     break;
+
+                case 'SIMPLE_RSA_SIGN':
+                    try {
+                        const mStr = inputs['message']?.data;
+                        const dStr = inputs['privateKey']?.data;
+
+                        if (!mStr || !dStr) {
+                             outputData = 'Waiting for message (m) and Private Key (d, n).';
+                             break;
+                        }
+                        
+                        let mValue = mStr.replace(/\s+/g, '');
+                        if (isNaN(Number(mValue))) {
+                            outputData = `ERROR: Message must be a valid DECIMAL number. Received: ${mStr}`;
+                            break;
+                        }
+                        
+                        // We need n from the key generator node (source of dStr)
+                        const sourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'privateKey');
+                        const sourceNodeKeyGen = newNodesMap.get(sourceConn?.source);
+
+                        if (!sourceNodeKeyGen || !sourceNodeKeyGen.n) {
+                            outputData = 'ERROR: Cannot find modulus (n). Ensure Private Key is connected from Simple RSA Key Gen.';
+                            break;
+                        }
+
+                        const m = BigInt(mValue);
+                        const d = BigInt(dStr);
+                        const n = BigInt(sourceNodeKeyGen.n);
+
+                        // Signature: s = m^d mod n
+                        isProcessing = true;
+                        const s = modPow(m, d, n);
+                        outputData = s.toString();
+                        isProcessing = false;
+
+                    } catch (err) {
+                        outputData = `ERROR: Signature failed. Check inputs. ${err.message}`;
+                    }
+                    break;
+                
+                case 'SIMPLE_RSA_VERIFY':
+                    try {
+                        const mStr = inputs['message']?.data;
+                        const sStr = inputs['signature']?.data;
+                        const pkStr = inputs['publicKey']?.data;
+
+                        if (!mStr || !sStr || !pkStr) {
+                             outputData = 'Waiting for message (m), signature (s), and Public Key (n, e).';
+                             break;
+                        }
+                        
+                        let mValue = mStr.replace(/\s+/g, '');
+                        let sValue = sStr.replace(/\s+/g, '');
+                        
+                        if (isNaN(Number(mValue)) || isNaN(Number(sValue))) {
+                            outputData = 'ERROR: Message and Signature must be valid DECIMAL numbers.';
+                            break;
+                        }
+
+                        const [nStr, eStr] = pkStr.split(',');
+                        const m = BigInt(mValue);
+                        const s = BigInt(sValue);
+                        const n = BigInt(nStr);
+                        const e = BigInt(eStr);
+                        
+                        isProcessing = true;
+                        // Verification: m' = s^e mod n
+                        const decryptedM = modPow(s, e, n);
+                        isProcessing = false;
+
+                        if (decryptedM === m) {
+                            outputData = `SUCCESS: Signature verified. Decrypted message m'=${decryptedM.toString()} equals original message m=${m.toString()}.`;
+                        } else {
+                            outputData = `FAILURE: Signature verification failed. Calculated m'=${decryptedM.toString()} does not equal original m=${m.toString()}.`;
+                        }
+
+                    } catch (err) {
+                        outputData = `ERROR: Verification failed. Check inputs. ${err.message}`;
+                    }
+                    break;
                     
                 case 'HASH_FN':
                     const hashInput = inputs['data']?.data;
@@ -2956,6 +3161,8 @@ const App = () => {
       initialContent.dataOutputPrivate = '';
     } else if (type === 'SIMPLE_RSA_ENC' || type === 'SIMPLE_RSA_DEC') {
       initialContent.outputFormat = 'Decimal';
+    } else if (type === 'SIMPLE_RSA_SIGN' || type === 'SIMPLE_RSA_VERIFY') { // New Signature nodes
+      initialContent.outputFormat = type === 'SIMPLE_RSA_SIGN' ? 'Decimal' : 'Text (UTF-8)';
     } else if (type === 'SYM_ENC' || type === 'SYM_DEC') {
       initialContent.symAlgorithm = 'AES-GCM';
     } else if (type === 'ASYM_ENC' || type === 'ASYM_DEC') {
