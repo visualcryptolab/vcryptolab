@@ -56,6 +56,7 @@ const BORDER_CLASSES = {
   purple: 'border-purple-600', // Simple RSA Key Gen
   maroon: 'border-red-800', // Simple RSA Encrypt
   rose: 'border-pink-700', // Simple RSA Decrypt
+  amber: 'border-amber-500', // Caesar Cipher
 };
 
 const HOVER_BORDER_CLASSES = {
@@ -64,6 +65,7 @@ const HOVER_BORDER_CLASSES = {
   purple: 'hover:border-purple-500',
   maroon: 'hover:border-red-700',
   rose: 'hover:border-pink-600',
+  amber: 'hover:border-amber-400',
 };
 
 const TEXT_ICON_CLASSES = {
@@ -72,6 +74,7 @@ const TEXT_ICON_CLASSES = {
   purple: 'text-purple-600',
   maroon: 'text-red-800',
   rose: 'text-pink-700',
+  amber: 'text-amber-500',
 };
 
 const HOVER_BORDER_TOOLBAR_CLASSES = {
@@ -80,6 +83,7 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
   purple: 'hover:border-purple-400',
   maroon: 'hover:border-red-600',
   rose: 'hover:border-pink-600',
+  amber: 'hover:border-amber-400',
 };
 
 // --- Port Configuration ---
@@ -87,7 +91,12 @@ const PORT_SIZE = 4; // w-4 h-4
 const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
 const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input 
-const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Output
+const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Data Output
+
+// New Specific Key Port Colors
+const PUBLIC_KEY_COLOR = 'bg-lime-500'; // Light Green/Lime for Public Key
+const PRIVATE_KEY_COLOR = 'bg-red-800'; // Dark Red/Maroon for Private Key (Warning)
+
 
 // Supported Algorithms
 const HASH_ALGORITHMS = ['SHA-256', 'SHA-512'];
@@ -106,6 +115,18 @@ const NODE_DEFINITIONS = {
   OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, 
     inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], outputPorts: [] },
   
+  // --- Classic Cipher Nodes ---
+  CAESAR_CIPHER: {
+    label: 'Caesar Cipher',
+    color: 'amber',
+    icon: Lock, // Using Lock icon as it is a cipher
+    inputPorts: [
+        // Only one input port for the plaintext data
+        { name: 'Plaintext', type: 'data', mandatory: true, id: 'plaintext' },
+    ],
+    outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }]
+  },
+
   // --- Key Generators ---
   KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] }, 
 
@@ -220,7 +241,8 @@ const NODE_DEFINITIONS = {
 // --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER'] },
-    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC'] },
+    { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER'] }, // NEW GROUP
+    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC'] }, // Removed 'SIMPLE_RSA_INFO'
     { name: 'SYMMETRIC (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },
     { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
     { name: 'BITWISE & HASH', types: ['HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
@@ -313,6 +335,46 @@ const generateSmallE = (phiN) => {
         e = BigInt(Math.floor(Math.random() * (Number(phiN) - 3)) + 2);
     } while (gcd(e, phiN) !== BigInt(1)); // FIX: 1n
     return e;
+};
+
+
+// --- Caesar Cipher Implementation ---
+
+/**
+ * Encrypts plaintext using the Caesar cipher.
+ * ONLY works on Text (UTF-8) input. Returns error otherwise.
+ * @param {string} inputData The data string (or text).
+ * @param {string} inputFormat The format of the inputData.
+ * @param {number} k The shift value (key).
+ * @returns {{output: string, format: string}} The resulting output data and its format.
+ */
+const caesarEncrypt = (inputData, inputFormat, k) => {
+    if (inputFormat !== 'Text (UTF-8)') {
+         return { output: `ERROR: Caesar Cipher requires Text (UTF-8) input. Received: ${inputFormat}`, format: inputFormat };
+    }
+    
+    let ciphertext = '';
+    const shift = (k % 26 + 26) % 26; // Ensure shift is positive and within 0-25
+    const plaintext = inputData;
+    
+    for (let i = 0; i < plaintext.length; i++) {
+        const char = plaintext[i];
+        const charCode = char.charCodeAt(0);
+
+        if (charCode >= 65 && charCode <= 90) { // Uppercase (A=65, Z=90)
+            // (charCode - 65 + shift) mod 26 + 65
+            const encryptedCode = ((charCode - 65 + shift) % 26) + 65;
+            ciphertext += String.fromCharCode(encryptedCode);
+        } else if (charCode >= 97 && charCode <= 122) { // Lowercase (a=97, z=122)
+            // (charCode - 97 + shift) mod 26 + 97
+            const encryptedCode = ((charCode - 97 + shift) % 26) + 97;
+            ciphertext += String.fromCharCode(encryptedCode);
+        } else {
+            // Non-alphabetic characters are left unchanged
+            ciphertext += char;
+        }
+    }
+    return { output: ciphertext, format: 'Text (UTF-8)' };
 };
 
 
@@ -462,7 +524,7 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
 const getOutputFormat = (nodeType) => {
     switch (nodeType) {
         case 'DATA_INPUT':
-            // Handled by the 'format' property on the node itself
+        case 'CAESAR_CIPHER': // Caesar outputs Text
             return 'Text (UTF-8)'; 
         case 'KEY_GEN':
         case 'SYM_ENC':
@@ -857,8 +919,20 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     let interactionClasses = "";
     let clickHandler = () => {};
     
-    const portColor = type === 'output' ? OUTPUT_PORT_COLOR : (isMandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR);
+    let portColor = OUTPUT_PORT_COLOR;
 
+    // Determine specific color for Key ports
+    if (outputType === 'public' || outputType === 'private') {
+        portColor = outputType === 'public' ? PUBLIC_KEY_COLOR : PRIVATE_KEY_COLOR;
+    } else if (type === 'input') {
+        portColor = isMandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR;
+    }
+    
+    // Change Output Port Color for 'key' type (Symmetric)
+    if (type === 'output' && outputType === 'key') {
+         portColor = TEXT_ICON_CLASSES['orange'].replace('text', 'bg'); // Use orange background for symmetric key output
+    }
+    
     if (type === 'output') {
         clickHandler = (e) => { 
             e.stopPropagation(); 
@@ -938,6 +1012,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isAsymEnc = type === 'ASYM_ENC'; 
   const isAsymDec = type === 'ASYM_DEC'; 
   const isBitShift = type === 'SHIFT_OP'; 
+  const isCaesarCipher = type === 'CAESAR_CIPHER'; // New Flag
   
   const FORMATS = ALL_FORMATS;
   
@@ -1211,6 +1286,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           )}
           <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
           {/* Show algorithm name for functional nodes */}
+          
+          {isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>k = {node.shiftKey || 0}</span>}
+
           {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
           {isKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({keyAlgorithm})</span>}
           
@@ -1232,7 +1310,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
 
-          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -1417,6 +1495,50 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 )}
             </div>
         )}
+
+        {isCaesarCipher && (
+            <div className="text-xs w-full text-center flex flex-col items-center">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT KEY (k)</span>
+                {/* Input for k, must be 0-25 */}
+                <input
+                    type="number"
+                    min="0"
+                    max="25"
+                    step="1"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                               text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition duration-200"
+                    value={node.shiftKey || 0}
+                    // Only update shiftKey. Recalc is triggered by updateNodeContent.
+                    onChange={(e) => updateNodeContent(id, 'shiftKey', parseInt(e.target.value) || 0)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+                
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-amber-600'}`}>
+                    {isProcessing ? 'Encrypting...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    {/* Increased padding and removed substring for full error visibility */}
+                    <p className="text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto">
+                        {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext...'}
+                    </p>
+                    {/* Copy Button for Caesar Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR') && node.outputFormat === 'Text (UTF-8)' 
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
 
         {/* Simple RSA Key Generator (Modular Arithmetic Demo) */}
         {isSimpleRSAKeyGen && (
@@ -1785,7 +1907,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {/* Generic Output Preview */}
-        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && (
+        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -1833,7 +1955,6 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
         </div>
     );
 };
-
 
 // --- Toolbar Component ---
 
@@ -1953,11 +2074,10 @@ const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
   const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
   const [connectingPort, setConnectingPort] = useState(null); 
-  // REMOVED MODAL STATES
+  
+  // Removed Info Panel state: [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
     
   const canvasRef = useRef(null);
-  
-  // --- Info Modal Handlers (REMOVED) ---
   
   // --- Project Management Handlers (Skipped for brevity) ---
   
@@ -2311,6 +2431,29 @@ const App = () => {
                     sourceNode.sourceFormat = calculatedSourceFormat; // Set the determined source format
                     sourceNode.rawInputData = outputData; // Store the raw input data separately
                     break;
+                
+                case 'CAESAR_CIPHER':
+                    // FIX: Key input is now taken from node's internal state (shiftKey), not a port
+                    const plaintextInput = inputs['plaintext']?.data;
+                    const plainFormat = inputs['plaintext']?.format;
+                    const shiftKey = sourceNode.shiftKey; // Read key from internal state
+                    
+                    if (plaintextInput !== undefined && plaintextInput !== null) {
+                        isProcessing = true;
+                        
+                        // Handle Text (Latin alphabet shift) or Numeric (Byte shift)
+                        const k = parseInt(shiftKey) || 0;
+
+                        const { output, format } = caesarEncrypt(plaintextInput, plainFormat, k);
+                        outputData = output;
+                        sourceNode.outputFormat = format;
+                        isProcessing = false;
+                        
+                    } else {
+                        outputData = 'Waiting for plaintext input.';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                    }
+                    break;
                     
                 case 'SIMPLE_RSA_ENC':
                     try {
@@ -2542,6 +2685,7 @@ const App = () => {
                     publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
                     shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
+                    shiftKey: (field === 'shiftKey' ? value : node.shiftKey), // New Caesar Key
                     // Simple RSA specific
                     p: (field === 'p' ? value : node.p),
                     q: (field === 'q' ? value : node.q),
@@ -2586,6 +2730,9 @@ const App = () => {
       initialContent.convertedData = ''; // New state
       initialContent.convertedFormat = 'Base64'; // New state
       initialContent.sourceFormat = '';
+    } else if (type === 'CAESAR_CIPHER') {
+        initialContent.shiftKey = 3; // Default shift key
+        initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'HASH_FN') { 
       initialContent.hashAlgorithm = 'SHA-256';
     } else if (type === 'KEY_GEN') {
@@ -2746,7 +2893,7 @@ const App = () => {
   return (
     <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
         
-      {/* InfoModal removed */}
+      {/* Removed SimpleInfoModal component */}
         
       <style dangerouslySetInnerHTML={{ __html: animatedLineStyle }} />
 
