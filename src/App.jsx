@@ -57,6 +57,7 @@ const BORDER_CLASSES = {
   maroon: 'border-red-800', // Simple RSA Encrypt
   rose: 'border-pink-700', // Simple RSA Decrypt
   amber: 'border-amber-500', // Caesar Cipher
+  yellow: 'border-yellow-400', // Vigenere Cipher
 };
 
 const HOVER_BORDER_CLASSES = {
@@ -66,6 +67,7 @@ const HOVER_BORDER_CLASSES = {
   maroon: 'hover:border-red-700',
   rose: 'hover:border-pink-600',
   amber: 'hover:border-amber-400',
+  yellow: 'hover:border-yellow-300',
 };
 
 const TEXT_ICON_CLASSES = {
@@ -75,6 +77,7 @@ const TEXT_ICON_CLASSES = {
   maroon: 'text-red-800',
   rose: 'text-pink-700',
   amber: 'text-amber-500',
+  yellow: 'text-yellow-400',
 };
 
 const HOVER_BORDER_TOOLBAR_CLASSES = {
@@ -84,6 +87,7 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
   maroon: 'hover:border-red-600',
   rose: 'hover:border-pink-600',
   amber: 'hover:border-amber-400',
+  yellow: 'hover:border-yellow-300',
 };
 
 // --- Port Configuration ---
@@ -127,6 +131,16 @@ const NODE_DEFINITIONS = {
     outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }]
   },
 
+  VIGENERE_CIPHER: {
+    label: 'Vigenère Cipher',
+    color: 'yellow',
+    icon: Lock,
+    inputPorts: [
+        { name: 'Plaintext/Ciphertext', type: 'data', mandatory: true, id: 'data' },
+    ],
+    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }]
+  },
+  
   // --- Key Generators ---
   KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] }, 
 
@@ -241,8 +255,8 @@ const NODE_DEFINITIONS = {
 // --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER'] },
-    { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER'] }, // NEW GROUP
-    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC'] }, // Removed 'SIMPLE_RSA_INFO'
+    { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, // Vigenere added
+    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC'] }, 
     { name: 'SYMMETRIC (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },
     { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
     { name: 'BITWISE & HASH', types: ['HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
@@ -375,6 +389,75 @@ const caesarEncrypt = (inputData, inputFormat, k) => {
         }
     }
     return { output: ciphertext, format: 'Text (UTF-8)' };
+};
+
+
+// --- Vigenère Cipher Implementation ---
+
+/**
+ * Encrypts/Decrypts plaintext using the Vigenère cipher.
+ * ONLY works on Text (UTF-8) input.
+ * @param {string} inputData The plaintext or ciphertext.
+ * @param {string} keyWord The keyword for the Vigenère cipher.
+ * @param {string} mode 'ENCRYPT' or 'DECRYPT'.
+ * @returns {{output: string, format: string}} The resulting output data and its format.
+ */
+const vigenereEncryptDecrypt = (inputData, keyWord, mode = 'ENCRYPT') => {
+    if (!keyWord || keyWord.length === 0) {
+        return { output: "ERROR: Keyword cannot be empty.", format: 'Text (UTF-8)' };
+    }
+
+    if (inputData.startsWith('ERROR')) {
+        return { output: inputData, format: 'Text (UTF-8)' };
+    }
+
+    let result = '';
+    let keyIndex = 0;
+    const plaintext = inputData;
+    const alphabetSize = 26;
+    const direction = mode === 'ENCRYPT' ? 1 : -1;
+
+    for (let i = 0; i < plaintext.length; i++) {
+        const char = plaintext[i];
+        const charCode = char.charCodeAt(0);
+
+        if ((charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)) {
+            // 1. Get the shift value (k_i) from the keyword
+            const keyChar = keyWord[keyIndex % keyWord.length];
+            let keyShift = keyChar.toUpperCase().charCodeAt(0) - 65;
+
+            // 2. Determine base (A=65 or a=97)
+            let base = 0;
+            if (charCode >= 65 && charCode <= 90) {
+                base = 65; // Uppercase
+            } else {
+                base = 97; // Lowercase
+            }
+
+            // 3. Calculate new position: (m_i + k_i) mod 26 or (c_i - k_i) mod 26
+            let charOffset = charCode - base;
+            
+            let encryptedOffset;
+            
+            if (mode === 'ENCRYPT') {
+                encryptedOffset = (charOffset + keyShift) % alphabetSize;
+            } else {
+                // Decryption: (charOffset - keyShift + 26) mod 26
+                encryptedOffset = (charOffset - keyShift + alphabetSize) % alphabetSize;
+            }
+
+            // 4. Convert back to character
+            result += String.fromCharCode(encryptedOffset + base);
+            
+            // 5. Advance key index only if an alphabetic character was processed
+            keyIndex++;
+        } else {
+            // Non-alphabetic characters are left unchanged and do not advance the key
+            result += char;
+        }
+    }
+
+    return { output: result, format: 'Text (UTF-8)' };
 };
 
 
@@ -525,6 +608,7 @@ const getOutputFormat = (nodeType) => {
     switch (nodeType) {
         case 'DATA_INPUT':
         case 'CAESAR_CIPHER': // Caesar outputs Text
+        case 'VIGENERE_CIPHER': // Vigenere outputs Text
             return 'Text (UTF-8)'; 
         case 'KEY_GEN':
         case 'SYM_ENC':
@@ -991,7 +1075,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
@@ -1013,6 +1097,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isAsymDec = type === 'ASYM_DEC'; 
   const isBitShift = type === 'SHIFT_OP'; 
   const isCaesarCipher = type === 'CAESAR_CIPHER'; // New Flag
+  const isVigenereCipher = type === 'VIGENERE_CIPHER'; // New Flag
   
   const FORMATS = ALL_FORMATS;
   
@@ -1288,6 +1373,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {/* Show algorithm name for functional nodes */}
           
           {isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>k = {node.shiftKey || 0}</span>}
+          {isVigenereCipher && <span className={`text-xs text-gray-500 mt-1`}>Keyword: {node.keyword || 'None'}</span>}
+
 
           {isHashFn && <span className={`text-xs text-gray-500 mt-1`}>({hashAlgorithm})</span>}
           {isKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({keyAlgorithm})</span>}
@@ -1300,17 +1387,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           
           {/* Simple RSA Encrypt/Decrypt */}
           {(isSimpleRSAEnc || isSimpleRSADec) && <span className={`text-xs text-gray-500 mt-1`}>Modular Arithmetic Demo</span>}
-
-          {isSymEnc && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
-          {isSymDec && <span className={`text-xs text-gray-500 mt-1`}>({symAlgorithm})</span>}
-          {isAsymEnc && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
-          {isAsymDec && <span className={`text-xs text-gray-500 mt-1`}>({asymAlgorithm})</span>}
           
           {/* Show status/algorithm for XOR and Bit Shift */}
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
 
-          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -1459,7 +1541,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         <span className="text-center font-bold text-red-600 text-[10px] flex-shrink-0">CONVERTED VIEW</span>
 
                         {/* Converted Output Box */}
-                        <div className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md overflow-y-auto border border-gray-200 min-h-[4rem]">
+                        <div className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200 min-h-[4rem]">
                             <p>{convertedData || 'Select conversion type...'}</p>
 
                             {/* Copy Button for Converted Output */}
@@ -1520,10 +1602,67 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     {/* Increased padding and removed substring for full error visibility */}
-                    <p className="text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto">
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                         {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext...'}
                     </p>
                     {/* Copy Button for Caesar Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR') && node.outputFormat === 'Text (UTF-8)' 
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {isVigenereCipher && (
+             <div className="text-xs w-full text-center flex flex-col items-center">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>KEYWORD (A-Z only)</span>
+                {/* Keyword Input */}
+                <input
+                    type="text"
+                    placeholder="Keyword"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                               text-gray-700 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition duration-200"
+                    value={keyword || ''}
+                    // Only update keyword. Recalc is triggered by updateNodeContent.
+                    onChange={(e) => updateNodeContent(id, 'keyword', e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} // Force uppercase letters only
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+
+                {/* Mode Selector */}
+                <div className="w-full mb-2">
+                    <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">OPERATION MODE</label>
+                    <select
+                        className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+                                   bg-white appearance-none cursor-pointer text-gray-700 
+                                   focus:ring-2 focus:ring-yellow-500 outline-none transition duration-200"
+                        value={vigenereMode || 'ENCRYPT'}
+                        onChange={(e) => updateNodeContent(id, 'vigenereMode', e.target.value)}
+                        onMouseDown={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <option value="ENCRYPT">Encrypt (C = P + K)</option>
+                        <option value="DECRYPT">Decrypt (P = C - K)</option>
+                    </select>
+                </div>
+                
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-yellow-600'}`}>
+                    {isProcessing ? 'Processing...' : `Active (${vigenereMode})`}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data and Keyword...'}
+                    </p>
+                    {/* Copy Button */}
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
                         disabled={!dataOutput || dataOutput.startsWith('ERROR')}
@@ -1907,7 +2046,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {/* Generic Output Preview */}
-        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && (
+        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -2454,6 +2593,33 @@ const App = () => {
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                     }
                     break;
+                
+                case 'VIGENERE_CIPHER':
+                    const vigenereInput = inputs['data']?.data;
+                    const vigenereFormat = inputs['data']?.format;
+                    const keyword = sourceNode.keyword;
+                    const mode = sourceNode.vigenereMode || 'ENCRYPT';
+
+                    if (vigenereInput !== undefined && vigenereInput !== null) {
+                        isProcessing = true;
+                        
+                        // Vigenere only operates on Text (UTF-8)
+                        if (vigenereFormat !== 'Text (UTF-8)') {
+                            outputData = `ERROR: Vigenère Cipher requires Text (UTF-8) input. Received: ${vigenereFormat}`;
+                            sourceNode.outputFormat = vigenereFormat;
+                            isProcessing = false;
+                            break;
+                        }
+
+                        const { output, format } = vigenereEncryptDecrypt(vigenereInput, keyword, mode);
+                        outputData = output;
+                        sourceNode.outputFormat = format;
+                        isProcessing = false;
+                    } else {
+                        outputData = 'Waiting for input data and keyword.';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                    }
+                    break;
                     
                 case 'SIMPLE_RSA_ENC':
                     try {
@@ -2686,6 +2852,8 @@ const App = () => {
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
                     shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
                     shiftKey: (field === 'shiftKey' ? value : node.shiftKey), // New Caesar Key
+                    keyword: (field === 'keyword' ? value : node.keyword), // New Vigenere Keyword
+                    vigenereMode: (field === 'vigenereMode' ? value : node.vigenereMode), // New Vigenere Mode
                     // Simple RSA specific
                     p: (field === 'p' ? value : node.p),
                     q: (field === 'q' ? value : node.q),
@@ -2718,6 +2886,31 @@ const App = () => {
     const definition = NODE_DEFINITIONS[type];
     
     const initialContent = { dataOutput: '', isProcessing: false, outputFormat: getOutputFormat(type) };
+    
+    // --- Determine a sensible starting position near the center/previous nodes ---
+    // Calculate canvas size (approximate center, assuming CanvasRef exists later)
+    const canvas = canvasRef.current;
+    
+    // Use fallback dimensions if ref is not yet active, or bounds are zero
+    const canvasWidth = canvas?.clientWidth > 100 ? canvas.clientWidth : 800;
+    const canvasHeight = canvas?.clientHeight > 100 ? canvas.clientHeight : 600;
+    
+    // Base position near the center
+    let x = (canvasWidth / 2) - (BOX_SIZE.width / 2);
+    let y = (canvasHeight / 2) - (BOX_SIZE.minHeight / 2);
+    
+    // Add small random offset (max 100px) to prevent direct overlap
+    // Range is -100 to 100
+    const randomOffset = () => Math.floor(Math.random() * 200) - 100;
+    x += randomOffset();
+    y += randomOffset();
+
+    // Ensure bounds are not violated by the random offset
+    x = Math.max(20, Math.min(x, canvasWidth - BOX_SIZE.width - 20));
+    y = Math.max(20, Math.min(y, canvasHeight - BOX_SIZE.minHeight - 20));
+    
+    const position = { x, y };
+    // --------------------------------------------------------------------------
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
@@ -2732,6 +2925,10 @@ const App = () => {
       initialContent.sourceFormat = '';
     } else if (type === 'CAESAR_CIPHER') {
         initialContent.shiftKey = 3; // Default shift key
+        initialContent.outputFormat = 'Text (UTF-8)';
+    } else if (type === 'VIGENERE_CIPHER') {
+        initialContent.keyword = 'HELLO'; // Default keyword
+        initialContent.vigenereMode = 'ENCRYPT';
         initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'HASH_FN') { 
       initialContent.hashAlgorithm = 'SHA-256';
@@ -2776,13 +2973,14 @@ const App = () => {
       { 
         id: newId, 
         label: definition.label, 
-        position: { x: 50 + Math.random() * 200, y: 50 + Math.random() * 200 }, 
+        position: position, 
         type: type, 
         color: color,
         ...initialContent 
       },
     ]);
-  }, []);
+  }, [canvasRef]); 
+
   
   const handleDeleteNode = useCallback((nodeIdToDelete) => {
       setNodes(prevNodes => prevNodes.filter(n => n.id !== nodeIdToDelete));
