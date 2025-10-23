@@ -1,6 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature } from 'lucide-react'; 
 
+// NOTE: For the 'Download Diagram (JPG)' feature to work, the html2canvas library 
+// needs to be loaded globally in the consuming environment, e.g., via a <script> tag.
+// Example: <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+
 // --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
 const XORIcon = (props) => (
   <svg 
@@ -53,7 +58,7 @@ const BitShiftIcon = (props) => (
 const BORDER_CLASSES = {
   blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-500', 
   teal: 'border-teal-600', gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
-  purple: 'border-purple-600', // Simple RSA Key Gen
+  purple: 'border-purple-600', // Simple RSA PrivKey Gen
   maroon: 'border-red-800', // Simple RSA Encrypt
   rose: 'border-pink-700', // Simple RSA Decrypt
   amber: 'border-amber-500', // Caesar Cipher
@@ -81,6 +86,7 @@ const TEXT_ICON_CLASSES = {
   amber: 'text-amber-500',
   yellow: 'text-yellow-400',
   fuchsia: 'text-fuchsia-600',
+  // REMOVED DUPLICATE 'lime' KEY: lime: 'text-lime-600',
 };
 
 const HOVER_BORDER_TOOLBAR_CLASSES = {
@@ -149,18 +155,33 @@ const NODE_DEFINITIONS = {
   // --- Key Generators ---
   KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] }, 
 
-  // Simple RSA Key Generator (New node for modular arithmetic demo)
+  // Simple RSA Key Generator (Private Key Gen - for modular arithmetic demo)
   SIMPLE_RSA_KEY_GEN: { 
-    label: 'Simple RSA Key Gen', 
+    label: 'Simple RSA PrivKey Gen', 
     color: 'purple', 
     icon: Key, 
     inputPorts: [], 
     outputPorts: [
-        { name: 'Public Key (n, e)', type: 'public', keyField: 'dataOutputPublic' },
-        { name: 'Private Key (d)', type: 'private', keyField: 'dataOutputPrivate' }
+        // The output stores the D value, but the node itself internally stores N and E for the PubKey Gen node
+        { name: 'Private Key (d)', type: 'private', keyField: 'dataOutputPrivate' } 
     ]
   },
     
+  // NEW: Simple RSA Public Key Generator
+  SIMPLE_RSA_PUBKEY_GEN: {
+    label: 'Simple RSA PubKey Gen',
+    color: 'lime', 
+    icon: Unlock, 
+    inputPorts: [
+        // This port is optional. If connected, it sources N and E from the Private Key Gen node
+        { name: 'Private Key Source', type: 'private', mandatory: false, id: 'keySource' } 
+    ],
+    outputPorts: [
+        // This output is the (n, e) combination for downstream encryption/verification
+        { name: 'Public Key (n, e)', type: 'public', keyField: 'dataOutputPublic' }
+    ]
+  },
+
   // Advanced RSA Key Generator (Existing node with more controls)
   RSA_KEY_GEN: { 
     label: 'Advanced RSA Key Gen', 
@@ -179,9 +200,9 @@ const NODE_DEFINITIONS = {
     color: 'maroon',
     icon: Lock,
     inputPorts: [
-        // FIX: Changed port type from 'number' to 'data' to allow connection from Data Input
         { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' }, 
-        { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
+        // Modified to connect to the Private Key output port of the KeyGen node to infer (n, e)
+        { name: 'Key Source (n, e)', type: 'private', mandatory: true, id: 'keySource' }
     ],
     outputPorts: [{ name: 'Ciphertext (c)', type: 'number', keyField: 'dataOutput' }]
   },
@@ -216,7 +237,8 @@ const NODE_DEFINITIONS = {
       inputPorts: [
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
           { name: 'Signature (s)', type: 'signature', mandatory: true, id: 'signature' },
-          { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
+          // Modified to connect to the Private Key output port of the KeyGen node to infer (n, e)
+          { name: 'Key Source (n, e)', type: 'private', mandatory: true, id: 'keySource' }
       ],
       outputPorts: [{ name: 'Verification Result', type: 'data', keyField: 'dataOutput' }]
   },
@@ -284,8 +306,9 @@ const NODE_DEFINITIONS = {
 // --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER'] },
-    { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, // Vigenere added
-    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
+    { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
+    // ADDED NEW NODE
+    { name: 'SIMPLE RSA (MODULAR)', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
     { name: 'SYMMETRIC (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },
     { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
     { name: 'BITWISE & HASH', types: ['HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
@@ -304,7 +327,7 @@ const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
 
 /** Calculates (base^exponent) mod modulus using BigInt for large numbers. */
 const modPow = (base, exponent, modulus) => {
-    // FIX: Replaced BigInt literals (1n, 0n, 2n) with BigInt() constructor calls
+    // Uses BigInt for large numbers.
     if (modulus === BigInt(1)) return BigInt(0);
     let result = BigInt(1);
     base = base % modulus;
@@ -331,12 +354,12 @@ const gcd = (a, b) => {
  */
 const modInverse = (a, m) => {
     let m0 = m;
-    let x0 = BigInt(0); // FIX: 0n -> BigInt(0)
-    let x1 = BigInt(1); // FIX: 1n -> BigInt(1)
+    let x0 = BigInt(0); 
+    let x1 = BigInt(1); 
 
-    if (m === BigInt(1)) return BigInt(0); // FIX: 1n, 0n
+    if (m === BigInt(1)) return BigInt(0); 
 
-    while (a > BigInt(1)) { // FIX: 1n
+    while (a > BigInt(1)) { 
         let q = a / m;
         let t = m;
 
@@ -348,7 +371,7 @@ const modInverse = (a, m) => {
         x1 = t;
     }
 
-    if (x1 < BigInt(0)) { // FIX: 0n
+    if (x1 < BigInt(0)) { 
         x1 += m0;
     }
     return x1;
@@ -372,11 +395,11 @@ const generateSmallPrimes = () => {
 
 /** Generates a random valid public exponent 'e' for the given phi(n). */
 const generateSmallE = (phiN) => {
-    let e = BigInt(0); // FIX: 0n -> BigInt(0)
+    let e = BigInt(0); 
     do {
         // Choose a random number > 1 and < phiN
         e = BigInt(Math.floor(Math.random() * (Number(phiN) - 3)) + 2);
-    } while (gcd(e, phiN) !== BigInt(1)); // FIX: 1n
+    } while (gcd(e, phiN) !== BigInt(1)); 
     return e;
 };
 
@@ -393,7 +416,7 @@ const generateSmallE = (phiN) => {
  */
 const caesarEncrypt = (inputData, inputFormat, k) => {
     if (inputFormat !== 'Text (UTF-8)') {
-         return { output: `ERROR: Caesar Cipher requires Text (UTF-8) input. Received: ${inputFormat}`, format: inputFormat };
+          return { output: `ERROR: Caesar Cipher requires Text (UTF-8) input. Received: ${inputFormat}`, format: inputFormat };
     }
     
     let ciphertext = '';
@@ -622,8 +645,8 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
             return arrayBufferToBinary(buffer);
         } else if (targetFormat === 'Decimal') {
              // Convert to decimal byte representation (space separated)
-            const byteArray = new Uint8Array(buffer);
-            return Array.from(byteArray).join(' ');
+             const byteArray = new Uint8Array(buffer);
+             return Array.from(byteArray).join(' ');
         } else {
              return `ERROR: Unsupported target format (${targetFormat})`;
         }
@@ -645,6 +668,7 @@ const getOutputFormat = (nodeType) => {
         case 'ASYM_ENC':
         case 'SIMPLE_RSA_KEY_GEN':
         case 'RSA_KEY_GEN':
+        case 'SIMPLE_RSA_PUBKEY_GEN': // NEW NODE
             return 'Base64';
         case 'HASH_FN':
             return 'Hexadecimal';
@@ -720,7 +744,7 @@ const performByteShiftOperation = (bytes, shiftType, shiftAmount) => {
 
 /** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
-  if (!str) return 'ERROR: Missing data input.';
+  if (!str) return 'Missing data input.';
   const webCryptoAlgorithm = algorithm.toUpperCase(); 
   
   if (!HASH_ALGORITHMS.includes(algorithm)) {
@@ -1075,8 +1099,8 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
         
         // A port is a target candidate if an output port is active AND port types match
         const isTargetCandidate = isConnecting && 
-                                  isConnecting.sourceId !== nodeId && 
-                                  isConnecting.outputType === inputPortType; 
+                                     isConnecting.sourceId !== nodeId && 
+                                     isConnecting.outputType === inputPortType; 
         
         if (isTargetCandidate) {
             clickHandler = (e) => { 
@@ -1097,7 +1121,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     return (
         <div 
             className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${portColor} absolute transform -translate-x-1/2 -translate-y-1/2 
-                        shadow-md border-2 border-white cursor-pointer ${interactionClasses}`}
+                         shadow-md border-2 border-white cursor-pointer ${interactionClasses}`}
             onClick={clickHandler}
             onMouseDown={stopPropagation}
             onTouchStart={stopPropagation}
@@ -1111,7 +1135,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly } = node; 
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
   const boxRef = useRef(null);
@@ -1123,7 +1147,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isOutputViewer = type === 'OUTPUT_VIEWER'; 
   const isHashFn = type === 'HASH_FN';
   const isKeyGen = type === 'KEY_GEN';
-  const isSimpleRSAKeyGen = type === 'SIMPLE_RSA_KEY_GEN'; // New Flag
+  const isSimpleRSAKeyGen = type === 'SIMPLE_RSA_KEY_GEN'; // Private Key Gen
+  const isSimpleRSAPubKeyGen = type === 'SIMPLE_RSA_PUBKEY_GEN'; // Public Key Gen
   const isRSAKeyGen = type === 'RSA_KEY_GEN'; 
   const isSimpleRSAEnc = type === 'SIMPLE_RSA_ENC'; // New Flag
   const isSimpleRSADec = type === 'SIMPLE_RSA_DEC'; // New Flag
@@ -1206,7 +1231,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const handleBoxClick = useCallback((e) => {
     if (isDragging) return; 
     if (connectingPort) {
-        handleConnectEnd(null); // Cancel connection if canvas clicked
+      handleConnectEnd(null); // Cancel connection if canvas clicked
     }
     e.stopPropagation();
   }, [connectingPort, handleConnectEnd, isDragging]);
@@ -1229,7 +1254,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         document.body.appendChild(tempTextArea);
         
         // FIX: Select and execute copy command
-        tempTextArea.select();
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
@@ -1378,8 +1402,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       onClick={handleBoxClick} 
     >
       
-      {/* Information Button (for Simple RSA Nodes) */}
-      {/* REMOVED INFO BUTTON LOGIC */}
+      {/* Removed Information Button (for Simple RSA Nodes) */}
 
       {/* Delete Button */}
       <button
@@ -1431,8 +1454,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {/* Show status/algorithm for XOR and Bit Shift */}
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
+          {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>}
 
-          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+
+          {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -1440,8 +1465,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           <div className="w-full flex flex-col items-center flex-grow">
             <textarea
               className="w-full text-xs p-2 border border-gray-200 rounded-lg shadow-md resize-none mb-2 
-                         placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
-                         outline-none transition duration-200"
+                           placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                           outline-none transition duration-200"
               rows="4" 
               placeholder="Enter data here..."
               value={content || ''}
@@ -1485,8 +1510,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             />
             <select
               className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
-                         bg-white appearance-none cursor-pointer text-gray-700 
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
+                           bg-white appearance-none cursor-pointer text-gray-700 
+                           focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
               value={format || 'Text (UTF-8)'}
               // FIX: Add auto-correction logic when user manually selects an incompatible format
               onChange={(e) => {
@@ -1534,7 +1559,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">Source Data Type</label>
                     <select
                         className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
-                                   bg-gray-100 cursor-default text-gray-700 appearance-none pointer-events-none"
+                                    bg-gray-100 cursor-default text-gray-700 appearance-none pointer-events-none"
                         value={sourceFormat || 'N/A'}
                         onChange={() => {}} // Disabled but functional selector
                         onMouseDown={(e) => e.stopPropagation()}
@@ -1589,9 +1614,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                                 onClick={(e) => handleCopyToClipboard(e, convertedData)}
                                 disabled={!convertedData || convertedData.startsWith('ERROR')}
                                 className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
-                                            ${convertedData && !convertedData.startsWith('ERROR')
-                                                ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
-                                                : 'bg-gray-300 cursor-not-allowed'}`}
+                                             ${convertedData && !convertedData.startsWith('ERROR')
+                                                 ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                                 : 'bg-gray-300 cursor-not-allowed'}`}
                                 title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
                             >
                                 <Clipboard className="w-3 h-3" />
@@ -1601,8 +1626,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         {/* Converted Format Selector */}
                         <select
                             className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
-                                        bg-white appearance-none cursor-pointer text-gray-700 
-                                        focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
+                                         bg-white appearance-none cursor-pointer text-gray-700 
+                                         focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
                             value={convertedFormat || 'Base64'}
                             onChange={(e) => updateNodeContent(id, 'convertedFormat', e.target.value)}
                             onMouseDown={(e) => e.stopPropagation()}
@@ -1642,7 +1667,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     {/* Increased padding and removed substring for full error visibility */}
-                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                         {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext...'}
                     </p>
                     {/* Copy Button for Caesar Output */}
@@ -1668,7 +1693,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <input
                     type="text"
                     placeholder="Keyword"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
                                text-gray-700 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition duration-200"
                     value={keyword || ''}
                     // Only update keyword. Recalc is triggered by updateNodeContent.
@@ -1683,8 +1708,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">OPERATION MODE</label>
                     <select
                         className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
-                                   bg-white appearance-none cursor-pointer text-gray-700 
-                                   focus:ring-2 focus:ring-yellow-500 outline-none transition duration-200"
+                                    bg-white appearance-none cursor-pointer text-gray-700 
+                                    focus:ring-2 focus:ring-yellow-500 outline-none transition duration-200"
                         value={vigenereMode || 'ENCRYPT'}
                         onChange={(e) => updateNodeContent(id, 'vigenereMode', e.target.value)}
                         onMouseDown={(e) => e.stopPropagation()} 
@@ -1699,7 +1724,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Processing...' : `Active (${vigenereMode})`}
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                         {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data and Keyword...'}
                     </p>
                     {/* Copy Button */}
@@ -1719,17 +1744,17 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
 
-        {/* Simple RSA Key Generator (Modular Arithmetic Demo) */}
+        {/* Simple RSA Private Key Generator (Modular Arithmetic Demo) */}
         {isSimpleRSAKeyGen && (
             <div className="text-xs w-full text-center flex flex-col items-center">
-                <span className="text-[10px] font-semibold text-gray-600 mb-1">PRIME INPUTS (P, Q, E)</span>
+                <span className="text-[10px] font-semibold text-gray-600 mb-1">KEY INPUTS (P, Q, E, D)</span>
                 
                 {/* P Input */}
                 <input
                     type="number"
-                    placeholder="Prime P"
+                    placeholder="Prime P (Autogenerates if empty)"
                     className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
-                             text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
+                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={p || ''}
                     onChange={(e) => updateNodeContent(id, 'p', e.target.value)}
                     onMouseDown={(e) => e.stopPropagation()} 
@@ -1738,9 +1763,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 {/* Q Input */}
                 <input
                     type="number"
-                    placeholder="Prime Q"
+                    placeholder="Prime Q (Autogenerates if empty)"
                     className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
-                             text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
+                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={q || ''}
                     onChange={(e) => updateNodeContent(id, 'q', e.target.value)}
                     onMouseDown={(e) => e.stopPropagation()} 
@@ -1749,14 +1774,27 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                  {/* E Input */}
                 <input
                     type="number"
-                    placeholder="Exponent E"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3
-                             text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
+                    placeholder="Exponent E (Autogenerates if empty)"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1
+                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={e || ''}
                     onChange={(e) => updateNodeContent(id, 'e', e.target.value)}
                     onMouseDown={(e) => e.stopPropagation()} 
                     onClick={(e) => e.stopPropagation()}
                 />
+                 {/* D Input (MODIFICADO) */}
+                <input
+                    type="number"
+                    placeholder="Private Exponent D (Optional: Checked, then calculated)"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3
+                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
+                    value={d || ''}
+                    // BIND d to the input field
+                    onChange={(e) => updateNodeContent(id, 'd', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+
 
                 <button
                     onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
@@ -1775,6 +1813,53 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     <p className="text-[10px]">n (Modulus): <span className="font-mono text-gray-800">{n || 'N/A'}</span></p>
                     <p className="text-[10px]">&phi;(n): <span className="font-mono text-gray-800">{phiN || 'N/A'}</span></p>
                     <p className="text-[10px]">d (Private Exp.): <span className="font-mono text-gray-800">{d || 'N/A'}</span></p>
+                    {dStatus && (
+                        <p className={`text-[10px] font-bold ${dStatus.includes('CORRECT') ? 'text-green-600' : dStatus.includes('INCORRECT') || dStatus.includes('ERROR') ? 'text-red-600' : 'text-gray-600'}`}>
+                            D Status: {dStatus}
+                        </p>
+                    )}
+                </div>
+            </div>
+        )}
+        
+        {/* NEW Simple RSA Public Key Generator */}
+        {isSimpleRSAPubKeyGen && (
+            <div className="text-xs w-full text-center flex flex-col items-center">
+                <span className="text-[10px] font-semibold text-gray-600 mb-1">PUBLIC KEY INPUTS (N, E)</span>
+                
+                {/* N Input */}
+                <input
+                    type="number"
+                    placeholder="Modulus N"
+                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
+                               text-gray-700 focus:ring-2 focus:ring-lime-500 outline-none transition duration-200 ${isReadOnly ? 'bg-gray-100 cursor-default' : ''}`}
+                    value={n_pub || ''}
+                    onChange={(e) => updateNodeContent(id, 'n_pub', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                    readOnly={isReadOnly}
+                />
+                {/* E Input */}
+                <input
+                    type="number"
+                    placeholder="Exponent E"
+                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3
+                               text-gray-700 focus:ring-2 focus:ring-lime-500 outline-none transition duration-200 ${isReadOnly ? 'bg-gray-100 cursor-default' : ''}`}
+                    value={e_pub || ''}
+                    onChange={(e) => updateNodeContent(id, 'e_pub', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                    readOnly={isReadOnly}
+                />
+
+                <span className={`font-semibold mt-2 ${dataOutputPublic ? 'text-lime-600' : 'text-gray-500'}`}>
+                    {dataOutputPublic ? 'Key Pair Ready' : 'Enter or Connect Key Source'}
+                </span>
+                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1">
+                    <label className="block text-[10px] font-semibold text-gray-600">Public Key Output (n, e):</label>
+                    <p className="text-[10px] font-mono text-gray-800 break-all overflow-hidden">
+                        {dataOutputPublic || 'N/A'}
+                    </p>
                 </div>
             </div>
         )}
@@ -1787,7 +1872,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Ciphertext (c): ${dataOutput}` : 'Waiting for m and Public Key...'}
+                        {dataOutput ? `Ciphertext (c): ${dataOutput}` : 'Waiting for m and Key Source...'}
                     </p>
                     {/* Copy Button for Ciphertext Output */}
                     <button
@@ -1832,7 +1917,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
             </div>
         )}
-        
+
         {/* Simple RSA Sign */}
         {isSimpleRSASign && (
              <div className="text-xs w-full text-center">
@@ -1868,224 +1953,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className={`text-left text-[10px] break-all p-1 rounded min-h-[3rem] overflow-auto 
-                                  ${dataOutput.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput.includes('FAILURE') || dataOutput.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
-                        {dataOutput || 'Waiting for m, s, and Public Key...'}
-                    </p>
-                </div>
-            </div>
-        )}
-
-
-        {/* Advanced RSA Key Generator */}
-        {isRSAKeyGen && (
-            <div className="text-xs w-full text-center flex flex-col items-center">
-                
-                {/* Modulus Length (n size) */}
-                <div className="w-full mb-1">
-                    <label className="block text-left text-[10px] font-semibold text-gray-600">Modulus Length (bits)</label>
-                    <select
-                      className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
-                                 bg-white appearance-none cursor-pointer text-gray-700 
-                                 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200"
-                      value={modulusLength || 2048}
-                      onChange={(e) => updateNodeContent(id, 'modulusLength', parseInt(e.target.value))}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {RSA_MODULUS_LENGTHS.map(len => (
-                        <option key={len} value={len}>{len} bits</option>
-                      ))}
-                    </select>
-                </div>
-                
-                {/* Public Exponent (e) - Input */}
-                <div className="w-full mb-2">
-                    <label className="block text-left text-[10px] font-semibold text-gray-600">Public Exponent (e)</label>
-                    <input
-                        type="number"
-                        className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm 
-                                 text-gray-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200"
-                        value={publicExponent || 65537}
-                        onChange={(e) => updateNodeContent(id, 'publicExponent', parseInt(e.target.value) || 65537)}
-                        onMouseDown={(e) => e.stopPropagation()} 
-                        onTouchStart={(e) => e.stopPropagation()} 
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                </div>
-                
-                <button
-                    onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
-                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-cyan-500 hover:bg-cyan-600`}
-                >
-                    <Key className="w-4 h-4" />
-                    <span>Generate RSA Key Pair</span>
-                </button>
-                
-                <span className={`font-semibold mt-2 ${dataOutputPublic ? 'text-cyan-600' : 'text-gray-500'}`}>
-                    {isProcessing ? 'Generating...' : dataOutputPublic ? 'Keys Ready' : 'Configure and Generate'}
-                </span>
-
-                <div className="w-full mt-1 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-2">
-                    <label className="block text-[10px] font-semibold text-gray-600">Extracted Key Parameters (Read Only)</label>
-                    
-                    {/* READ-ONLY PARAMETERS */}
-                    {['n', 'd', 'p', 'q'].map(param => (
-                        <div key={param} className="flex flex-col">
-                            <label className="text-[10px] font-medium text-gray-500 capitalize">{param} (Base64URL):</label>
-                            <input
-                                type="text"
-                                readOnly
-                                className="w-full text-[8px] p-1 border border-gray-100 rounded bg-gray-50 break-all overflow-hidden cursor-default"
-                                value={rsaParameters?.[param] ? `${rsaParameters[param].substring(0, 20)}...` : 'N/A'}
-                                title={rsaParameters?.[param] || 'Parameter not yet generated'}
-                                onMouseDown={(e) => e.stopPropagation()} 
-                                onTouchStart={(e) => e.stopPropagation()} 
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
-        
-        {/* Sym Encrypt (Skipped for brevity) */}
-        {isSymEnc && (
-            <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
-                    {isProcessing ? 'Encrypting...' : 'Active'}
-                </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Key...'}
-                    </p>
-                    <button
-                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
-                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
-                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
-                                    ${dataOutput && !dataOutput.startsWith('ERROR')
-                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
-                                        : 'bg-gray-300 cursor-not-allowed'}`}
-                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
-                    >
-                        <Clipboard className="w-3 h-3" />
-                    </button>
-                </div>
-            </div>
-        )}
-
-        {/* Sym Decrypt (Skipped for brevity) */}
-        {isSymDec && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
-                    {isProcessing ? 'Decrypting...' : 'Active'}
-                </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Key...'}
-                    </p>
-                    <button
-                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
-                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
-                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
-                                    ${dataOutput && !dataOutput.startsWith('ERROR')
-                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
-                                        : 'bg-gray-300 cursor-not-allowed'}`}
-                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
-                    >
-                        <Clipboard className="w-3 h-3" />
-                    </button>
-                </div>
-            </div>
-        )}
-
-        {/* Asym Encrypt (Skipped for brevity) */}
-        {isAsymEnc && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
-                    {isProcessing ? 'Encrypting (RSA-OAEP)...' : 'Active'}
-                </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Ciphertext (Base64): ${dataOutput.substring(0, 15)}...` : 'Waiting for Data and Public Key...'}
-                    </p>
-                    <button
-                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
-                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
-                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
-                                    ${dataOutput && !dataOutput.startsWith('ERROR')
-                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
-                                        : 'bg-gray-300 cursor-not-allowed'}`}
-                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
-                    >
-                        <Clipboard className="w-3 h-3" />
-                    </button>
-                </div>
-            </div>
-        )}
-
-        {/* Asym Decrypt (Skipped for brevity) */}
-        {isAsymDec && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
-                    {isProcessing ? 'Decrypting (RSA-OAEP)...' : 'Active'}
-                </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Plaintext (UTF-8): ${dataOutput.substring(0, 15)}...` : 'Waiting for Cipher and Private Key...'}
-                    </p>
-                    <button
-                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
-                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
-                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
-                                    ${dataOutput && !dataOutput.startsWith('ERROR')
-                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
-                                        : 'bg-gray-300 cursor-not-allowed'}`}
-                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
-                    >
-                        <Clipboard className="w-3 h-3" />
-                    </button>
-                </div>
-            </div>
-        )}
-        
-        {/* Simple RSA Sign */}
-        {isSimpleRSASign && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
-                    {isProcessing ? 'Signing...' : 'Active'}
-                </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Signature (s): ${dataOutput}` : 'Waiting for m and Private Key...'}
-                    </p>
-                    {/* Copy Button for Signature Output */}
-                    <button
-                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
-                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
-                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
-                                    ${dataOutput && !dataOutput.startsWith('ERROR')
-                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
-                                        : 'bg-gray-300 cursor-not-allowed'}`}
-                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
-                    >
-                        <Clipboard className="w-3 h-3" />
-                    </button>
-                </div>
-                <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
-            </div>
-        )}
-
-        {/* Simple RSA Verify */}
-        {isSimpleRSAVerify && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
-                    {isProcessing ? 'Verifying...' : 'Active'}
-                </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className={`text-left text-[10px] break-all p-1 rounded min-h-[3rem] overflow-auto 
-                                  ${dataOutput.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput.includes('FAILURE') || dataOutput.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
-                        {dataOutput || 'Waiting for m, s, and Public Key...'}
+                                     ${dataOutput?.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput?.includes('FAILURE') || dataOutput?.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
+                        {dataOutput || 'Waiting for m, s, and Key Source...'}
                     </p>
                 </div>
             </div>
@@ -2099,7 +1968,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput.substring(0, 15)}...` : 'Waiting for two data inputs...'}
+                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for two data inputs...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2135,8 +2004,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT DIRECTION</span>
                 <select
                     className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2
-                               bg-white appearance-none cursor-pointer text-gray-700 
-                               focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
                     value={node.shiftType || 'Left'}
                     onChange={(e) => updateNodeContent(id, 'shiftType', e.target.value)}
                     onMouseDown={(e) => e.stopPropagation()}
@@ -2152,7 +2021,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput.substring(0, 15)}...` : 'Waiting for input...'}
+                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for input...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2170,7 +2039,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {/* Generic Output Preview */}
-        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && (
+        {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -2242,10 +2111,10 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage 
             {/* Title/Logo Container */}
             <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
                 <img 
-                    src="VCL - Horizonal logo + name.png"
-                    alt="VisualCryptoLab Logo and Name" 
+                    src="https://placehold.co/180x40/999/fff?text=VisualCryptoLab"
+                    alt="VisualCryptoLab Logo Placeholder" 
                     className="w-full h-auto max-w-[180px]"
-                    // Fallback if image fails to load
+                    // Fallback if image fails to load (used placeholder from the start)
                     onError={(e) => {
                         e.target.onerror = null; 
                         e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
@@ -2282,8 +2151,8 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage 
                                             key={type}
                                             onClick={() => addNode(type, def.label, def.color)}
                                             className={`w-full py-3 px-4 flex items-center justify-start space-x-3 
-                                                        bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
-                                                        transition duration-150 text-gray-700 rounded-lg shadow-sm`}
+                                                         bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
+                                                         transition duration-150 text-gray-700 rounded-lg shadow-sm`}
                                         >
                                             {/* Render the custom icon component or the default Lucide icon */}
                                             {def.icon && typeof def.icon === 'function' ? (
@@ -2423,7 +2292,7 @@ const App = () => {
   // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
-    // FIX: Re-initialize newNodesMap correctly to ensure integrity and reset calculation fields.
+    // Re-initialize newNodesMap correctly to ensure integrity and reset calculation fields.
     const newNodesMap = new Map(currentNodes.map(n => {
         const newNode = { ...n };
         // Reset fields relevant to calculation output/status
@@ -2486,17 +2355,17 @@ const App = () => {
                          generateSymmetricKey(algorithm).then(({ keyObject, keyBase64 }) => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
-                                    ? { ...n, dataOutput: keyBase64, key: keyObject, isProcessing: false, generateKey: false } 
-                                    : n
+                                     ? { ...n, dataOutput: keyBase64, key: keyObject, isProcessing: false, generateKey: false } 
+                                     : n
                             ));
-                        }).catch(err => {
-                            setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: `ERROR: Key generation failed.`, isProcessing: false, generateKey: false } 
-                                    : n
-                            ));
-                        });
-                        outputData = sourceNode.dataOutput || 'Generating Key...';
+                         }).catch(err => {
+                             setNodes(prevNodes => prevNodes.map(n => 
+                                 n.id === sourceId 
+                                     ? { ...n, dataOutput: `ERROR: Key generation failed.`, isProcessing: false, generateKey: false } 
+                                     : n
+                             ));
+                         });
+                         outputData = sourceNode.dataOutput || 'Generating Key...';
                     } else {
                         outputData = sourceNode.dataOutput || '';
                         isProcessing = false;
@@ -2511,119 +2380,150 @@ const App = () => {
                  
                  // --- Simple RSA Key Gen Logic ---
                  if (sourceNode.type === 'SIMPLE_RSA_KEY_GEN' && sourceNode.generateKey) {
-                    isProcessing = true;
-                    
-                    const userP = sourceNode.p ? BigInt(sourceNode.p) : null;
-                    const userQ = sourceNode.q ? BigInt(sourceNode.q) : null;
-                    const userE = sourceNode.e ? BigInt(sourceNode.e) : null;
+                     isProcessing = true;
+                     
+                     // Read P, Q, E from input fields
+                     const rawP = sourceNode.p;
+                     const rawQ = sourceNode.q;
+                     const rawE = sourceNode.e;
+                     const userD = sourceNode.d ? BigInt(sourceNode.d) : null; 
 
-                    let p_val, q_val, e_val;
-                    let n_val, phiN_val, d_val;
-                    let error = null;
-                    
-                    try {
-                        // Get P and Q
-                        if (userP && userQ) {
+                     let p_val, q_val, e_val, d_val;
+                     let n_val, phiN_val;
+                     let error = null;
+                     let d_status = ''; // New status field
+
+                     
+                     try {
+                        
+                        // 1. Determine P and Q (Generate if missing or invalid)
+                        const userP = rawP && !isNaN(Number(rawP)) ? BigInt(rawP) : null;
+                        const userQ = rawQ && !isNaN(Number(rawQ)) ? BigInt(rawQ) : null;
+                        
+                        if (userP && userQ && userP > BigInt(0) && userQ > BigInt(0)) {
                             p_val = userP;
                             q_val = userQ;
                         } else {
+                            // Autogenerate if P or Q are missing/invalid
                             ({ p: p_val, q: q_val } = generateSmallPrimes());
                         }
 
-                        // Calculate n and phi(n)
+                        // 2. Calculate n and phi(n)
                         n_val = p_val * q_val;
-                        phiN_val = (p_val - BigInt(1)) * (q_val - BigInt(1)); // FIX: BigInt literals
+                        phiN_val = (p_val - BigInt(1)) * (q_val - BigInt(1)); 
 
-                        // Get E
-                        if (userE) {
+                        // 3. Determine E (Generate if missing, validate if provided)
+                        const userE = rawE && !isNaN(Number(rawE)) ? BigInt(rawE) : null;
+                        
+                        if (userE && userE > BigInt(1) && userE < phiN_val && gcd(userE, phiN_val) === BigInt(1)) {
                             e_val = userE;
-                            if (e_val <= BigInt(1) || e_val >= phiN_val || gcd(e_val, phiN_val) !== BigInt(1)) { // FIX: BigInt literals
-                                error = `ERROR: Invalid E (${e_val}). Must be 1 < E < phi(n) and gcd(E, phi(n)) = 1.`;
-                            }
-                        } else {
-                             // Auto generate E
+                        } else if (!userE || userE <= BigInt(0)) {
+                            // Autogenerate if E is missing/invalid or 0
                             e_val = generateSmallE(phiN_val);
-                        }
-                        
-                        if (!error) {
-                            // Calculate d
-                            d_val = modInverse(e_val, phiN_val);
-                            
-                            // Public Key: n, e; Private Key: d (stored as simple BigInt strings)
-                            sourceNode.dataOutputPublic = `${n_val.toString()},${e_val.toString()}`;
-                            sourceNode.dataOutputPrivate = d_val.toString();
-                            
-                            // Store parameters for display
-                            sourceNode.n = n_val.toString();
-                            sourceNode.phiN = phiN_val.toString();
-                            sourceNode.d = d_val.toString();
-                            sourceNode.p = p_val.toString();
-                            sourceNode.q = q_val.toString();
-                            sourceNode.e = e_val.toString();
-                            
-                            outputData = sourceNode.dataOutputPublic;
-                            isProcessing = false;
                         } else {
-                            outputData = error;
-                            // Clear keys on error
-                            sourceNode.dataOutputPublic = error;
-                            sourceNode.dataOutputPrivate = error;
-                            sourceNode.n = ''; sourceNode.phiN = ''; sourceNode.d = ''; sourceNode.p = ''; sourceNode.q = ''; sourceNode.e = '';
+                            error = `ERROR: Invalid E (${userE.toString()}). Must be 1 < E < phi(n) and gcd(E, phi(n)) = 1.`;
+                            throw new Error(error);
                         }
-                        
-                    } catch (err) {
-                        outputData = `ERROR: Calculation failed. ${err.message}`;
-                        sourceNode.dataOutputPublic = outputData;
-                        sourceNode.dataOutputPrivate = outputData;
-                    }
+                         
+                        // 4. Determine D (Always calculate the correct D)
+                        const calculatedD = modInverse(e_val, phiN_val);
+                        d_val = calculatedD; 
+                         
+                        // 5. Provide feedback on the user's D input
+                        if (userD && userD > BigInt(0)) {
+                           if ((userD * e_val) % phiN_val === BigInt(1) && userD < phiN_val) {
+                               d_status = `CORRECT (User input D: ${userD.toString()}). Using calculated value for consistency.`;
+                           } else {
+                               d_status = `INCORRECT (User input D: ${userD.toString()}). The correct value is: ${calculatedD.toString()}.`;
+                           }
+                        } else {
+                            d_status = 'CORRECT (Calculated).';
+                        }
+                         
+                     } catch (err) {
+                         // Catches validation errors and modular inverse errors
+                         error = err.message.startsWith("ERROR") ? err.message : `ERROR: Calculation failed. ${err.message}`;
+                     }
+                     
+                     // 6. Update Node State
+                     if (!error) {
+                         // Key data output for downstream nodes
+                         sourceNode.dataOutputPublic = `${n_val.toString()},${e_val.toString()}`; 
+                         sourceNode.dataOutputPrivate = d_val.toString();
+                         
+                         // Internal display parameters (P, Q, E are now saved back to fill empty fields)
+                         sourceNode.n = n_val.toString();
+                         sourceNode.phiN = phiN_val.toString();
+                         sourceNode.d = d_val.toString(); // OVERWRITE: Ensure D field shows the correct calculated key
+                         sourceNode.p = p_val.toString();
+                         sourceNode.q = q_val.toString();
+                         sourceNode.e = e_val.toString();
+                         sourceNode.dStatus = d_status; 
+                         
+                         outputData = sourceNode.dataOutputPrivate; // Only outputting Private Key
+                         isProcessing = false;
+                     } else {
+                         // Handle error: reset output fields and display the error
+                         outputData = error;
+                         sourceNode.dataOutputPublic = outputData;
+                         sourceNode.dataOutputPrivate = outputData;
+                         sourceNode.n = ''; sourceNode.phiN = ''; 
+                         
+                         // Keep user-entered P, Q, E but set calculated fields to error state
+                         sourceNode.p = rawP; 
+                         sourceNode.q = rawQ;
+                         sourceNode.e = rawE;
+                         sourceNode.d = ''; // CLEAR D FIELD ON ERROR
+                         sourceNode.dStatus = error;
+                     }
 
-                    // Since Simple RSA calculation is synchronous, we update the map directly
-                    sourceNode.isProcessing = isProcessing;
-                    sourceNode.generateKey = false; // Reset trigger
-                    newNodesMap.set(sourceId, sourceNode);
-                    
-                    // Jump to next loop iteration
-                    processed.add(sourceId);
-                    nodesToProcess.push(...findAllTargets(sourceId));
-                    continue;
+                     // Since Simple RSA calculation is synchronous, we update the map directly
+                     sourceNode.isProcessing = isProcessing;
+                     sourceNode.generateKey = false; // Reset trigger
+                     newNodesMap.set(sourceId, sourceNode);
+                     
+                     // Jump to next loop iteration
+                     processed.add(sourceId);
+                     nodesToProcess.push(...findAllTargets(sourceId));
+                     continue;
 
                  } else if (sourceNode.keyPairObject || sourceNode.generateKey) {
-                    // --- Web Crypto RSA Key Gen Logic (Advanced) ---
-                    isProcessing = true;
-                    
-                    if (!sourceNode.keyPairObject || sourceNode.generateKey) {
-                         const algorithm = ASYM_ALGORITHMS[0]; 
-                         const modulusLength = sourceNode.modulusLength || 2048;
-                         
-                         generateAsymmetricKeyPair(algorithm, modulusLength, publicExponentToUse).then(({ publicKey, privateKey, keyPairObject, rsaParameters }) => {
-                            setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { 
-                                        ...n, 
-                                        dataOutputPublic: publicKey, 
-                                        dataOutputPrivate: privateKey, 
-                                        keyPairObject: keyPairObject, 
-                                        rsaParameters: rsaParameters, 
-                                        isProcessing: false, 
-                                        generateKey: false 
-                                      } 
-                                    : n
-                            ));
-                        }).catch(err => {
-                            setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutputPublic: `ERROR: ${err.message}`, dataOutputPrivate: `ERROR: ${err.message}`, isProcessing: false, generateKey: false } 
-                                    : n
-                            ));
-                        });
-                        outputData = sourceNode.dataOutputPublic || 'Generating Keys...';
-                    } else {
-                        outputData = sourceNode.dataOutputPublic || '';
-                        isProcessing = false;
-                    }
-                } else {
-                    outputData = 'Click "Generate RSA Key Pair"';
-                }
+                     // --- Web Crypto RSA Key Gen Logic (Advanced) ---
+                     isProcessing = true;
+                     
+                     if (!sourceNode.keyPairObject || sourceNode.generateKey) {
+                          const algorithm = ASYM_ALGORITHMS[0]; 
+                          const modulusLength = sourceNode.modulusLength || 2048;
+                          
+                          generateAsymmetricKeyPair(algorithm, modulusLength, publicExponentToUse).then(({ publicKey, privateKey, keyPairObject, rsaParameters }) => {
+                              setNodes(prevNodes => prevNodes.map(n => 
+                                  n.id === sourceId 
+                                      ? { 
+                                          ...n, 
+                                          dataOutputPublic: publicKey, 
+                                          dataOutputPrivate: privateKey, 
+                                          keyPairObject: keyPairObject, 
+                                          rsaParameters: rsaParameters, 
+                                          isProcessing: false, 
+                                          generateKey: false 
+                                        } 
+                                      : n
+                              ));
+                          }).catch(err => {
+                              setNodes(prevNodes => prevNodes.map(n => 
+                                  n.id === sourceId 
+                                      ? { ...n, dataOutputPublic: `ERROR: ${err.message}`, dataOutputPrivate: `ERROR: ${err.message}`, isProcessing: false, generateKey: false } 
+                                      : n
+                              ));
+                          });
+                          outputData = sourceNode.dataOutputPublic || 'Generating Keys...';
+                     } else {
+                         outputData = sourceNode.dataOutputPublic || '';
+                         isProcessing = false;
+                     }
+                 } else {
+                     outputData = 'Click "Generate RSA Key Pair"';
+                 }
             }
         
         // --- Processing/Sink Nodes (Have input ports) ---
@@ -2671,7 +2571,7 @@ const App = () => {
                     let convertedDataOutput = sourceNode.convertedData || '';
                     let calculatedSourceFormat = inputObj?.format || 'N/A';
                     
-                    if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput.startsWith('ERROR')) {
+                    if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput?.startsWith('ERROR')) {
                         
                         // FIX: Primary output (outputData) is the RAW UNCONVERTED input
                         outputData = rawInput; 
@@ -2745,13 +2645,68 @@ const App = () => {
                     }
                     break;
                     
+                case 'SIMPLE_RSA_KEY_GEN':
+                    // Handled in the initial (no input ports) block. Skip here.
+                    outputData = sourceNode.dataOutputPrivate;
+                    break;
+                
+                case 'SIMPLE_RSA_PUBKEY_GEN':
+                    const keySourceConn = incomingConns.find(c => c.targetPortId === 'keySource');
+                    const sourceKeyGenNode = keySourceConn ? newNodesMap.get(keySourceConn.source) : null;
+                    
+                    let n_val = sourceNode.n_pub;
+                    let e_val = sourceNode.e_pub;
+                    let isReadOnly = false;
+
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
+                        // Connected to Simple RSA PrivKey Gen: pull values and set read-only
+                        n_val = sourceKeyGenNode.n;
+                        e_val = sourceKeyGenNode.e;
+                        isReadOnly = true;
+                    } 
+                    
+                    // Update node state immediately (will be used in the UI)
+                    sourceNode.isReadOnly = isReadOnly;
+                    sourceNode.n_pub = n_val;
+                    sourceNode.e_pub = e_val;
+
+                    if (n_val && e_val) {
+                        try {
+                            // Simple validation that values are convertible to BigInt (numbers)
+                            BigInt(n_val);
+                            BigInt(e_val);
+                            // Output is the concatenated string (n,e)
+                            sourceNode.dataOutputPublic = `${n_val},${e_val}`;
+                        } catch (err) {
+                            sourceNode.dataOutputPublic = `ERROR: Invalid N or E format. Must be numeric.`;
+                        }
+                    } else {
+                        sourceNode.dataOutputPublic = 'N/A (Missing N or E input)';
+                    }
+
+                    // Set the main output field (dataOutputPublic is already set above)
+                    outputData = sourceNode.dataOutputPublic;
+                    break;
+                    
                 case 'SIMPLE_RSA_ENC':
                     try {
                         const mStr = inputs['message']?.data; // FIX: Now accepts data type
-                        const pkStr = inputs['publicKey']?.data;
+                        // MODIFIED: Now uses 'keySource' (Private Key or Public Key Gen) to connect and infer (n, e).
+                        const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'keySource');
+                        const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
 
-                        if (!mStr || !pkStr) {
-                            outputData = 'Waiting for message (m) and Public Key (n, e).';
+                        let n, e;
+
+                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_KEY_GEN') {
+                            n = sourceNodeKeyGen.n ? BigInt(sourceNodeKeyGen.n) : null;
+                            e = sourceNodeKeyGen.e ? BigInt(sourceNodeKeyGen.e) : null;
+                        } else if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
+                            n = sourceNodeKeyGen.n_pub ? BigInt(sourceNodeKeyGen.n_pub) : null;
+                            e = sourceNodeKeyGen.e_pub ? BigInt(sourceNodeKeyGen.e_pub) : null;
+                        }
+
+                        if (!mStr || !n || !e) {
+                            outputData = 'Waiting for message (m) and Key Source (n, e).';
                             break;
                         }
                         
@@ -2762,13 +2717,10 @@ const App = () => {
                             break;
                         }
                         
-                        const [nStr, eStr] = pkStr.split(',');
                         const m = BigInt(mValue);
-                        const n = BigInt(nStr);
-                        const e = BigInt(eStr);
-                        
+
                         if (m >= n) {
-                            outputData = `ERROR: Message (m=${mStr}) must be less than Modulus (n=${nStr}).`;
+                            outputData = `ERROR: Message (m=${mStr}) must be less than Modulus (n=${n.toString()}).`;
                         } else {
                             isProcessing = true;
                             // c = m^e mod n
@@ -2837,7 +2789,7 @@ const App = () => {
                         const sourceNodeKeyGen = newNodesMap.get(sourceConn?.source);
 
                         if (!sourceNodeKeyGen || !sourceNodeKeyGen.n) {
-                            outputData = 'ERROR: Cannot find modulus (n). Ensure Private Key is connected from Simple RSA Key Gen.';
+                            outputData = 'ERROR: Cannot find modulus (n). Ensure Private Key is connected from Simple RSA PrivKey Gen.';
                             break;
                         }
 
@@ -2860,11 +2812,23 @@ const App = () => {
                     try {
                         const mStr = inputs['message']?.data;
                         const sStr = inputs['signature']?.data;
-                        const pkStr = inputs['publicKey']?.data;
+                        // MODIFIED: Now uses 'keySource' (Private Key Gen or Public Key Gen) to connect and infer (n, e).
+                        const keySourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'keySource');
+                        const sourceNodeKeyGen = newNodesMap.get(keySourceConn?.source);
 
-                        if (!mStr || !sStr || !pkStr) {
-                             outputData = 'Waiting for message (m), signature (s), and Public Key (n, e).';
-                             break;
+                        let n, e;
+
+                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_KEY_GEN') {
+                            n = sourceNodeKeyGen.n ? BigInt(sourceNodeKeyGen.n) : null;
+                            e = sourceNodeKeyGen.e ? BigInt(sourceNodeKeyGen.e) : null;
+                        } else if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
+                            n = sourceNodeKeyGen.n_pub ? BigInt(sourceNodeKeyGen.n_pub) : null;
+                            e = sourceNodeKeyGen.e_pub ? BigInt(sourceNodeKeyGen.e_pub) : null;
+                        }
+
+                        if (!mStr || !sStr || !n || !e) {
+                            outputData = 'Waiting for message (m), signature (s), and Key Source (n, e).';
+                            break;
                         }
                         
                         let mValue = mStr.replace(/\s+/g, '');
@@ -2875,11 +2839,9 @@ const App = () => {
                             break;
                         }
 
-                        const [nStr, eStr] = pkStr.split(',');
+                        // Get n and e from the key generator node properties
                         const m = BigInt(mValue);
                         const s = BigInt(sValue);
-                        const n = BigInt(nStr);
-                        const e = BigInt(eStr);
                         
                         isProcessing = true;
                         // Verification: m' = s^e mod n
@@ -2906,8 +2868,8 @@ const App = () => {
                         calculateHash(hashInput, algorithm).then(hashResult => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
-                                    ? { ...n, dataOutput: hashResult, isProcessing: false } 
-                                    : n
+                                     ? { ...n, dataOutput: hashResult, isProcessing: false } 
+                                     : n
                             ));
                         });
                         outputData = sourceNode.dataOutput || 'Calculating...';
@@ -3063,11 +3025,16 @@ const App = () => {
                     p: (field === 'p' ? value : node.p),
                     q: (field === 'q' ? value : node.q),
                     e: (field === 'e' ? value : node.e),
+                    d: (field === 'd' ? value : node.d), // PRESERVE D BEFORE RECALC
+                    n_pub: (field === 'n_pub' ? value : node.n_pub), // NEW PUBKEY FIELD
+                    e_pub: (field === 'e_pub' ? value : node.e_pub), // NEW PUBKEY FIELD
+                    isReadOnly: node.isReadOnly, // NEW PUBKEY FIELD
                     // Conversion Feature State:
                     isConversionExpanded: (field === 'isConversionExpanded' ? value : node.isConversionExpanded),
                     convertedFormat: (field === 'convertedFormat' ? value : node.convertedFormat),
                     viewFormat: (field === 'viewFormat' ? value : node.viewFormat),
                     isProcessing: node.isProcessing,
+                    dStatus: node.dStatus,
                 };
                 return updatedNode;
             }
@@ -3129,12 +3096,12 @@ const App = () => {
       initialContent.convertedFormat = 'Base64'; // New state
       initialContent.sourceFormat = '';
     } else if (type === 'CAESAR_CIPHER') {
-        initialContent.shiftKey = 3; // Default shift key
-        initialContent.outputFormat = 'Text (UTF-8)';
+      initialContent.shiftKey = 3; // Default shift key
+      initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'VIGENERE_CIPHER') {
-        initialContent.keyword = 'HELLO'; // Default keyword
-        initialContent.vigenereMode = 'ENCRYPT';
-        initialContent.outputFormat = 'Text (UTF-8)';
+      initialContent.keyword = 'HELLO'; // Default keyword
+      initialContent.vigenereMode = 'ENCRYPT';
+      initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'HASH_FN') { 
       initialContent.hashAlgorithm = 'SHA-256';
     } else if (type === 'KEY_GEN') {
@@ -3148,17 +3115,24 @@ const App = () => {
       initialContent.dataOutputPrivate = '';
       initialContent.keyPairObject = null;
       initialContent.rsaParameters = { n: '', d: '', p: '', q: '', e: 65537 }; 
-    } else if (type === 'SIMPLE_RSA_KEY_GEN') { // New node initialization
+    } else if (type === 'SIMPLE_RSA_KEY_GEN') { // Private Key Gen initialization
       initialContent.keyAlgorithm = 'RSA-OAEP';
       initialContent.modulusLength = 0;
       initialContent.p = '';
       initialContent.q = '';
       initialContent.e = '';
-      initialContent.d = '';
+      initialContent.d = ''; // MODIFICADO: Initialize d as empty string to allow input
       initialContent.n = '';
       initialContent.phiN = '';
       initialContent.dataOutputPublic = '';
       initialContent.dataOutputPrivate = '';
+      initialContent.dStatus = ''; // New status field
+    } else if (type === 'SIMPLE_RSA_PUBKEY_GEN') { // Public Key Gen initialization (NEW)
+      initialContent.outputFormat = 'Decimal';
+      initialContent.n_pub = '';
+      initialContent.e_pub = '';
+      initialContent.dataOutputPublic = ''; 
+      initialContent.isReadOnly = false;
     } else if (type === 'SIMPLE_RSA_ENC' || type === 'SIMPLE_RSA_DEC') {
       initialContent.outputFormat = 'Decimal';
     } else if (type === 'SIMPLE_RSA_SIGN' || type === 'SIMPLE_RSA_VERIFY') { // New Signature nodes
@@ -3226,15 +3200,15 @@ const App = () => {
         const targetNodeDef = NODE_DEFINITIONS[targetNode?.type];
         
         if (targetNodeDef && targetNodeDef.inputPorts.some(p => p.id === targetPortId)) {
-             setConnections(prevConnections => [
-              ...prevConnections, 
-              { 
-                  source: sourceId, 
-                  sourcePortIndex: sourcePortIndex, 
-                  target: targetId,
-                  targetPortId: targetPortId 
-              }
-            ]);
+              setConnections(prevConnections => [
+               ...prevConnections, 
+               { 
+                   source: sourceId, 
+                   sourcePortIndex: sourcePortIndex, 
+                   target: targetId,
+                   targetPortId: targetPortId 
+               }
+             ]);
         } else {
              console.warn(`Cannot connect: Node ${targetId} is not configured to receive input at port ${targetPortId}.`);
         }
