@@ -201,8 +201,8 @@ const NODE_DEFINITIONS = {
     icon: Lock,
     inputPorts: [
         { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' }, 
-        // Modified to connect to the Private Key output port of the KeyGen node to infer (n, e)
-        { name: 'Key Source (n, e)', type: 'private', mandatory: true, id: 'keySource' }
+        // MODIFIED PORT TYPE: Changed from 'private' to 'public' to allow connection from PubKey Gen node
+        { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
     ],
     outputPorts: [{ name: 'Ciphertext (c)', type: 'number', keyField: 'dataOutput' }]
   },
@@ -237,8 +237,8 @@ const NODE_DEFINITIONS = {
       inputPorts: [
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
           { name: 'Signature (s)', type: 'signature', mandatory: true, id: 'signature' },
-          // Modified to connect to the Private Key output port of the KeyGen node to infer (n, e)
-          { name: 'Key Source (n, e)', type: 'private', mandatory: true, id: 'keySource' }
+          // MODIFIED PORT TYPE: Changed from 'private' to 'public' to allow connection from PubKey Gen node
+          { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
       ],
       outputPorts: [{ name: 'Verification Result', type: 'data', keyField: 'dataOutput' }]
   },
@@ -1872,7 +1872,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Ciphertext (c): ${dataOutput}` : 'Waiting for m and Key Source...'}
+                        {dataOutput ? `Ciphertext (c): ${dataOutput}` : 'Waiting for m and Public Key...'}
                     </p>
                     {/* Copy Button for Ciphertext Output */}
                     <button
@@ -1954,7 +1954,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <div className="relative mt-1 text-gray-500 break-all w-full">
                     <p className={`text-left text-[10px] break-all p-1 rounded min-h-[3rem] overflow-auto 
                                      ${dataOutput?.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput?.includes('FAILURE') || dataOutput?.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
-                        {dataOutput || 'Waiting for m, s, and Key Source...'}
+                        {dataOutput || 'Waiting for m, s, and Public Key...'}
                     </p>
                 </div>
             </div>
@@ -2691,22 +2691,28 @@ const App = () => {
                 case 'SIMPLE_RSA_ENC':
                     try {
                         const mStr = inputs['message']?.data; // FIX: Now accepts data type
-                        // MODIFIED: Now uses 'keySource' (Private Key or Public Key Gen) to connect and infer (n, e).
-                        const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'keySource');
+                        // NEW LOGIC: Use 'publicKey' port to find the source node and extract N and E.
+                        const pkInputObj = inputs['publicKey'];
+                        const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
                         const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
 
                         let n, e;
 
-                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_KEY_GEN') {
-                            n = sourceNodeKeyGen.n ? BigInt(sourceNodeKeyGen.n) : null;
-                            e = sourceNodeKeyGen.e ? BigInt(sourceNodeKeyGen.e) : null;
-                        } else if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
+                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
                             n = sourceNodeKeyGen.n_pub ? BigInt(sourceNodeKeyGen.n_pub) : null;
                             e = sourceNodeKeyGen.e_pub ? BigInt(sourceNodeKeyGen.e_pub) : null;
+                        } else if (pkInputObj?.data) {
+                            // Fallback: if data came from a public type port, try to parse it
+                            const [nStr, eStr] = pkInputObj.data.split(',');
+                            if (nStr && eStr) {
+                                n = BigInt(nStr);
+                                e = BigInt(eStr);
+                            }
                         }
 
+
                         if (!mStr || !n || !e) {
-                            outputData = 'Waiting for message (m) and Key Source (n, e).';
+                            outputData = 'Waiting for message (m) and Public Key (n, e).';
                             break;
                         }
                         
@@ -2755,6 +2761,7 @@ const App = () => {
                         
                         const c = BigInt(cStr);
                         const d = BigInt(dStr);
+                        // Get N from the original private key generator node
                         const n = BigInt(sourceNodeKeyGen.n);
 
                         isProcessing = true;
@@ -2764,7 +2771,7 @@ const App = () => {
                         isProcessing = false;
                         
                     } catch (err) {
-                         outputData = `ERROR: Decryption failed. Check if Public Key was generated correctly. ${err.message}`;
+                         outputData = `ERROR: Decryption failed. Check if Private Key was generated correctly. ${err.message}`;
                     }
                     break;
 
@@ -2812,22 +2819,27 @@ const App = () => {
                     try {
                         const mStr = inputs['message']?.data;
                         const sStr = inputs['signature']?.data;
-                        // MODIFIED: Now uses 'keySource' (Private Key Gen or Public Key Gen) to connect and infer (n, e).
-                        const keySourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'keySource');
-                        const sourceNodeKeyGen = newNodesMap.get(keySourceConn?.source);
+                        // NEW LOGIC: Use 'publicKey' port to find the source node and extract N and E.
+                        const pkInputObj = inputs['publicKey'];
+                        const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
+                        const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
 
                         let n, e;
 
-                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_KEY_GEN') {
-                            n = sourceNodeKeyGen.n ? BigInt(sourceNodeKeyGen.n) : null;
-                            e = sourceNodeKeyGen.e ? BigInt(sourceNodeKeyGen.e) : null;
-                        } else if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
+                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
                             n = sourceNodeKeyGen.n_pub ? BigInt(sourceNodeKeyGen.n_pub) : null;
                             e = sourceNodeKeyGen.e_pub ? BigInt(sourceNodeKeyGen.e_pub) : null;
+                        } else if (pkInputObj?.data) {
+                            // Fallback: if data came from a public type port, try to parse it
+                            const [nStr, eStr] = pkInputObj.data.split(',');
+                            if (nStr && eStr) {
+                                n = BigInt(nStr);
+                                e = BigInt(eStr);
+                            }
                         }
 
                         if (!mStr || !sStr || !n || !e) {
-                            outputData = 'Waiting for message (m), signature (s), and Key Source (n, e).';
+                            outputData = 'Waiting for message (m), signature (s), and Public Key (n, e).';
                             break;
                         }
                         
