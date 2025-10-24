@@ -127,8 +127,14 @@ const ALL_FORMATS = ['Text (UTF-8)', 'Base64', 'Hexadecimal', 'Binary', 'Decimal
 const NODE_DEFINITIONS = {
   // --- Core Nodes ---
   DATA_INPUT: { label: 'Data Input', color: 'blue', icon: LayoutGrid, inputPorts: [], outputPorts: [{ name: 'Data Output', type: 'data', keyField: 'dataOutput' }] },
-  OUTPUT_VIEWER: { label: 'Output Viewer', color: 'red', icon: Zap, 
-    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], outputPorts: [] },
+  OUTPUT_VIEWER: { 
+    label: 'Output Viewer', 
+    color: 'red', 
+    icon: Zap, 
+    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
+    // ADDED: Output port to send data (converted or raw) downstream
+    outputPorts: [{ name: 'Viewer Data Output', type: 'data', keyField: 'dataOutput' }] 
+  },
   
   // --- Classic Cipher Nodes ---
   CAESAR_CIPHER: {
@@ -200,11 +206,13 @@ const NODE_DEFINITIONS = {
     color: 'maroon',
     icon: Lock,
     inputPorts: [
+        // Changed to 'data' for BigInt string message compatibility
         { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' }, 
-        // MODIFIED PORT TYPE: Changed from 'private' to 'public' to allow connection from PubKey Gen node
+        // MODIFIED PORT TYPE: Public key input uses 'public' type port
         { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
     ],
-    outputPorts: [{ name: 'Ciphertext (c)', type: 'number', keyField: 'dataOutput' }]
+    // CHANGED OUTPUT TYPE: from 'number' to 'data' to connect to Output Viewer
+    outputPorts: [{ name: 'Ciphertext (c)', type: 'data', keyField: 'dataOutput' }] 
   },
 
   SIMPLE_RSA_DEC: {
@@ -212,10 +220,12 @@ const NODE_DEFINITIONS = {
     color: 'rose',
     icon: Unlock,
     inputPorts: [
-        { name: 'Ciphertext (c)', type: 'number', mandatory: true, id: 'cipher' }, 
+        // CHANGED INPUT TYPE: from 'number' to 'data' to connect from Encrypt or Data Input
+        { name: 'Ciphertext (c)', type: 'data', mandatory: true, id: 'cipher' }, 
         { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
     ],
-    outputPorts: [{ name: 'Plaintext (m)', type: 'number', keyField: 'dataOutput' }]
+    // CHANGED OUTPUT TYPE: from 'number' to 'data' to connect to Output Viewer
+    outputPorts: [{ name: 'Plaintext (m)', type: 'data', keyField: 'dataOutput' }]
   },
 
   // --- Simple RSA Signature Nodes ---
@@ -224,10 +234,12 @@ const NODE_DEFINITIONS = {
       color: 'fuchsia',
       icon: Signature, // Changed to Signature icon
       inputPorts: [
+          // CHANGED INPUT TYPE: from 'number' to 'data' for consistency
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
           { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
       ],
-      outputPorts: [{ name: 'Signature (s)', type: 'signature', keyField: 'dataOutput' }]
+      // CHANGED OUTPUT TYPE: from 'signature' to 'data' to connect to Output Viewer
+      outputPorts: [{ name: 'Signature (s)', type: 'data', keyField: 'dataOutput' }]
   },
 
   SIMPLE_RSA_VERIFY: {
@@ -235,9 +247,11 @@ const NODE_DEFINITIONS = {
       color: 'fuchsia',
       icon: CheckCheck,
       inputPorts: [
+          // CHANGED INPUT TYPE: from 'number' to 'data' for consistency
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
-          { name: 'Signature (s)', type: 'signature', mandatory: true, id: 'signature' },
-          // MODIFIED PORT TYPE: Changed from 'private' to 'public' to allow connection from PubKey Gen node
+          // CHANGED INPUT TYPE: from 'signature' to 'data' to connect from Sign output
+          { name: 'Signature (s)', type: 'data', mandatory: true, id: 'signature' },
+          // MODIFIED PORT TYPE: Public key input uses 'public' type port
           { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
       ],
       outputPorts: [{ name: 'Verification Result', type: 'data', keyField: 'dataOutput' }]
@@ -536,9 +550,45 @@ const base64ToArrayBuffer = (base64) => {
   return bytes.buffer;
 };
 
+// --- Single Big Number Conversion Helpers ---
+
+/** Converts ArrayBuffer to a single BigInt string (Base 10). */
+const arrayBufferToBigIntString = (buffer) => {
+    const hex = arrayBufferToHex(buffer);
+    if (hex.length === 0) return '0';
+    
+    let bigInt = BigInt(0);
+    // Convert hex string to BigInt
+    // Note: This relies on the browser supporting BigInt from hex literal '0x'
+    try {
+        bigInt = BigInt(`0x${hex}`);
+    } catch (e) {
+        // Fallback for extremely large numbers or environments lacking full BigInt support
+        return `ERROR: Data too large for BigInt conversion (${buffer.byteLength} bytes).`;
+    }
+    return bigInt.toString(10);
+};
+
+/** Converts ArrayBuffer to a single hexadecimal string (Big Number representation). */
+const arrayBufferToHexBig = (buffer) => {
+    const hex = arrayBufferToHex(buffer);
+    return hex.toUpperCase(); // Display as one single number
+};
+
+/** Converts ArrayBuffer to a single binary string (Big Number representation). */
+const arrayBufferToBinaryBig = (buffer) => {
+    const byteArray = new Uint8Array(buffer);
+    let binary = '';
+    // Concatenate all 8-bit binary strings
+    for (const byte of byteArray) {
+        binary += byte.toString(2).padStart(8, '0');
+    }
+    return binary;
+};
+
 // --- Other Data Format Conversion Functions ---
 
-/** Converts ArrayBuffer to a hexadecimal string. */
+/** Converts ArrayBuffer to a hexadecimal string (space separated by byte). */
 const arrayBufferToHex = (buffer) => {
     const byteArray = new Uint8Array(buffer);
     return Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -553,7 +603,7 @@ const arrayBufferToBinary = (buffer) => {
 /** Converts a hexadecimal string to ArrayBuffer. */
 const hexToArrayBuffer = (hex) => {
     // Clean the hex string from spaces or non-hex characters
-    const cleanedHex = hex.replace(/[^0-9a-fA-F]/g, '');
+    const cleanedHex = hex.replace(/\s/g, ''); // Remove all spaces
     if (cleanedHex.length === 0) return new ArrayBuffer(0);
 
     // Ensure it has an even length, padding with 0 if necessary
@@ -577,7 +627,10 @@ const convertToUint8Array = (dataStr, sourceFormat) => {
         } else if (sourceFormat === 'Base64') {
              return new Uint8Array(base64ToArrayBuffer(dataStr));
         } else if (sourceFormat === 'Hexadecimal') {
-             return new Uint8Array(hexToArrayBuffer(dataStr));
+             // Handle both single big number hex and byte-separated hex if needed.
+             // For consistency in binary operation inputs, we interpret input hex as raw byte data.
+             const cleanedHex = dataStr.replace(/\s/g, ''); // Assume contiguous hex stream
+             return new Uint8Array(hexToArrayBuffer(cleanedHex));
         } else if (sourceFormat === 'Binary') {
              // Convert space-separated binary string to bytes
              const binaryArray = dataStr.replace(/\s+/g, '').match(/.{1,8}/g) || []; // Group into 8-bit chunks
@@ -599,7 +652,7 @@ const convertToUint8Array = (dataStr, sourceFormat) => {
 };
 
 /** Converts a data string from a source format to a target format via ArrayBuffer. */
-const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
+const convertDataFormat = (dataStr, sourceFormat, targetFormat, toSingleNumber = false) => {
     if (!dataStr) return '';
     
     // Skip conversion if formats are the same OR if the source data is an error message
@@ -614,14 +667,16 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
         } else if (sourceFormat === 'Base64') {
              buffer = base64ToArrayBuffer(dataStr);
         } else if (sourceFormat === 'Hexadecimal') {
-             buffer = hexToArrayBuffer(dataStr);
+             // Handle hex input (assumed to be a stream of bytes, possibly a large number if crypto output)
+             const cleanedHex = dataStr.replace(/\s/g, '');
+             buffer = hexToArrayBuffer(cleanedHex);
         } else if (sourceFormat === 'Binary') {
-             // Convert binary string (space separated) to ArrayBuffer
-             const binaryArray = dataStr.split(/\s+/).map(s => parseInt(s, 2));
-             const validBytes = binaryArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
+             // Convert binary string (space separated or contiguous) to ArrayBuffer
+             const binaryArray = dataStr.replace(/\s+/g, '').match(/.{1,8}/g) || [];
+             const validBytes = binaryArray.map(s => parseInt(s, 2)).filter(b => !isNaN(b) && b >= 0 && b <= 255);
              buffer = new Uint8Array(validBytes).buffer;
         } else if (sourceFormat === 'Decimal') {
-             // Convert decimal string (space separated) to ArrayBuffer
+             // NOTE: Assuming space-separated bytes for now. True BigInt parsing requires more complex input logic.
              const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
              const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
              buffer = new Uint8Array(validBytes).buffer;
@@ -635,14 +690,29 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat) => {
 
     // 2. Convert from ArrayBuffer to target format
     try {
+        // --- Single Number Representation ---
+        if (toSingleNumber) {
+            if (targetFormat === 'Decimal') {
+                return arrayBufferToBigIntString(buffer);
+            }
+            if (targetFormat === 'Hexadecimal') {
+                return arrayBufferToHexBig(buffer);
+            }
+            // If target format is Binary in SLN mode, we output contiguous binary string
+            if (targetFormat === 'Binary') {
+                return arrayBufferToBinaryBig(buffer);
+            }
+        }
+
+        // --- Byte-by-Byte Representation ---
         if (targetFormat === 'Text (UTF-8)') {
             return new TextDecoder().decode(buffer);
         } else if (targetFormat === 'Base64') {
             return arrayBufferToBase64(buffer);
         } else if (targetFormat === 'Hexadecimal') {
-            return arrayBufferToHex(buffer);
+            return arrayBufferToHex(buffer).toUpperCase().match(/.{1,2}/g)?.join(' ') || ''; // Space-separated Hex bytes
         } else if (targetFormat === 'Binary') {
-            return arrayBufferToBinary(buffer);
+            return arrayBufferToBinary(buffer); // Space-separated Binary bytes
         } else if (targetFormat === 'Decimal') {
              // Convert to decimal byte representation (space separated)
              const byteArray = new Uint8Array(buffer);
@@ -2573,26 +2643,41 @@ const App = () => {
                     
                     if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput?.startsWith('ERROR')) {
                         
-                        // FIX: Primary output (outputData) is the RAW UNCONVERTED input
-                        outputData = rawInput; 
+                        // Check if the source format suggests binary data (i.e., not a simple text node)
+                        // Binary formats are Base64, Hexadecimal, Binary (byte-separated)
+                        const isSourceBinary = ['Base64', 'Hexadecimal', 'Binary'].includes(calculatedSourceFormat) && !rawInput.match(/^[0-9\s]*$/);
                         
-                        // 2. Calculate Secondary (Converted) Output if Expanded
+                        // Decide if we should treat the data as a single large number (SLN)
+                        const isSLNTarget = ['Decimal', 'Hexadecimal', 'Binary'].includes(sourceNode.convertedFormat);
+                        const shouldBeSingleNumber = isSLNTarget && isSourceBinary;
+
+                        // 1. Calculate Secondary (Converted) Output if Expanded
                         if (sourceNode.isConversionExpanded) {
-                            // Use calculatedSourceFormat for conversion
-                            convertedDataOutput = convertDataFormat(rawInput, calculatedSourceFormat, sourceNode.convertedFormat || 'Base64');
+                            // Pass the flag to the converter
+                            convertedDataOutput = convertDataFormat(rawInput, calculatedSourceFormat, sourceNode.convertedFormat || 'Base64', shouldBeSingleNumber);
                         } else {
                             convertedDataOutput = '';
                         }
+                        
+                        // 2. Set the data for the OUTPUT PORT (dataOutput)
+                        if (sourceNode.isConversionExpanded && convertedDataOutput && !convertedDataOutput.startsWith('ERROR')) {
+                            // Output converted data if expansion is active AND conversion was successful
+                            outputData = convertedDataOutput;
+                        } else {
+                            // Otherwise, output the raw input (as raw input format)
+                            outputData = rawInput;
+                        }
+
                     } else {
                         outputData = 'Not connected or no data.';
                         convertedDataOutput = '';
                         calculatedSourceFormat = 'N/A';
                     }
                     
-                    // Update the node's state fields (must happen here as we are inside the graph engine)
+                    // 3. Update the node's state fields for UI display
                     sourceNode.convertedData = convertedDataOutput;
-                    sourceNode.sourceFormat = calculatedSourceFormat; // Set the determined source format
-                    sourceNode.rawInputData = outputData; // Store the raw input data separately
+                    sourceNode.sourceFormat = calculatedSourceFormat; 
+                    sourceNode.rawInputData = rawInput || outputData; // Raw input for internal viewer display
                     break;
                 
                 case 'CAESAR_CIPHER':
@@ -3100,8 +3185,8 @@ const App = () => {
       initialContent.content = '';
       initialContent.format = 'Text (UTF-8)';
     } else if (type === 'OUTPUT_VIEWER') { 
-      initialContent.dataOutput = ''; // Will hold RAW input string
-      initialContent.rawInputData = ''; // New field
+      initialContent.dataOutput = ''; // Will hold the final data (raw or converted)
+      initialContent.rawInputData = ''; // New field to hold the raw input string
       initialContent.viewFormat = 'Text (UTF-8)'; 
       initialContent.isConversionExpanded = false; // New state
       initialContent.convertedData = ''; // New state
