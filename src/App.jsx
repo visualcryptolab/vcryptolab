@@ -1880,6 +1880,51 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
+        {/* Hash Function Implementation */}
+        {isHashFn && (
+            <div className="text-xs w-full text-center flex flex-col items-center">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>ALGORITHM</span>
+                {/* Hash Algorithm Selector */}
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none transition duration-200"
+                    value={hashAlgorithm || 'SHA-256'}
+                    onChange={(e) => updateNodeContent(id, 'hashAlgorithm', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {HASH_ALGORITHMS.map(alg => (
+                        <option key={alg} value={alg}>{alg}</option>
+                    ))}
+                </select>
+
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                    {isProcessing ? 'Calculating Hash...' : 'Active'}
+                </span>
+                
+                {/* Output Display Box */}
+                <div className="relative mt-1 text-gray-500 break-all w-full">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Hash (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data Input...'}
+                    </p>
+                    {/* Copy Button for Hash Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
 
         {/* Simple RSA Private Key Generator (Modular Arithmetic Demo) */}
         {isSimpleRSAKeyGen && (
@@ -3064,13 +3109,24 @@ const App = () => {
                         isProcessing = true; 
                         const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
 
-                        calculateHash(hashInput, algorithm).then(hashResult => {
+                        // Calculate hash using async function
+                        const hashPromise = calculateHash(hashInput, algorithm).then(hashResult => {
+                            // Update node state after successful calculation
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
                                      ? { ...n, dataOutput: hashResult, isProcessing: false } 
                                      : n
                             ));
+                        }).catch(err => {
+                             // Handle error during calculation
+                             setNodes(prevNodes => prevNodes.map(n => 
+                                 n.id === sourceId 
+                                      ? { ...n, dataOutput: `ERROR: Hash calculation failed. ${err.message}`, isProcessing: false } 
+                                      : n
+                             ));
                         });
+                        
+                        // Output placeholder while processing
                         outputData = sourceNode.dataOutput || 'Calculating...';
                     } else { 
                         outputData = 'Waiting for data input.'; 
@@ -3243,6 +3299,7 @@ const App = () => {
                     viewFormat: (field === 'viewFormat' ? value : node.viewFormat),
                     isProcessing: node.isProcessing,
                     dStatus: node.dStatus,
+                    hashAlgorithm: (field === 'hashAlgorithm' ? value : node.hashAlgorithm), // Added hashAlgorithm update
                 };
                 return updatedNode;
             }
@@ -3311,7 +3368,7 @@ const App = () => {
       initialContent.vigenereMode = 'ENCRYPT';
       initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'HASH_FN') { 
-      initialContent.hashAlgorithm = 'SHA-256';
+      initialContent.hashAlgorithm = 'SHA-256'; // Default value
     } else if (type === 'KEY_GEN') {
       initialContent.keyAlgorithm = 'AES-GCM';
       initialContent.key = null; 
