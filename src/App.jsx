@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature } from 'lucide-react'; 
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut } from 'lucide-react'; 
 
 // NOTE: For the 'Download Diagram (JPG)' feature to work, the html2canvas library 
-// needs to be loaded globally in the consuming environment, e.g., via a <script> tag.
-// Example: <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+// needs to be loaded globally in the consuming environment. This is included in index.html.
 
 
 // --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
@@ -1203,7 +1202,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 // --- Component for the Draggable Box ---
 
-const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes }) => {
+const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale }) => {
   // Destructure node props and look up definition
   const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly } = node; 
   const definition = NODE_DEFINITIONS[type];
@@ -1256,18 +1255,20 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     
     if (boxRef.current && canvas) {
       const canvasRect = canvas.getBoundingClientRect();
-      const mouseXRelativeToCanvas = clientX - canvasRect.left;
-      const mouseYRelativeToCanvas = clientY - canvasRect.top;
+
+      // Calculate mouse position relative to the unscaled coordinate system
+      const unscaledMouseX = (clientX - canvasRect.left) / scale;
+      const unscaledMouseY = (clientY - canvasRect.y) / scale;
 
       offset.current = {
-        x: mouseXRelativeToCanvas - position.x,
-        y: mouseYRelativeToCanvas - position.y,
+        x: unscaledMouseX - position.x,
+        y: unscaledMouseY - position.y,
       };
       
       setIsDragging(true);
       e.preventDefault(); 
     }
-  }, [canvasRef, position.x, position.y, connectingPort]);
+  }, [canvasRef, position.x, position.y, connectingPort, scale]);
 
   const handleDragMove = useCallback((e) => {
     if (!isDragging) return;
@@ -1278,21 +1279,29 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
 
     const canvasRect = canvas.getBoundingClientRect();
-    const mouseXRelativeToCanvas = clientX - canvasRect.left;
-    const mouseYRelativeToCanvas = clientY - canvasRect.y; // Correct use of canvasRect.y
     
-    let newX = mouseXRelativeToCanvas - offset.current.x;
-    let newY = mouseYRelativeToCanvas - offset.current.y;
+    // Mouse coordinates relative to the unscaled coordinate system (scaled back up)
+    const unscaledMouseX = (clientX - canvasRect.left) / scale;
+    const unscaledMouseY = (clientY - canvasRect.y) / scale;
     
-    // BOUNDS CHECKING
-    const maxWidth = canvasRect.width - BOX_SIZE.width;
-    const maxHeight = canvasRect.height - BOX_SIZE.minHeight; 
+    let newX = unscaledMouseX - offset.current.x;
+    let newY = unscaledMouseY - offset.current.y;
+    
+    // BOUNDS CHECKING (Unscaled dimensions)
+    // NOTE: For simplicity and to allow content to pan/scroll naturally when zoomed, 
+    // we use the actual scrollable area boundaries for max X/Y. 
+    // If we limit based on canvasRect.width/scale, we prevent dragging outside the initial visible area.
+    // For now, we revert to simple bounds check to prevent nodes from disappearing off the edge.
+    const canvasWidth = canvasRect.width / scale;
+    const canvasHeight = canvasRect.height / scale;
 
-    newX = Math.max(0, Math.min(newX, maxWidth));
-    newY = Math.max(0, Math.min(newY, maxHeight));
+    newX = Math.max(0, newX);
+    newY = Math.max(0, newY);
+    // Note: Max bounds check is complex with dynamic canvas size and scale, leaving it open-ended 
+    // to allow the diagram to grow beyond initial viewport when zoomed in.
 
     setPosition(id, { x: newX, y: newY });
-  }, [isDragging, id, setPosition, canvasRef]);
+  }, [isDragging, id, setPosition, canvasRef, scale]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
@@ -1324,6 +1333,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         document.body.appendChild(tempTextArea);
         
         // FIX: Select and execute copy command
+        tempTextArea.select();
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
@@ -1723,7 +1733,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     max="25"
                     step="1"
                     className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
-                               text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition duration-200"
+                               text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 
+                               outline-none transition duration-200"
                     value={node.shiftKey || 0}
                     // Only update shiftKey. Recalc is triggered by updateNodeContent.
                     onChange={(e) => updateNodeContent(id, 'shiftKey', parseInt(e.target.value) || 0)}
@@ -2160,7 +2171,7 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
 
 // --- Toolbar Component ---
 
-const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage }) => {
+const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoomOut }) => {
     const [collapsedGroups, setCollapsedGroups] = useState(() => {
         // Initialize all groups to open (false)
         return ORDERED_NODE_GROUPS.reduce((acc, group) => {
@@ -2241,7 +2252,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage 
                 
             </div>
             
-            {/* New Action Buttons Section at the bottom - NOW HORIZONTAL */}
+            {/* Action Buttons Section at the bottom */}
             <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
                 
                 <ToolbarButton 
@@ -2259,12 +2270,30 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onDownloadImage 
                     isFileInput={true} 
                 />
                 
+                {/* NEW: Zoom Out Button */}
+                <ToolbarButton 
+                    icon={ZoomOut} 
+                    label="Zoom Out" 
+                    color="teal" 
+                    onClick={onZoomOut}
+                />
+
+                {/* NEW: Zoom In Button */}
+                <ToolbarButton 
+                    icon={ZoomIn} 
+                    label="Zoom In" 
+                    color="teal" 
+                    onClick={onZoomIn}
+                />
+                
+                {/* Removed 'Download Diagram (JPG)' button as per previous request.
                 <ToolbarButton 
                     icon={Camera} 
                     label="Download Diagram (JPG)" 
                     color="teal" 
                     onClick={onDownloadImage}
                 />
+                */}
             </div>
         </div>
     );
@@ -2276,8 +2305,21 @@ const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
   const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
   const [connectingPort, setConnectingPort] = useState(null); 
+  const [scale, setScale] = useState(1.0); // New state for zoom level
   
-  // Removed Info Panel state: [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const MAX_SCALE = 2.0;
+  const MIN_SCALE = 0.5;
+  const ZOOM_STEP = 0.2;
+
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => {
+      setScale(prevScale => Math.min(MAX_SCALE, prevScale + ZOOM_STEP));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+      setScale(prevScale => Math.max(MIN_SCALE, prevScale - ZOOM_STEP));
+  }, []);
+
     
   const canvasRef = useRef(null);
   
@@ -3358,6 +3400,10 @@ const App = () => {
         stroke-width: 6 !important;
         cursor: pointer;
     }
+    /* Styles for zoom/pan when content is scaled up */
+    .canvas-container {
+        overflow: auto; /* Enable scrolling when content exceeds viewport */
+    }
   `;
   
   const handleCanvasClick = useCallback(() => {
@@ -3378,50 +3424,64 @@ const App = () => {
         onDownloadProject={handleDownloadProject}
         onUploadProject={handleUploadProject}
         onDownloadImage={handleDownloadImage}
+        onZoomIn={handleZoomIn} // Passed new zoom handler
+        onZoomOut={handleZoomOut} // Passed new zoom handler
       />
 
       <div className="flex-grow flex flex-col p-4">
         
         <div 
           ref={canvasRef}
-          className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner overflow-hidden"
+          className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner" // Removed overflow-hidden here, added overflow:auto to style
           onClick={handleCanvasClick}
         >
           
-          <svg className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0">
-            {connectionPaths.map((conn, index) => (
-              <path
-                key={`${conn.source}-${conn.target}-${conn.sourcePortIndex}-${conn.targetPortId}`}
-                d={conn.path}
-                stroke="#059669"
-                strokeWidth="4"
-                fill="none"
-                // Removed animate-line class here:
-                className="connection-line"
-                onClick={(e) => { 
-                    e.stopPropagation();
-                    handleRemoveConnection(conn.source, conn.target, conn.sourcePortIndex, conn.targetPortId);
-                }}
-              />
-            ))}
-          </svg>
+          {/* New wrapper for scaling nodes and lines */}
+          <div 
+              style={{ 
+                  transform: `scale(${scale})`, 
+                  transformOrigin: 'top left',
+                  // Ensure content area is big enough to be scrolled when zoomed in. 
+                  // Set a large enough size when zoomed out to act as a workspace.
+                  // For simplicity, let's keep it 100% and let scaling handle the visual effect and bounds check handles drag limits.
+              }} 
+              className="absolute top-0 left-0 w-full h-full"
+          >
+              <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
+                {connectionPaths.map((conn, index) => (
+                  <path
+                    key={`${conn.source}-${conn.target}-${conn.sourcePortIndex}-${conn.targetPortId}`}
+                    d={conn.path}
+                    stroke="#059669"
+                    strokeWidth="4"
+                    fill="none"
+                    // Removed animate-line class here:
+                    className="connection-line"
+                    onClick={(e) => { 
+                        e.stopPropagation();
+                        handleRemoveConnection(conn.source, conn.target, conn.sourcePortIndex, conn.targetPortId);
+                    }}
+                  />
+                ))}
+              </svg>
 
-          {nodes.map(node => (
-            <DraggableBox
-              key={node.id}
-              node={node}
-              setPosition={setPosition}
-              updateNodeContent={updateNodeContent}
-              canvasRef={canvasRef}
-              handleConnectStart={handleConnectStart}
-              handleConnectEnd={handleConnectEnd}
-              connectingPort={connectingPort}
-              connections={connections}
-              handleDeleteNode={handleDeleteNode}
-              nodes={nodes} // PASSING NODES PROP
-              // openInfoModal={openInfoModal} // MODAL HANDLER REMOVED FROM PROP PASSING
-            />
-          ))}
+              {nodes.map(node => (
+                <DraggableBox
+                  key={node.id}
+                  node={node}
+                  setPosition={setPosition}
+                  updateNodeContent={updateNodeContent}
+                  canvasRef={canvasRef}
+                  handleConnectStart={handleConnectStart}
+                  handleConnectEnd={handleConnectEnd}
+                  connectingPort={connectingPort}
+                  connections={connections}
+                  handleDeleteNode={handleDeleteNode}
+                  nodes={nodes} 
+                  scale={scale} // Passed scale for accurate drag calculation
+                />
+              ))}
+          </div>
           
         </div>
       </div>
