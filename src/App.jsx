@@ -141,7 +141,6 @@ const NODE_DEFINITIONS = {
     color: 'amber',
     icon: Lock, // Using Lock icon as it is a cipher
     inputPorts: [
-        // Only one input port for the plaintext data
         { name: 'Plaintext', type: 'data', mandatory: true, id: 'plaintext' },
     ],
     outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }]
@@ -780,36 +779,93 @@ const performBitwiseXor = (bytesA, bytesB) => {
     }
 };
 
-/** * Performs a byte shift operation on the input byte array.
- * Returns the result as a Base64 string.
+/** Converts a large number represented as a string (Decimal, Hex, or Binary) to a BigInt.
+ * Returns BigInt or null if conversion fails.
  */
-const performByteShiftOperation = (bytes, shiftType, shiftAmount) => {
-    if (bytes.length === 0) return "ERROR: Missing data input or input failed conversion to bytes.";
-    const byteAmount = Math.max(0, parseInt(shiftAmount) || 0);
+const stringToBigInt = (dataStr, format) => {
+    if (!dataStr) return null;
+    
+    // ** MODIFICATION: Check for spaces to enforce single number constraint **
+    if (dataStr.includes(' ')) {
+        return null; 
+    }
+    const cleanedStr = dataStr.replace(/\s/g, ''); // Remove spaces (should be empty now if spaces were present)
 
     try {
-        const numBytes = bytes.length;
-        const result = new Uint8Array(numBytes);
-
-        if (byteAmount >= numBytes) {
-            return arrayBufferToBase64(result.buffer); 
+        if (format === 'Decimal') {
+            if (!/^\d+$/.test(cleanedStr)) return null;
+            return BigInt(cleanedStr);
         }
-        
+        if (format === 'Hexadecimal') {
+            if (!/^[0-9a-fA-F]+$/.test(cleanedStr)) return null;
+            return BigInt(`0x${cleanedStr}`);
+        }
+        if (format === 'Binary') {
+            if (!/^[01]+$/.test(cleanedStr)) return null;
+            return BigInt(`0b${cleanedStr}`);
+        }
+    } catch (e) {
+        // BigInt parsing failure
+        return null;
+    }
+    return null;
+};
+
+/** Converts a BigInt back to a string in the specified format (Decimal, Hex, Binary). */
+const bigIntToString = (bigIntValue, format) => {
+    if (bigIntValue === null) return 'N/A';
+    
+    switch (format) {
+        case 'Decimal':
+            return bigIntValue.toString(10);
+        case 'Hexadecimal':
+            return bigIntValue.toString(16).toUpperCase();
+        case 'Binary':
+            return bigIntValue.toString(2);
+        default:
+            return bigIntValue.toString(10);
+    }
+};
+
+/** * Performs a bit shift operation on the input number (represented by a string).
+ * This function now specifically expects the input data to represent a SINGLE large number.
+ */
+const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) => {
+    if (!dataStr) return "ERROR: Missing data input.";
+    
+    // 1. **REJECT TEXT INPUT** (from previous requirement)
+    if (inputFormat === 'Text (UTF-8)' || inputFormat === 'Base64') {
+        return "ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary), not Text or Base64 byte stream.";
+    }
+    
+    // 2. **VALIDATE AND CONVERT TO BIGINT**
+    const bigIntData = stringToBigInt(dataStr, inputFormat);
+    if (bigIntData === null) {
+        // Now, this check will correctly catch inputs like "10 20" because of the space check added to stringToBigInt
+        return `ERROR: Data must represent a single, contiguous number in ${inputFormat} format. Spaces are not allowed.`;
+    }
+    
+    const amount = BigInt(Math.max(0, parseInt(shiftAmount) || 0));
+    let resultBigInt;
+
+    // 3. **PERFORM BIT SHIFT**
+    try {
         if (shiftType === 'Left') {
-            // Shift Left: [A, B, C, D] -> [C, D, 0, 0] (amount 2)
-            result.set(bytes.slice(byteAmount), 0);
+            // Shift Left: multiplication by 2^amount
+            resultBigInt = bigIntData << amount;
         } else if (shiftType === 'Right') {
-            // Shift Right: [A, B, C, D] -> [0, 0, A, B] (amount 2)
-            result.set(bytes.slice(0, numBytes - byteAmount), byteAmount);
+            // Shift Right: division by 2^amount (integer division)
+            resultBigInt = bigIntData >> amount;
         } else {
             return "ERROR: Invalid shift type.";
         }
-
-        return arrayBufferToBase64(result.buffer);
     } catch (error) {
-        console.error("Byte Shift operation failed:", error);
-        return `ERROR: Byte Shift failed. ${error.message}`;
+        console.error("Bit Shift operation failed:", error);
+        return `ERROR: Bit Shift calculation failed. ${error.message}`;
     }
+
+    // 4. **CONVERT BACK** to the original input format
+    return bigIntToString(resultBigInt, inputFormat);
 };
 
 /** Calculates the hash of a given string using the Web Crypto API. */
@@ -1533,8 +1589,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           
           {/* Show status/algorithm for XOR and Bit Shift */}
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
-          {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Byte Shift'})</span>}
-          {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>}
+          {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bit Shift'})</span>}
+          {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>} 
 
 
           {!isDataInput && !isOutputViewer && type !== 'HASH_FN' && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
@@ -2066,10 +2122,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {/* Bit Shift (Skipped for brevity) */}
+        {/* Bit Shift (Single Large Number) */}
         {isBitShift && (
              <div className="text-xs w-full text-center">
-                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT AMOUNT (BYTES)</span>
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT AMOUNT (BITS)</span>
                 <input
                     type="number"
                     min="0"
@@ -2098,11 +2154,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </select>
 
                 <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'}`}>
-                    {isProcessing ? 'Shifting...' : 'Active'}
+                    {isProcessing ? 'Shifting...' : 'Active (Single Number Mode)'}
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
-                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for input...'}
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for single numeric input...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2686,7 +2742,6 @@ const App = () => {
                     if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput?.startsWith('ERROR')) {
                         
                         // Check if the source format suggests binary data (i.e., not a simple text node)
-                        // Binary formats are Base64, Hexadecimal, Binary (byte-separated)
                         const isSourceBinary = ['Base64', 'Hexadecimal', 'Binary'].includes(calculatedSourceFormat) && !rawInput.match(/^[0-9\s]*$/);
                         
                         // Decide if we should treat the data as a single large number (SLN)
@@ -2705,15 +2760,20 @@ const App = () => {
                         if (sourceNode.isConversionExpanded && convertedDataOutput && !convertedDataOutput.startsWith('ERROR')) {
                             // Output converted data if expansion is active AND conversion was successful
                             outputData = convertedDataOutput;
+                            // FIX: Set the advertised output format to the converted format
+                            sourceNode.outputFormat = sourceNode.convertedFormat; 
                         } else {
                             // Otherwise, output the raw input (as raw input format)
                             outputData = rawInput;
+                            // Set the advertised output format to the raw input format
+                            sourceNode.outputFormat = calculatedSourceFormat === 'N/A' ? 'Text (UTF-8)' : calculatedSourceFormat; 
                         }
 
                     } else {
                         outputData = 'Not connected or no data.';
                         convertedDataOutput = '';
                         calculatedSourceFormat = 'N/A';
+                        sourceNode.outputFormat = 'Text (UTF-8)'; // Default fallback format
                     }
                     
                     // 3. Update the node's state fields for UI display
@@ -2788,7 +2848,7 @@ const App = () => {
                     if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
                         n_val = sourceKeyGenNode.n;
-                        e_val = sourceKeyGenNode.e;
+                        e_val = sourceNodeKeyGen.e;
                         isReadOnly = true;
                     } 
                     
@@ -3024,6 +3084,7 @@ const App = () => {
                     const formatB = inputs['dataB']?.format;
 
                     if (dataInputA && dataInputB) { 
+                        // Note: XOR is a byte-wise operation, so conversion to Uint8Array is appropriate.
                         const bytesA = convertToUint8Array(dataInputA, formatA);
                         const bytesB = convertToUint8Array(dataInputB, formatB);
 
@@ -3050,13 +3111,21 @@ const App = () => {
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
                     
-                    if (shiftDataInput) { 
-                        const bytes = convertToUint8Array(shiftDataInput, shiftFormat);
+                    if (shiftDataInput) {
+                        isProcessing = true;
                         
-                        isProcessing = true; 
-                        const base64Result = performByteShiftOperation(bytes, shiftType, shiftAmount); 
-                        outputData = convertDataFormat(base64Result, 'Base64', shiftFormat);
-                        sourceNode.outputFormat = shiftFormat; 
+                        // Data formats considered single numbers: Decimal, Hexadecimal, Binary
+                        if (shiftFormat === 'Decimal' || shiftFormat === 'Hexadecimal' || shiftFormat === 'Binary') {
+                            
+                            outputData = performBitShiftOperation(shiftDataInput, shiftType, shiftAmount, shiftFormat);
+                            sourceNode.outputFormat = shiftFormat;
+                            
+                        } else {
+                             // This covers Text (UTF-8) and Base64 (which is byte stream)
+                            outputData = `ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary). Received: ${shiftFormat}.`;
+                            sourceNode.outputFormat = shiftFormat;
+                        }
+
                         isProcessing = false; 
                     } else { 
                         outputData = 'Waiting for data input.'; 
@@ -3395,14 +3464,21 @@ const App = () => {
     .animate-pulse-slow {
       animation: animate-pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
-    .connection-line:hover {
-        stroke: #f87171 !important;
-        stroke-width: 6 !important;
-        cursor: pointer;
+    .connection-line-visible {
+        stroke: #059669; /* Emerald 600 */
+        stroke-width: 4;
+        fill: none;
+        pointer-events: none; /* Invisible to mouse, only the hitbox is active */
     }
-    /* Styles for zoom/pan when content is scaled up */
-    .canvas-container {
-        overflow: auto; /* Enable scrolling when content exceeds viewport */
+    .connection-hitbox {
+        stroke: transparent;
+        stroke-width: 15; /* Large clickable area */
+        fill: none;
+        cursor: pointer;
+        pointer-events: stroke; /* Only sensitive to stroke clicks */
+    }
+    .connection-hitbox:hover {
+        stroke: rgba(248, 113, 129, 0.5); /* Semi-transparent red on hover */
     }
   `;
   
@@ -3441,27 +3517,30 @@ const App = () => {
               style={{ 
                   transform: `scale(${scale})`, 
                   transformOrigin: 'top left',
-                  // Ensure content area is big enough to be scrolled when zoomed in. 
-                  // Set a large enough size when zoomed out to act as a workspace.
-                  // For simplicity, let's keep it 100% and let scaling handle the visual effect and bounds check handles drag limits.
               }} 
               className="absolute top-0 left-0 w-full h-full"
           >
-              <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
+              <svg className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0">
                 {connectionPaths.map((conn, index) => (
-                  <path
+                  <g 
                     key={`${conn.source}-${conn.target}-${conn.sourcePortIndex}-${conn.targetPortId}`}
-                    d={conn.path}
-                    stroke="#059669"
-                    strokeWidth="4"
-                    fill="none"
-                    // Removed animate-line class here:
-                    className="connection-line"
                     onClick={(e) => { 
-                        e.stopPropagation();
+                        e.stopPropagation(); 
                         handleRemoveConnection(conn.source, conn.target, conn.sourcePortIndex, conn.targetPortId);
                     }}
-                  />
+                    className="cursor-pointer" // Add cursor style to the group
+                  >
+                    {/* Invisible Hitbox (must come first) */}
+                    <path
+                        d={conn.path}
+                        className="connection-hitbox"
+                    />
+                    {/* Visible Line */}
+                    <path
+                        d={conn.path}
+                        className="connection-line-visible"
+                    />
+                  </g>
                 ))}
               </svg>
 
