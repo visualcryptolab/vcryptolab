@@ -318,13 +318,14 @@ const NODE_DEFINITIONS = {
 
 // --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
-    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER'] },
+    // Consolidated 'DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP' into CORE TOOLS
+    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
     // MODIFIED: Changed name from 'SIMPLE RSA (MODULAR)' to 'SIMPLE RSA'
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
     { name: 'SYMMETRIC (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },
     { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
-    { name: 'BITWISE & HASH', types: ['HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
+    // Removed old 'BITWISE & HASH' category
 ];
 
 // Initial nodes on the canvas
@@ -957,7 +958,6 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
         const cipherBuffer = base64ToArrayBuffer(base64Ciphertext);
 
         const decryptedBuffer = await crypto.subtle.decrypt(
-            // NOTE: The Web Crypto API for RSA-OAEP decrypt does not take an IV parameter.
             { name: algorithm }, // Corrected for RSA-OAEP
             privateKey, 
             cipherBuffer
