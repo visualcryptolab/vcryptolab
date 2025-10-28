@@ -333,7 +333,8 @@ const INITIAL_NODES = []; // Set to empty array to start clean
 const INITIAL_CONNECTIONS = []; // No initial connections
 
 // --- Node Dimension Constants (for initial and minimum size) ---
-const NODE_DIMENSIONS = { initialWidth: 192, initialHeight: 144, minWidth: 160, minHeight: 144 };
+// INCREASED initialWidth/Height and minWidth/Height to fit controls better
+const NODE_DIMENSIONS = { initialWidth: 256, initialHeight: 256, minWidth: 200, minHeight: 180 };
 
 // Used for initial placement reference. All components should use NODE_DIMENSIONS now.
 const BOX_SIZE = NODE_DIMENSIONS; 
@@ -1582,6 +1583,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   }
   
   // Determine if the node is currently auto-sizing (e.g., OutputViewer expanded)
+  // We use the node's height, but enforce a minimum.
   const effectiveMinHeight = isOutputViewer && isConversionExpanded ? 280 : NODE_DIMENSIONS.minHeight;
 
   const baseClasses = 
@@ -1597,6 +1599,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       minHeight: `${effectiveMinHeight}px`,
       height: `${height}px`, // Use controlled height for port calculation
   };
+  
+  // Calculate remaining space inside the box for growing components
+  const contentHeightExcludingHeader = height - 50; // Estimate header/padding height
 
   // --- Render ---
   return (
@@ -1641,7 +1646,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       {renderOutputPorts()} 
 
       {/* -------------------- CONTENT -------------------- */}
-      <div className="flex flex-col h-full w-full justify-start items-center overflow-hidden">
+      {/* Use style to dynamically set height based on node's height - accounting for padding/header */}
+      <div 
+          className="flex flex-col w-full justify-start items-center overflow-hidden" 
+          style={{ height: `${contentHeightExcludingHeader}px` }}
+      >
         {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
           {/* Custom icons need size and color applied to the container/SVG itself */}
@@ -1703,10 +1712,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           /* Data Input Specific Controls */
           <div className="w-full flex flex-col items-center flex-grow">
             <textarea
-              className="w-full text-xs p-2 border border-gray-200 rounded-lg shadow-md resize-none mb-2 
+              className="w-full text-xs p-2 border border-gray-200 rounded-lg shadow-md resize-y flex-grow mb-2 
                            placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
                            outline-none transition duration-200"
-              rows="4" 
               placeholder="Enter data here..."
               value={content || ''}
               // FIX: Handle content change with format detection
@@ -1748,7 +1756,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
               onClick={(e) => e.stopPropagation()}
             />
             <select
-              className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+              className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm flex-shrink-0
                            bg-white appearance-none cursor-pointer text-gray-700 
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
               value={format || 'Text (UTF-8)'}
@@ -1794,7 +1802,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RAW INPUT DATA</span>
                 
                 {/* Source Data Type Selector (Read-only representation of input data type) */}
-                <div className="w-full mb-1">
+                <div className="w-full mb-1 flex-shrink-0">
                     <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">Source Data Type</label>
                     <select
                         className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
@@ -1809,8 +1817,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     </select>
                 </div>
 
-                {/* Primary Output Box (RAW UNCONVERTED Input Data - now using rawInputData state) */}
-                <div className="relative w-full flex-grow break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200 min-h-[4rem]">
+                {/* Primary Output Box (RAW UNCONVERTED Input Data - uses relative height) */}
+                <div 
+                    className={`relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200`}
+                    style={{ flexGrow: isConversionExpanded ? 0.5 : 1 }} // Share space when expanded
+                >
                     <p>{rawInputData || 'Not connected or no data.'}</p>
                     
                     {/* Copy Button for Primary Output */}
@@ -1833,7 +1844,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         e.stopPropagation();
                         updateNodeContent(id, 'isConversionExpanded', !isConversionExpanded);
                     }}
-                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-red-500 hover:bg-red-600`}
+                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-red-500 hover:bg-red-600 flex-shrink-0`}
                 >
                     <span>{isConversionExpanded ? 'Hide Conversion' : 'Convert Type'}</span>
                 </button>
@@ -1841,11 +1852,14 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
                 {/* Secondary Output/Conversion Section (Conditionally rendered) */}
                 {isConversionExpanded && (
-                    <div className="w-full mt-2 pt-2 border-t border-gray-200 flex flex-col space-y-2">
+                    <div className="w-full mt-2 pt-2 border-t border-gray-200 flex flex-col space-y-2 flex-grow">
                         <span className="text-center font-bold text-red-600 text-[10px] flex-shrink-0">CONVERTED VIEW</span>
 
                         {/* Converted Output Box */}
-                        <div className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200 min-h-[4rem]">
+                        <div 
+                            className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200"
+                            style={{ flexGrow: 1 }} // Takes remaining space
+                        >
                             <p>{convertedData || 'Select conversion type...'}</p>
 
                             {/* Copy Button for Converted Output */}
@@ -1864,7 +1878,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
                         {/* Converted Format Selector */}
                         <select
-                            className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+                            className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm flex-shrink-0
                                          bg-white appearance-none cursor-pointer text-gray-700 
                                          focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
                             value={convertedFormat || 'Base64'}
@@ -1883,15 +1897,15 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {isCaesarCipher && (
-            <div className="text-xs w-full text-center flex flex-col items-center">
-                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT KEY (k)</span>
+            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>SHIFT KEY (k)</span>
                 {/* Input for k, must be 0-25 */}
                 <input
                     type="number"
                     min="0"
                     max="25"
                     step="1"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 
                                outline-none transition duration-200"
                     value={node.shiftKey || 0}
@@ -1902,12 +1916,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     onClick={(e) => e.stopPropagation()}
                 />
                 
-                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-amber-600'}`}>
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-amber-600'} flex-shrink-0`}>
                     {isProcessing ? 'Encrypting...' : 'Active'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
                     {/* Increased padding and removed substring for full error visibility */}
-                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                         {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext...'}
                     </p>
                     {/* Copy Button for Caesar Output */}
@@ -1927,13 +1941,13 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         )}
 
         {isVigenereCipher && (
-             <div className="text-xs w-full text-center flex flex-col items-center">
-                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>KEYWORD (A-Z only)</span>
+             <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>KEYWORD (A-Z only)</span>
                 {/* Keyword Input */}
                 <input
                     type="text"
                     placeholder="Keyword"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition duration-200"
                     value={keyword || ''}
                     // Only update keyword. Recalc is triggered by updateNodeContent.
@@ -1944,7 +1958,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 />
 
                 {/* Mode Selector */}
-                <div className="w-full mb-2">
+                <div className="w-full mb-2 flex-shrink-0">
                     <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">OPERATION MODE</label>
                     <select
                         className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
@@ -1960,11 +1974,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     </select>
                 </div>
                 
-                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-yellow-600'}`}>
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-yellow-600'} flex-shrink-0`}>
                     {isProcessing ? 'Processing...' : `Active (${vigenereMode})`}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded min-h-[3rem] overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                         {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data and Keyword...'}
                     </p>
                     {/* Copy Button */}
@@ -1987,13 +2001,13 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         {isHashFn && (
             <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
                 {/* Algorithm Selector is now inside the title block */}
-                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
                     {isProcessing ? 'Calculating Hash...' : 'Active'}
                 </span>
                 
                 {/* Output Display Box */}
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
-                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded min-h-[3rem] overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                         {dataOutput ? `Hash (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data Input...'}
                     </p>
                     {/* Copy Button for Hash Output */}
@@ -2015,14 +2029,14 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
         {/* Simple RSA Private Key Generator (Modular Arithmetic Demo) */}
         {isSimpleRSAKeyGen && (
-            <div className="text-xs w-full text-center flex flex-col items-center">
-                <span className="text-[10px] font-semibold text-gray-600 mb-1">KEY INPUTS (P, Q, E, D)</span>
+            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className="text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0">KEY INPUTS (P, Q, E, D)</span>
                 
                 {/* P Input */}
                 <input
                     type="number"
                     placeholder="Prime P (Autogenerates if empty)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={p || ''}
                     onChange={(e) => updateNodeContent(id, 'p', e.target.value)}
@@ -2033,7 +2047,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <input
                     type="number"
                     placeholder="Prime Q (Autogenerates if empty)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={q || ''}
                     onChange={(e) => updateNodeContent(id, 'q', e.target.value)}
@@ -2044,7 +2058,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <input
                     type="number"
                     placeholder="Exponent E (Autogenerates if empty)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={e || ''}
                     onChange={(e) => updateNodeContent(id, 'e', e.target.value)}
@@ -2055,7 +2069,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <input
                     type="number"
                     placeholder="Private Exponent D (Optional: Checked, then calculated)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
                     value={d || ''}
                     // BIND d to the input field
@@ -2067,17 +2081,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
                 <button
                     onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
-                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-purple-500 hover:bg-purple-600`}
+                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-purple-500 hover:bg-purple-600 flex-shrink-0`}
                 >
                     <Key className="w-4 h-4" />
                     <span>Calculate/Generate Keys</span>
                 </button>
                 
-                <span className={`font-semibold mt-2 ${n ? 'text-purple-600' : 'text-gray-500'}`}>
+                <span className={`font-semibold mt-2 ${n ? 'text-purple-600' : 'text-gray-500'} flex-shrink-0`}>
                     {isProcessing ? 'Calculating...' : n ? 'Keys Ready' : 'Enter or Generate Primes'}
                 </span>
 
-                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1">
+                {/* Parameters Display should scroll if needed, using remaining space */}
+                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1 overflow-y-auto flex-grow">
                     <label className="block text-[10px] font-semibold text-gray-600">Calculated Parameters:</label>
                     <p className="text-[10px]">n (Modulus): <span className="font-mono text-gray-800">{n || 'N/A'}</span></p>
                     <p className="text-[10px]">&phi;(n): <span className="font-mono text-gray-800">{phiN || 'N/A'}</span></p>
@@ -2093,14 +2108,14 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         
         {/* NEW Simple RSA Public Key Generator */}
         {isSimpleRSAPubKeyGen && (
-            <div className="text-xs w-full text-center flex flex-col items-center">
-                <span className="text-[10px] font-semibold text-gray-600 mb-1">PUBLIC KEY INPUTS (N, E)</span>
+            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className="text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0">PUBLIC KEY INPUTS (N, E)</span>
                 
                 {/* N Input */}
                 <input
                     type="number"
                     placeholder="Modulus N"
-                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 
+                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-lime-500 outline-none transition duration-200 ${isReadOnly ? 'bg-gray-100 cursor-default' : ''}`}
                     value={n_pub || ''}
                     onChange={(e) => updateNodeContent(id, 'n_pub', e.target.value)}
@@ -2112,7 +2127,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 <input
                     type="number"
                     placeholder="Exponent E"
-                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3
+                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-lime-500 outline-none transition duration-200 ${isReadOnly ? 'bg-gray-100 cursor-default' : ''}`}
                     value={e_pub || ''}
                     onChange={(e) => updateNodeContent(id, 'e_pub', e.target.value)}
@@ -2121,10 +2136,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     readOnly={isReadOnly}
                 />
 
-                <span className={`font-semibold mt-2 ${dataOutputPublic ? 'text-lime-600' : 'text-gray-500'}`}>
+                <span className={`font-semibold mt-2 ${dataOutputPublic ? 'text-lime-600' : 'text-gray-500'} flex-shrink-0`}>
                     {dataOutputPublic ? 'Key Pair Ready' : 'Enter or Connect Key Source'}
                 </span>
-                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1">
+                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1 overflow-y-auto flex-grow">
                     <label className="block text-[10px] font-semibold text-gray-600">Public Key Output (n, e):</label>
                     <p className="text-[10px] font-mono text-gray-800 break-all overflow-hidden">
                         {dataOutputPublic || 'N/A'}
@@ -2135,12 +2150,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         
         {/* Simple RSA Encrypt */}
         {isSimpleRSAEnc && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
                     {isProcessing ? 'Encrypting (m^e mod n)...' : 'Active'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
                         {dataOutput ? `Ciphertext (c): ${dataOutput}` : 'Waiting for m and Public Key...'}
                     </p>
                     {/* Copy Button for Ciphertext Output */}
@@ -2156,18 +2171,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         <Clipboard className="w-3 h-3" />
                     </button>
                 </div>
-                <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">Input/Output are Decimal Numbers.</span>
             </div>
         )}
 
         {/* Simple RSA Decrypt */}
         {isSimpleRSADec && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'}`}>
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
                     {isProcessing ? 'Decrypting (c^d mod n)...' : 'Active'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
                         {dataOutput ? `Plaintext (m): ${dataOutput}` : 'Waiting for c and Private Key...'}
                     </p>
                     {/* Copy Button for Plaintext Output */}
@@ -2183,18 +2198,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         <Clipboard className="w-3 h-3" />
                     </button>
                 </div>
-                <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">Input/Output are Decimal Numbers.</span>
             </div>
         )}
 
         {/* Simple RSA Sign */}
         {isSimpleRSASign && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'} flex-shrink-0`}>
                     {isProcessing ? 'Signing...' : 'Active'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
                         {dataOutput ? `Signature (s): ${dataOutput}` : 'Waiting for m and Private Key...'}
                     </p>
                     {/* Copy Button for Signature Output */}
@@ -2210,18 +2225,18 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         <Clipboard className="w-3 h-3" />
                     </button>
                 </div>
-                <span className="text-[10px] text-gray-500 mt-2">Input/Output are Decimal Numbers.</span>
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">Input/Output are Decimal Numbers.</span>
             </div>
         )}
 
         {/* Simple RSA Verify */}
         {isSimpleRSAVerify && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'}`}>
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'} flex-shrink-0`}>
                     {isProcessing ? 'Verifying...' : 'Active'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className={`text-left text-[10px] break-all p-1 rounded min-h-[3rem] overflow-auto 
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 rounded overflow-auto h-full 
                                      ${dataOutput?.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput?.includes('FAILURE') || dataOutput?.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
                         {dataOutput || 'Waiting for m, s, and Public Key...'}
                     </p>
@@ -2231,12 +2246,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         
         {/* XOR Operation (Skipped for brevity) */}
         {type === 'XOR_OP' && (
-             <div className="text-xs w-full text-center">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-lime-600'}`}>
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-lime-600'} flex-shrink-0`}>
                     {isProcessing ? 'Calculating XOR...' : 'Active'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded">
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
                         {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for two data inputs...'}
                     </p>
                     <button
@@ -2256,12 +2271,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
         {/* Bit Shift (Single Large Number) */}
         {isBitShift && (
-             <div className="text-xs w-full text-center">
-                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT AMOUNT (BITS)</span>
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>SHIFT AMOUNT (BITS)</span>
                 <input
                     type="number"
                     min="0"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
                                text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
                     value={node.shiftAmount || 0}
                     onChange={(e) => updateNodeContent(id, 'shiftAmount', parseInt(e.target.value) || 0)}
@@ -2270,9 +2285,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     onClick={(e) => e.stopPropagation()}
                 />
                 
-                <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>SHIFT DIRECTION</span>
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>SHIFT DIRECTION</span>
                 <select
-                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
                                  bg-white appearance-none cursor-pointer text-gray-700 
                                  focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
                     value={node.shiftType || 'Left'}
@@ -2285,11 +2300,11 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     <option value="Right">Right (&gt;&gt;)</option>
                 </select>
 
-                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'}`}>
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'} flex-shrink-0`}>
                     {isProcessing ? 'Shifting...' : 'Active (Single Number Mode)'}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full">
-                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'} overflow-y-auto h-full`}>
                         {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for single numeric input...'}
                     </p>
                     <button
