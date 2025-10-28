@@ -332,7 +332,12 @@ const INITIAL_NODES = []; // Set to empty array to start clean
 
 const INITIAL_CONNECTIONS = []; // No initial connections
 
-const BOX_SIZE = { width: 192, minHeight: 144 }; // w-48 is 192px
+// --- Node Dimension Constants (for initial and minimum size) ---
+const NODE_DIMENSIONS = { initialWidth: 192, initialHeight: 144, minWidth: 160, minHeight: 144 };
+
+// Used for initial placement reference. All components should use NODE_DIMENSIONS now.
+const BOX_SIZE = NODE_DIMENSIONS; 
+
 
 // =================================================================
 // 2. CRYPTO & UTILITY FUNCTIONS
@@ -638,7 +643,7 @@ const convertToUint8Array = (dataStr, sourceFormat) => {
         } else if (sourceFormat === 'Decimal') {
              // Convert space-separated decimal string to bytes
              const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
-             const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
+             const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b >= 255);
              return new Uint8Array(validBytes);
         } else {
              // Default to UTF-8 encoding for safety
@@ -786,10 +791,11 @@ const stringToBigInt = (dataStr, format) => {
     if (!dataStr) return null;
     
     // ** MODIFICATION: Check for spaces to enforce single number constraint **
+    // If we find any space, it implies byte-stream format, which is not allowed for single number bit shift.
     if (dataStr.includes(' ')) {
         return null; 
     }
-    const cleanedStr = dataStr.replace(/\s/g, ''); // Remove spaces (should be empty now if spaces were present)
+    const cleanedStr = dataStr.replace(/\s/g, ''); // Should be no-op now if check passed.
 
     try {
         if (format === 'Decimal') {
@@ -805,7 +811,7 @@ const stringToBigInt = (dataStr, format) => {
             return BigInt(`0b${cleanedStr}`);
         }
     } catch (e) {
-        // BigInt parsing failure
+        // BigInt parsing failure (e.g., number too large or invalid structure)
         return null;
     }
     return null;
@@ -1145,27 +1151,31 @@ const getLinePath = (sourceNode, targetNode, connection) => {
     const targetDef = NODE_DEFINITIONS[targetNode.type];
     
     // 1. Calculate vertical position based on port index and node height
-    const getVerticalPosition = (nodeDef, index, isInput) => {
+    const getVerticalPosition = (nodeDef, index, isInput, nodeHeight) => {
         const numPorts = isInput ? nodeDef.inputPorts.length : nodeDef.outputPorts.length;
-        const step = BOX_SIZE.minHeight / (numPorts + 1); 
+        // Use nodeHeight instead of fixed BOX_SIZE.minHeight
+        const step = nodeHeight / (numPorts + 1); 
         return (index + 1) * step;
     };
 
     // Calculate vertical position for Source Output Port
-    const sourceVerticalPos = getVerticalPosition(sourceDef, connection.sourcePortIndex, false);
+    // Use sourceNode.height
+    const sourceVerticalPos = getVerticalPosition(sourceDef, connection.sourcePortIndex, false, sourceNode.height);
     
     // Find the index of the targetPortId in the target node's inputPorts array
     const targetPortIndex = targetDef.inputPorts.findIndex(p => p.id === connection.targetPortId);
     // Calculate vertical position for Target Input Port
-    const targetVerticalPos = getVerticalPosition(targetDef, targetPortIndex, true);
+    // Use targetNode.height
+    const targetVerticalPos = getVerticalPosition(targetDef, targetPortIndex, true, targetNode.height);
 
-    // P1: Source connection point (Node right edge + visual offset for the port center)
+    // P1: Source connection point 
+    // Use sourceNode.width
     const p1 = { 
-      x: sourceNode.position.x + BOX_SIZE.width + PORT_VISUAL_OFFSET_PX, 
+      x: sourceNode.position.x + sourceNode.width + PORT_VISUAL_OFFSET_PX, 
       y: sourceNode.position.y + sourceVerticalPos 
     }; 
     
-    // P2: Target connection point (Node left edge - visual offset for the port center)
+    // P2: Target connection point
     const p2 = { 
       x: targetNode.position.x - PORT_VISUAL_OFFSET_PX, 
       y: targetNode.position.y + targetVerticalPos
@@ -1258,13 +1268,15 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 // --- Component for the Draggable Box ---
 
-const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale }) => {
+const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly } = node; 
-  const definition = NODE_DEFINITIONS[type];
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height } = node; 
+  definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false); // New resizing state
   const boxRef = useRef(null);
   const offset = useRef({ x: 0, y: 0 });
+  const resizeOffset = useRef({ x: 0, y: 0 }); // Stores the difference between mouse and corner
   const [copyStatus, setCopyStatus] = useState('Copy'); // English for Copy
 
   // Node specific flags
@@ -1294,7 +1306,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   
   // --- Drag Handlers (standard) ---
   const handleDragStart = useCallback((e) => {
-    if (connectingPort) return; 
+    if (connectingPort || isResizing) return; 
     const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'BUTTON', 'INPUT']; 
     // Check if a port was clicked to prevent drag
     if (e.target.tagName === 'DIV' && e.target.classList.contains('w-4') && e.target.classList.contains('h-4')) {
@@ -1324,7 +1336,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       setIsDragging(true);
       e.preventDefault(); 
     }
-  }, [canvasRef, position.x, position.y, connectingPort, scale]);
+  }, [canvasRef, position.x, position.y, connectingPort, isResizing, scale]);
 
   const handleDragMove = useCallback((e) => {
     if (!isDragging) return;
@@ -1344,17 +1356,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     let newY = unscaledMouseY - offset.current.y;
     
     // BOUNDS CHECKING (Unscaled dimensions)
-    // NOTE: For simplicity and to allow content to pan/scroll naturally when zoomed, 
-    // we use the actual scrollable area boundaries for max X/Y. 
-    // If we limit based on canvasRect.width/scale, we prevent dragging outside the initial visible area.
-    // For now, we revert to simple bounds check to prevent nodes from disappearing off the edge.
-    const canvasWidth = canvasRect.width / scale;
-    const canvasHeight = canvasRect.height / scale;
-
     newX = Math.max(0, newX);
     newY = Math.max(0, newY);
-    // Note: Max bounds check is complex with dynamic canvas size and scale, leaving it open-ended 
-    // to allow the diagram to grow beyond initial viewport when zoomed in.
 
     setPosition(id, { x: newX, y: newY });
   }, [isDragging, id, setPosition, canvasRef, scale]);
@@ -1363,13 +1366,97 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     setIsDragging(false);
   }, []);
   
+  // --- Resizing Handlers ---
+  const handleResizeStart = useCallback((e) => {
+    e.stopPropagation(); 
+    setIsResizing(true);
+    
+    const clientX = e.clientX || (e.touches?.[0]?.clientX ?? 0);
+    const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
+    
+    // Store the difference between current mouse pos (relative to document/viewport) and node's current size position
+    const canvas = canvasRef.current.getBoundingClientRect();
+    const unscaledMouseX = (clientX - canvas.left) / scale;
+    const unscaledMouseY = (clientY - canvas.y) / scale;
+
+    // Calculate current width/height in unscaled coords relative to canvas top/left,
+    // and store the difference to maintain offset while resizing.
+    resizeOffset.current = {
+        x: unscaledMouseX - (node.position.x + node.width),
+        y: unscaledMouseY - (node.position.y + node.height),
+    };
+    
+  }, [node.position.x, node.position.y, node.width, node.height, scale, canvasRef]);
+
+  const handleResizeMove = useCallback((e) => {
+    if (!isResizing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const clientX = e.clientX || (e.touches?.[0]?.clientX ?? 0);
+    const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
+
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    // Mouse coordinates relative to the unscaled coordinate system
+    const unscaledMouseX = (clientX - canvasRect.left) / scale;
+    const unscaledMouseY = (clientY - canvasRect.y) / scale;
+    
+    // Calculate new dimensions based on mouse position relative to node's origin
+    let newWidth = unscaledMouseX - node.position.x - resizeOffset.current.x;
+    let newHeight = unscaledMouseY - node.position.y - resizeOffset.current.y;
+    
+    handleResize(id, newWidth, newHeight);
+
+    e.preventDefault(); 
+  }, [isResizing, id, handleResize, node.position.x, node.position.y, scale]);
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+  
+  
+  // --- Combined Global Event Listeners ---
+  useEffect(() => {
+    // Determine the correct move/up handlers based on which operation is active
+    const globalHandleMove = (e) => {
+        if (isDragging) {
+            handleDragMove(e);
+        } else if (isResizing) {
+            handleResizeMove(e);
+        }
+    };
+    
+    const globalHandleUp = (e) => {
+        if (isDragging) {
+            handleDragEnd(e);
+        } else if (isResizing) {
+            handleResizeEnd(e);
+        }
+    };
+
+    if (isDragging || isResizing) {
+      document.addEventListener('mousemove', globalHandleMove);
+      document.addEventListener('mouseup', globalHandleUp);
+      document.addEventListener('touchmove', globalHandleMove, { passive: false });
+      document.addEventListener('touchend', globalHandleUp);
+    } 
+
+    return () => {
+      document.removeEventListener('mousemove', globalHandleMove);
+      document.removeEventListener('mouseup', globalHandleUp);
+      document.removeEventListener('touchmove', globalHandleMove);
+      document.removeEventListener('touchend', globalHandleUp);
+    };
+  }, [isDragging, isResizing, handleDragMove, handleDragEnd, handleResizeMove, handleResizeEnd]);
+  
   const handleBoxClick = useCallback((e) => {
-    if (isDragging) return; 
+    if (isDragging || isResizing) return; 
     if (connectingPort) {
       handleConnectEnd(null); // Cancel connection if canvas clicked
     }
     e.stopPropagation();
-  }, [connectingPort, handleConnectEnd, isDragging]);
+  }, [connectingPort, handleConnectEnd, isDragging, isResizing]);
 
   // Handle Copy to Clipboard for Output Viewer
   const handleCopyToClipboard = useCallback((e, textToCopy) => {
@@ -1404,39 +1491,15 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   }, [setCopyStatus]);
 
 
-  // Attach global event listeners for dragging
-  useEffect(() => {
-    const handleUp = handleDragEnd;
-    const handleMove = handleDragMove;
-    
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMove);
-      document.addEventListener('mouseup', handleUp);
-      document.addEventListener('touchmove', handleMove, { passive: false });
-      document.addEventListener('touchend', handleUp);
-    } else {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
-      document.removeEventListener('touchmove', handleMove);
-      document.removeEventListener('touchend', handleUp);
-    };
-    return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
-      document.removeEventListener('touchmove', handleMove);
-      document.removeEventListener('touchend', handleUp);
-    };
-  }, [isDragging, handleDragMove, handleDragEnd]);
-
-
   // --- Port Rendering Logic ---
   
   const renderInputPorts = () => {
     if (!definition.inputPorts || definition.inputPorts.length === 0) return null;
     
     const numPorts = definition.inputPorts.length;
+    const nodeHeight = height; // Use dynamic height
     // Calculate vertical offset for even distribution
-    const step = 100 / (numPorts + 1); 
+    const step = nodeHeight / (numPorts + 1); 
 
     return definition.inputPorts.map((portDef, index) => {
         const topPosition = (index + 1) * step;
@@ -1448,7 +1511,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             <div 
                 key={portId}
                 className="absolute -left-2 transform -translate-y-1/2 z-20"
-                style={{ top: `${topPosition}%` }}
+                style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
                 <Port 
                     nodeId={id} 
@@ -1471,8 +1534,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     if (!definition.outputPorts || definition.outputPorts.length === 0) return null;
     
     const numPorts = definition.outputPorts.length;
+    const nodeHeight = height; // Use dynamic height
     // Calculate vertical offset for even distribution
-    const step = 100 / (numPorts + 1); 
+    const step = nodeHeight / (numPorts + 1); 
 
     return definition.outputPorts.map((portDef, index) => {
         const topPosition = (index + 1) * step;
@@ -1481,7 +1545,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             <div 
                 key={portDef.name}
                 className="absolute -right-2 transform -translate-y-1/2 z-20"
-                style={{ top: `${topPosition}%` }}
+                style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
                 <Port 
                     nodeId={id} 
@@ -1515,11 +1579,23 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   if (isProcessing) {
      specificClasses = `border-yellow-500 ring-4 ring-yellow-300 animate-pulse transition duration-200`; 
   }
+  
+  // Determine if the node is currently auto-sizing (e.g., OutputViewer expanded)
+  const effectiveMinHeight = isOutputViewer && isConversionExpanded ? 280 : NODE_DIMENSIONS.minHeight;
 
   const baseClasses = 
-    `w-[${BOX_SIZE.width}px] min-h-[${BOX_SIZE.minHeight}px] h-auto flex flex-col justify-start items-center p-3 
+    `h-auto flex flex-col justify-start items-center p-3 
     bg-white shadow-xl rounded-xl border-4 transition duration-150 ease-in-out 
     hover:shadow-2xl absolute select-none z-10`;
+    
+  // --- Dynamic Style Object ---
+  const boxStyle = {
+      left: `${position.x}px`,
+      top: `${position.y}px`,
+      width: `${width}px`,
+      minHeight: `${effectiveMinHeight}px`,
+      height: `${height}px`, // Use controlled height for port calculation
+  };
 
   // --- Render ---
   return (
@@ -1527,18 +1603,25 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       ref={boxRef}
       id={id}
       className={`${baseClasses} ${specificClasses}`}
-      style={{ 
-        left: `${position.x}px`, 
-        top: `${position.y}px`,
-        // Dynamic height adjustment for expanded viewer
-        minHeight: isOutputViewer && isConversionExpanded ? '280px' : `${BOX_SIZE.minHeight}px` 
-      }} 
+      style={boxStyle} 
       onMouseDown={handleDragStart} 
       onTouchStart={handleDragStart} 
       onClick={handleBoxClick} 
     >
       
-      {/* Removed Information Button (for Simple RSA Nodes) */}
+      {/* Resizing Handle (Bottom Right Corner) */}
+      <div 
+          className="absolute bottom-0 right-0 w-4 h-4 rounded-tl-lg bg-gray-200 opacity-60 hover:opacity-100 transition duration-150 cursor-nwse-resize z-30"
+          onMouseDown={handleResizeStart}
+          onTouchStart={handleResizeStart}
+          onClick={(e) => e.stopPropagation()} // Prevent click propagation during resize
+          title="Resize"
+      >
+        <div className="w-1 h-1 bg-gray-600 absolute bottom-1 right-1"></div>
+        <div className="w-1 h-1 bg-gray-600 absolute bottom-2 right-2"></div>
+        <div className="w-1 h-1 bg-gray-600 absolute bottom-2 right-1"></div>
+        <div className="w-1 h-1 bg-gray-600 absolute bottom-1 right-2"></div>
+      </div>
 
       {/* Delete Button */}
       <button
@@ -2386,15 +2469,6 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                     color="teal" 
                     onClick={onZoomIn}
                 />
-                
-                {/* Removed 'Download Diagram (JPG)' button as per previous request.
-                <ToolbarButton 
-                    icon={Camera} 
-                    label="Download Diagram (JPG)" 
-                    color="teal" 
-                    onClick={onDownloadImage}
-                />
-                */}
             </div>
         </div>
     );
@@ -2890,9 +2964,9 @@ const App = () => {
                     let e_val = sourceNode.e_pub;
                     let isReadOnly = false;
 
-                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceNodeKeyGen.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
-                        n_val = sourceKeyGenNode.n;
+                        n_val = sourceNodeKeyGen.n;
                         e_val = sourceNodeKeyGen.e;
                         isReadOnly = true;
                     } 
@@ -3318,11 +3392,32 @@ const App = () => {
     ));
   }, []);
   
+  const handleNodeResize = useCallback((id, newWidth, newHeight) => {
+      setNodes(prevNodes => prevNodes.map(node => {
+          if (node.id === id) {
+              const finalWidth = Math.max(NODE_DIMENSIONS.minWidth, newWidth);
+              const finalHeight = Math.max(NODE_DIMENSIONS.minHeight, newHeight);
+              
+              // Only update if dimension changed significantly
+              if (finalWidth !== node.width || finalHeight !== node.height) {
+                  return { ...node, width: finalWidth, height: finalHeight };
+              }
+          }
+          return node;
+      }));
+  }, []);
+
   const addNode = useCallback((type, label, color) => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
-    const initialContent = { dataOutput: '', isProcessing: false, outputFormat: getOutputFormat(type) };
+    const initialContent = { 
+        dataOutput: '', 
+        isProcessing: false, 
+        outputFormat: getOutputFormat(type),
+        width: NODE_DIMENSIONS.initialWidth, // Initial width
+        height: NODE_DIMENSIONS.initialHeight, // Initial height
+    };
     
     // --- Determine a sensible starting position near the center/previous nodes ---
     // Calculate canvas size (approximate center, assuming CanvasRef exists later)
@@ -3333,8 +3428,8 @@ const App = () => {
     const canvasHeight = canvas?.clientHeight > 100 ? canvas.clientHeight : 600;
     
     // Base position near the center
-    let x = (canvasWidth / 2) - (BOX_SIZE.width / 2);
-    let y = (canvasHeight / 2) - (BOX_SIZE.minHeight / 2);
+    let x = (canvasWidth / 2) - (NODE_DIMENSIONS.initialWidth / 2);
+    let y = (canvasHeight / 2) - (NODE_DIMENSIONS.initialHeight / 2);
     
     // Add small random offset (max 100px) to prevent direct overlap
     // Range is -100 to 100
@@ -3343,8 +3438,8 @@ const App = () => {
     y += randomOffset();
 
     // Ensure bounds are not violated by the random offset
-    x = Math.max(20, Math.min(x, canvasWidth - BOX_SIZE.width - 20));
-    y = Math.max(20, Math.min(y, canvasHeight - BOX_SIZE.minHeight - 20));
+    x = Math.max(20, Math.min(x, canvasWidth - NODE_DIMENSIONS.initialWidth - 20));
+    y = Math.max(20, Math.min(y, canvasHeight - NODE_DIMENSIONS.initialHeight - 20));
     
     const position = { x, y };
     // --------------------------------------------------------------------------
@@ -3615,6 +3710,7 @@ const App = () => {
                   handleDeleteNode={handleDeleteNode}
                   nodes={nodes} 
                   scale={scale} // Passed scale for accurate drag calculation
+                  handleResize={handleNodeResize} // Passed resize handler
                 />
               ))}
           </div>
