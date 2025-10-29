@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut } from 'lucide-react'; 
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut, Info } from 'lucide-react'; 
 
 // NOTE: For the 'Download Diagram (JPG)' feature to work, the html2canvas library 
 // needs to be loaded globally in the consuming environment. This is included in index.html.
@@ -1472,7 +1472,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         tempTextArea.value = textToCopy;
         
         tempTextArea.style.position = 'fixed';
-        tempTextArea.style.left = '-9999px'; // FIX: Terminated string literal
+        tempTextArea.style.left = '-9999px';
         tempTextArea.style.top = '0';
         tempTextArea.style.opacity = '0'; 
 
@@ -2391,6 +2391,12 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
             [groupName]: !prev[groupName]
         }));
     }, []);
+    
+    // Function to handle the Info button click
+    const handleInfoClick = (url) => {
+        // Open the specified URL in a new browser tab
+        window.open(url, '_blank');
+    };
 
     return (
         <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
@@ -2418,7 +2424,23 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                             className="flex justify-between items-center text-xs font-bold uppercase text-gray-500 pt-2 pb-1 border-b border-gray-200 cursor-pointer hover:text-gray-700 transition"
                             onClick={() => toggleGroup(group.name)}
                         >
-                            <span>{group.name}</span>
+                            <span className="flex items-center space-x-1">
+                                <span>{group.name}</span>
+                                
+                                {/* Info Button for Simple RSA Group */}
+                                {group.name === 'SIMPLE RSA' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent toggling the group
+                                            handleInfoClick('https://github.com/visualcryptolab/vcryptolab/blob/main/docs/SimpleRSA.md');
+                                        }}
+                                        className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
+                                        title="View Simple RSA Documentation"
+                                    >
+                                        <Info className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </span>
                             <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsedGroups[group.name] ? 'rotate-180' : ''}`} />
                         </div>
                         
