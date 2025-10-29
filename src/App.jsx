@@ -793,7 +793,8 @@ const stringToBigInt = (dataStr, format) => {
     
     // ** MODIFICATION: Check for spaces to enforce single number constraint **
     // If we find any space, it implies byte-stream format, which is not allowed for single number bit shift.
-    if (dataStr.includes(' ')) {
+    if (dataStr.includes(' ') && format !== 'Text (UTF-8)' && format !== 'Base64') { // Allow spaces if it's text/base64, though it will be rejected later by performBitShiftOperation anyway.
+        // For numeric formats (Decimal, Hex, Binary), spaces indicate multiple numbers/bytes, which is not supported for SLN bit shift.
         return null; 
     }
     const cleanedStr = dataStr.replace(/\s/g, ''); // Should be no-op now if check passed.
@@ -841,7 +842,7 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
     if (!dataStr) return "ERROR: Missing data input.";
     
     // 1. **REJECT TEXT INPUT** (from previous requirement)
-    if (inputFormat === 'Text (UTF-8)' || inputFormat === 'Base64') {
+    if (shiftFormat === 'Text (UTF-8)' || shiftFormat === 'Base64') {
         return "ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary), not Text or Base64 byte stream.";
     }
     
@@ -1471,7 +1472,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         tempTextArea.value = textToCopy;
         
         tempTextArea.style.position = 'fixed';
-        tempTextArea.style.left = '-9999px';
+        tempTextArea.style.left = '-9999px'; // FIX: Terminated string literal
         tempTextArea.style.top = '0';
         tempTextArea.style.opacity = '0'; 
 
@@ -1667,6 +1668,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {isSimpleRSASign && <span className={`text-xs text-gray-500 mt-1`}>Signing (m^d mod n)</span>}
           {isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>Verifying (s^e mod n)</span>}
 
+          {/* Simple RSA Encrypt/Decrypt Subtitle (Updated as requested) */}
+          {isSimpleRSAEnc && <span className={`text-xs text-gray-500 mt-1`}>Encryption: (c = m^e mod n)</span>}
+          {isSimpleRSADec && <span className={`text-xs text-gray-500 mt-1`}>Decryption: (m = c^d mod n)</span>}
+
 
           {isHashFn && (
               <div className="text-xs w-full text-center flex flex-col items-center">
@@ -1695,9 +1700,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           
           {/* Advanced RSA Key Gen */}
           {isRSAKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({node.keyAlgorithm} {modulusLength} bits, e={publicExponent})</span>}
-          
-          {/* Simple RSA Encrypt/Decrypt */}
-          {(isSimpleRSAEnc || isSimpleRSADec) && <span className={`text-xs text-gray-500 mt-1`}>Modular Arithmetic Demo</span>}
           
           {/* Show status/algorithm for XOR and Bit Shift */}
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
@@ -2667,7 +2669,7 @@ const App = () => {
                          }).catch(err => {
                              setNodes(prevNodes => prevNodes.map(n => 
                                  n.id === sourceId 
-                                     ? { ...n, dataOutput: `ERROR: Key generation failed.`, isProcessing: false, generateKey: false } 
+                                     ? { ...n, dataOutput: `ERROR: Key generation failed. ${err.message}`, isProcessing: false, generateKey: false } 
                                      : n
                              ));
                          });
@@ -2880,10 +2882,12 @@ const App = () => {
                     if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput?.startsWith('ERROR')) {
                         
                         // Check if the source format suggests binary data (i.e., not a simple text node)
-                        const isSourceBinary = ['Base64', 'Hexadecimal', 'Binary'].includes(calculatedSourceFormat) && !rawInput.match(/^[0-9\s]*$/);
+                        // A simpler heuristic: if it's not text/base64, assume byte stream that might be large number
+                        const isSourceBinary = ['Hexadecimal', 'Binary', 'Decimal', 'Base64'].includes(calculatedSourceFormat);
                         
                         // Decide if we should treat the data as a single large number (SLN)
                         const isSLNTarget = ['Decimal', 'Hexadecimal', 'Binary'].includes(sourceNode.convertedFormat);
+                        // Heuristic: If source is binary-based AND target is SLN, we attempt SLN conversion.
                         const shouldBeSingleNumber = isSLNTarget && isSourceBinary;
 
                         // 1. Calculate Secondary (Converted) Output if Expanded
@@ -2983,10 +2987,10 @@ const App = () => {
                     let e_val = sourceNode.e_pub;
                     let isReadOnly = false;
 
-                    if (sourceKeyGenNode && sourceNodeKeyGen.n && sourceNodeKeyGen.e) {
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
-                        n_val = sourceNodeKeyGen.n;
-                        e_val = sourceNodeKeyGen.e;
+                        n_val = sourceKeyGenNode.n;
+                        e_val = sourceKeyGenNode.e;
                         isReadOnly = true;
                     } 
                     
@@ -3023,9 +3027,9 @@ const App = () => {
 
                         let n, e;
 
-                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
-                            n = sourceNodeKeyGen.n_pub ? BigInt(sourceNodeKeyGen.n_pub) : null;
-                            e = sourceNodeKeyGen.e_pub ? BigInt(sourceNodeKeyGen.e_pub) : null;
+                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN' && sourceNodeKeyGen.n_pub && sourceNodeKeyGen.e_pub) {
+                            n = BigInt(sourceNodeKeyGen.n_pub);
+                            e = BigInt(sourceNodeKeyGen.e_pub);
                         } else if (pkInputObj?.data) {
                             // Fallback: if data came from a public type port, try to parse it
                             const [nStr, eStr] = pkInputObj.data.split(',');
@@ -3151,9 +3155,9 @@ const App = () => {
 
                         let n, e;
 
-                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN') {
-                            n = sourceNodeKeyGen.n_pub ? BigInt(sourceNodeKeyGen.n_pub) : null;
-                            e = sourceNodeKeyGen.e_pub ? BigInt(sourceNodeKeyGen.e_pub) : null;
+                        if (sourceNodeKeyGen?.type === 'SIMPLE_RSA_PUBKEY_GEN' && sourceNodeKeyGen.n_pub && sourceNodeKeyGen.e_pub) {
+                            n = BigInt(sourceNodeKeyGen.n_pub);
+                            e = BigInt(sourceNodeKeyGen.e_pub);
                         } else if (pkInputObj?.data) {
                             // Fallback: if data came from a public type port, try to parse it
                             const [nStr, eStr] = pkInputObj.data.split(',');
@@ -3239,8 +3243,12 @@ const App = () => {
 
                         isProcessing = true; 
                         const base64Result = performBitwiseXor(bytesA, bytesB); 
-                        outputData = convertDataFormat(base64Result, 'Base64', formatA);
-                        sourceNode.outputFormat = formatA; 
+                        // For XOR, the output format is defaulted to the first input's format, but must be Base64 internally
+                        let outputFormat = formatA; 
+                        if (outputFormat === 'N/A' || outputFormat === 'Decimal') outputFormat = 'Base64'; // Fallback if format is weird or Decimal bytes assumed
+                        
+                        outputData = convertDataFormat(base64Result, 'Base64', outputFormat);
+                        sourceNode.outputFormat = outputFormat; 
                         isProcessing = false; 
                     } else if (dataInputA && !dataInputB) {
                         outputData = 'Waiting for Input B.';
@@ -3294,6 +3302,8 @@ const App = () => {
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
                         symmetricEncrypt(inputs['data'].data, inputs['key'].data, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n));
+                        }).catch(err => {
+                            setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: `ERROR: Encryption failed. ${err.message}`, isProcessing: false } : n));
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
@@ -3302,6 +3312,8 @@ const App = () => {
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
                         symmetricDecrypt(inputs['cipher'].data, inputs['key'].data, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n));
+                        }).catch(err => {
+                            setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: `ERROR: Decryption failed. ${err.message}`, isProcessing: false } : n));
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
@@ -3310,6 +3322,8 @@ const App = () => {
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
                         asymmetricEncrypt(inputs['data'].data, inputs['publicKey'].data, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n));
+                        }).catch(err => {
+                            setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: `ERROR: Encryption failed. ${err.message}`, isProcessing: false } : n));
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
@@ -3318,6 +3332,8 @@ const App = () => {
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
                         asymmetricDecrypt(inputs['cipher'].data, inputs['privateKey'].data, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n));
+                        }).catch(err => {
+                            setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: `ERROR: Decryption failed. ${err.message}`, isProcessing: false } : n));
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
@@ -3628,6 +3644,15 @@ const App = () => {
 
   // Define the CSS for the line animation (removed dashed animation)
   const animatedLineStyle = `
+    /* Global styles copied from src/App.css */
+    html, body, #root { 
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    /* Styles copied from src/main.css and src/styles.css (only tailwind base/components/utilities) 
+       are covered by the Canvas environment's Tailwind setup. Only custom CSS remains. */
+    
     @keyframes animate-pulse-slow {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -3679,7 +3704,7 @@ const App = () => {
         
         <div 
           ref={canvasRef}
-          className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner" // Removed overflow-hidden here, added overflow:auto to style
+          className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner overflow-auto" // Added overflow-auto here to allow panning/scrolling
           onClick={handleCanvasClick}
         >
           
@@ -3688,10 +3713,18 @@ const App = () => {
               style={{ 
                   transform: `scale(${scale})`, 
                   transformOrigin: 'top left',
+                  // Ensure the scalable area is large enough to contain nodes without clipping when scaled down
+                  minWidth: `calc(100% / ${scale})`,
+                  minHeight: `calc(100% / ${scale})`,
+                  width: `calc(100% / ${scale})`, // Fix to ensure contents start at top-left
+                  height: `calc(100% / ${scale})`,
               }} 
-              className="absolute top-0 left-0 w-full h-full"
+              className="absolute top-0 left-0"
           >
-              <svg className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0">
+              <svg 
+                  className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0" 
+                  style={{ width: `calc(100% * ${scale})`, height: `calc(100% * ${scale})` }} // Scaled back up to cover the transformed div
+              >
                 {connectionPaths.map((conn, index) => (
                   <g 
                     key={`${conn.source}-${conn.target}-${conn.sourcePortIndex}-${conn.targetPortId}`}
