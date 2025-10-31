@@ -1154,16 +1154,16 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
 /**
  * Checks content compatibility with numeric formats.
  * @param {string} content The user input string.
- * @param {string} targetFormat The format to check against ('Binary', 'Decimal', 'Hexadecimal', 'Text (UTF-8)').
+ * @param {string} targetFormat The format to check against ('Binary', 'Decimal', 'Hexadecimal', 'Base64', 'Text (UTF-8)').
  * @returns {boolean} True if content is compatible with the target format.
  */
 const isContentCompatible = (content, targetFormat) => {
-    if (targetFormat === 'Text (UTF-8)') return true;
-    
     // Remove spaces for robust numeric/hex checking
     const cleanedContent = content.replace(/\s+/g, '');
     if (!cleanedContent) return true; // Empty content is always compatible
 
+    if (targetFormat === 'Text (UTF-8)') return true;
+    
     if (targetFormat === 'Binary') {
         // Must only contain 0s and 1s
         return /^[01]*$/.test(cleanedContent);
@@ -1176,7 +1176,15 @@ const isContentCompatible = (content, targetFormat) => {
         // Must only contain 0-9, a-f, A-F
         return /^[0-9a-fA-F]*$/.test(cleanedContent);
     }
-    return true;
+    if (targetFormat === 'Base64') {
+        // Simple heuristic for Base64 (alphanumeric, +, /, =, and potentially URL-safe chars)
+        // Note: A truly strict Base64 check is complex (padding, valid chars).
+        // For simplicity here, we use a basic regex that allows typical Base64 characters, 
+        // but it is still highly permissive. The control flow in onChange will prioritize it
+        // over Text (UTF-8).
+        return /^[A-Za-z0-9+/=]*$/.test(cleanedContent); 
+    }
+    return true; // Should be covered by Text (UTF-8) above, but kept for completeness.
 };
 
 
@@ -1762,35 +1770,32 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
               // FIX: Handle content change with format detection
               onChange={(e) => {
                   const newContent = e.target.value;
-                  let newFormat = format;
+                  const currentFormat = node.format;
+                  let newFormat = currentFormat;
                   
-                  // --- Auto-switch logic (only if current format is restrictive) ---
-                  if (format !== 'Text (UTF-8)') {
-                      
-                      if (format === 'Binary' && !isContentCompatible(newContent, 'Binary')) {
-                          if (isContentCompatible(newContent, 'Decimal')) {
-                              newFormat = 'Decimal';
-                          } else if (isContentCompatible(newContent, 'Hexadecimal')) {
-                              newFormat = 'Hexadecimal';
-                          } else {
-                              newFormat = 'Text (UTF-8)';
-                          }
-                      } else if (format === 'Decimal' && !isContentCompatible(newContent, 'Decimal')) {
-                          if (isContentCompatible(newContent, 'Hexadecimal')) {
-                              newFormat = 'Hexadecimal';
-                          } else {
-                              newFormat = 'Text (UTF-8)';
-                          }
-                      } else if (format === 'Hexadecimal' && !isContentCompatible(newContent, 'Hexadecimal')) {
-                          newFormat = 'Text (UTF-8)';
-                      }
+                  // Define the priority order (most restrictive first)
+                  const formatsByRestrictiveness = ['Binary', 'Decimal', 'Hexadecimal', 'Base64', 'Text (UTF-8)'];
+                  
+                  // 1. Check if new content is compatible with the CURRENT format. 
+                  // If it is, we keep the current format to avoid annoying auto-reversions (e.g., from Hex to Dec).
+                  if (!isContentCompatible(newContent, currentFormat)) {
+                       // 2. If incompatible with the current format, find the MOST restrictive compatible format.
+                       let detectedFormat = 'Text (UTF-8)'; // Safest fallback
+                       for (const formatCheck of formatsByRestrictiveness) {
+                            if (isContentCompatible(newContent, formatCheck)) {
+                                detectedFormat = formatCheck;
+                                break; 
+                            }
+                       }
+                       newFormat = detectedFormat;
                   }
-                  // If format is 'Text (UTF-8)', it is preserved, meeting the user's requirement.
-
-                  // Apply changes
-                  if (newFormat !== format) {
+                  
+                  // Only update if the determined new format is DIFFERENT from the old format
+                  if (newFormat !== currentFormat) {
                       updateNodeContent(id, 'format', newFormat);
                   }
+                  
+                  // Always update content
                   updateNodeContent(id, 'content', newContent);
               }}
               onMouseDown={(e) => e.stopPropagation()} 
@@ -1813,15 +1818,19 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     // If the selected format is NOT compatible with the current content,
                     // calculate the safest compatible format based on the content.
                     
-                    if (isContentCompatible(currentContent, 'Binary')) {
-                        finalFormat = 'Binary';
-                    } else if (isContentCompatible(currentContent, 'Decimal')) {
-                        finalFormat = 'Decimal';
-                    } else if (isContentCompatible(currentContent, 'Hexadecimal')) {
-                        finalFormat = 'Hexadecimal';
-                    } else {
-                        // Safest fallback
-                        finalFormat = 'Text (UTF-8)';
+                    const formatsByRestrictiveness = ['Binary', 'Decimal', 'Hexadecimal', 'Base64', 'Text (UTF-8)'];
+                    
+                    // Find the most restrictive format that fits the current content
+                    for (const formatCheck of formatsByRestrictiveness) {
+                        if (isContentCompatible(currentContent, formatCheck)) {
+                            finalFormat = formatCheck;
+                            break;
+                        }
+                    }
+
+                    // Inform user that original choice was incompatible, reverting to safe fallback
+                    if (finalFormat !== selectedFormat) {
+                        console.warn(`Content incompatible with ${selectedFormat}. Reverted to compatible format: ${finalFormat}`);
                     }
                 }
 
@@ -2615,7 +2624,7 @@ const App = () => {
       // Clear previous error
       clearUploadError();
       
-      const file = event.target.files[0];
+      const file = event.files?.[0]; // Use files[0] for input type="file"
       if (!file) return;
 
       const reader = new FileReader();
@@ -2710,9 +2719,10 @@ const App = () => {
         initialQueue.add(changedNodeId);
         currentConnections
             .filter(c => c.source === changedNodeId)
-            .forEach(c => initialQueue.add(c.target));
+            .forEach(c => nodesToProcess.push(c.target)); // Add targets to be processed after the changed node
     }
     
+    // Convert initialQueue to an array for processing order
     const nodesToProcess = Array.from(initialQueue);
     const processed = new Set();
     
@@ -3072,7 +3082,7 @@ const App = () => {
                     let e_val = sourceNode.e_pub;
                     let isReadOnly = false;
 
-                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceNodeKeyGen.e) {
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
                         n_val = sourceKeyGenNode.n;
                         e_val = sourceKeyGenNode.e;
@@ -3566,7 +3576,7 @@ const App = () => {
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
-      initialContent.format = 'Text (UTF-8)';
+      initialContent.format = 'Binary'; // MODIFIED: Default to Binary (most restrictive)
     } else if (type === 'OUTPUT_VIEWER') { 
       initialContent.dataOutput = ''; // Will hold the final data (raw or converted)
       initialContent.rawInputData = ''; // New field to hold the raw input string
