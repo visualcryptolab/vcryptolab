@@ -2445,7 +2445,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                 <img 
           // NOTE: The original path was 'VCL - Horizonal logo + name.png'.
           // Assuming the Canvas environment handles path resolution for the uploaded files in 'public/'.
-          src="visualcryptolab/vcryptolab/vcryptolab-39789f50ae28d51009a5b5a3e531170be1b098da/public/VCL - Horizonal logo + name.png"
+          src="VCL - Horizonal logo + name.png"
           alt="VisualCryptoLab Logo and Name" 
           className="w-full h-auto max-w-[180px]"
           // Fallback if image fails to load
