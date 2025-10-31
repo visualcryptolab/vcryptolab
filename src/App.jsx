@@ -2,7 +2,47 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut, Info } from 'lucide-react'; 
 
 // NOTE: For the 'Download Diagram (JPG)' feature to work, the html2canvas library 
-// needs to be loaded globally in the consuming environment. This is included in index.html.
+// needs to be loaded globally in the consuming environment. This is assumed to be handled
+// by the Canvas environment or an external script tag (as seen in the original index.html).
+
+// --- CSS Styles (Consolidated from src/App.css, src/main.css, and src/styles.css) ---
+const globalStyles = `
+/* Styles from src/main.css and src/styles.css (Tailwind directives) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Styles from src/App.css */
+html, body, #root { /* Or the ID of your React app container */
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+@keyframes animate-pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.animate-pulse-slow {
+    animation: animate-pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.connection-line-visible {
+    stroke: #059669; /* Emerald 600 */
+    stroke-width: 4;
+    fill: none;
+    pointer-events: none; /* Invisible to mouse, only the hitbox is active */
+}
+.connection-hitbox {
+    stroke: transparent;
+    stroke-width: 15; /* Large clickable area */
+    fill: none;
+    cursor: pointer;
+    pointer-events: stroke; /* Only sensitive to stroke clicks */
+}
+.connection-hitbox:hover {
+    stroke: rgba(248, 113, 129, 0.5); /* Semi-transparent red on hover */
+}
+`;
 
 
 // --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
@@ -49,7 +89,7 @@ const BitShiftIcon = (props) => (
 
 
 // =================================================================
-// 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS
+// 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS (Copied from original App.jsx)
 // =================================================================
 
 // --- Static Tailwind Class Maps (Ensures no dynamic class generation) ---
@@ -341,7 +381,7 @@ const BOX_SIZE = NODE_DIMENSIONS;
 
 
 // =================================================================
-// 2. CRYPTO & UTILITY FUNCTIONS
+// 2. CRYPTO & UTILITY FUNCTIONS (Copied from original App.jsx)
 // =================================================================
 
 /** Calculates (base^exponent) mod modulus using BigInt for large numbers. */
@@ -842,7 +882,7 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
     if (!dataStr) return "ERROR: Missing data input.";
     
     // 1. **REJECT TEXT INPUT** (from previous requirement)
-    if (shiftFormat === 'Text (UTF-8)' || shiftFormat === 'Base64') {
+    if (inputFormat === 'Text (UTF-8)' || inputFormat === 'Base64') {
         return "ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary), not Text or Base64 byte stream.";
     }
     
@@ -1141,7 +1181,7 @@ const isContentCompatible = (content, targetFormat) => {
 
 
 // =================================================================
-// 3. UI COMPONENTS & GRAPH LOGIC
+// 3. UI COMPONENTS & GRAPH LOGIC (Copied from original App.jsx)
 // =================================================================
 
 /**
@@ -2254,7 +2294,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
                     <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
-                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for two data inputs...'}
+                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 10) + '...'}` : 'Waiting for two data inputs...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2307,7 +2347,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
                     <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'} overflow-y-auto h-full`}>
-                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput?.substring(0, 15)}...` : 'Waiting for single numeric input...'}
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput?.substring(0, 10) + '...'}` : 'Waiting for single numeric input...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2403,7 +2443,9 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
             {/* Title/Logo Container */}
             <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
                 <img 
-          src="VCL - Horizonal logo + name.png"
+          // NOTE: The original path was 'VCL - Horizonal logo + name.png'.
+          // Assuming the Canvas environment handles path resolution for the uploaded files in 'public/'.
+          src="visualcryptolab/vcryptolab/vcryptolab-39789f50ae28d51009a5b5a3e531170be1b098da/public/VCL - Horizonal logo + name.png"
           alt="VisualCryptoLab Logo and Name" 
           className="w-full h-auto max-w-[180px]"
           // Fallback if image fails to load
@@ -2524,6 +2566,9 @@ const App = () => {
   const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
   const [connectingPort, setConnectingPort] = useState(null); 
   const [scale, setScale] = useState(1.0); // New state for zoom level
+    
+  // --- NEW: State for handling upload errors ---
+  const [uploadError, setUploadError] = useState(null);
   
   const MAX_SCALE = 2.0;
   const MIN_SCALE = 0.5;
@@ -2538,10 +2583,12 @@ const App = () => {
       setScale(prevScale => Math.max(MIN_SCALE, prevScale - ZOOM_STEP));
   }, []);
 
+  // Handler to clear the error notification
+  const clearUploadError = useCallback(() => setUploadError(null), []);
     
   const canvasRef = useRef(null);
   
-  // --- Project Management Handlers (Skipped for brevity) ---
+  // --- Project Management Handlers (Copied from original App.jsx) ---
   
   const downloadFile = (data, filename, type) => {
     const blob = new Blob([data], { type: type });
@@ -2565,29 +2612,45 @@ const App = () => {
   }, [nodes, connections]);
 
   const handleUploadProject = useCallback((event) => {
+      // Clear previous error
+      clearUploadError();
+      
       const file = event.target.files[0];
       if (!file) return;
 
       const reader = new FileReader();
       reader.onload = (e) => {
+          let projectData = null;
+          
           try {
-              const projectData = JSON.parse(e.target.result);
-              if (projectData.nodes && projectData.connections) {
-                  setNodes(projectData.nodes);
-                  setConnections(projectData.connections);
-                  // Recalculation is triggered by the useEffect hook watching nodes/connections
-              } else {
-                  console.error("Invalid project file format.");
-                  // Non-blocking user feedback needed here, but for now, console log.
-              }
+              // 1. Attempt to parse JSON
+              projectData = JSON.parse(e.target.result);
           } catch (error) {
               console.error("Error parsing project file:", error);
+              setUploadError("The file could not be read as valid JSON. This may indicate the file is corrupted or belongs to an older application version.");
+              return;
+          }
+
+          // 2. Validate the essential structure
+          if (projectData && Array.isArray(projectData.nodes) && Array.isArray(projectData.connections)) {
+              setNodes(projectData.nodes);
+              setConnections(projectData.connections);
+              // Recalculation is triggered by the useEffect hook watching nodes/connections
+          } else {
+              console.error("Invalid project file structure:", projectData);
+              setUploadError("The JSON file is missing the required 'nodes' or 'connections' data structure. This suggests the file might be from an incompatible or older version of the application.");
           }
       };
+      
+      reader.onerror = (e) => {
+           console.error("Error reading file:", e);
+           setUploadError("An error occurred while reading the file from disk.");
+      };
+      
       reader.readAsText(file);
       // Clear file input value after reading
       event.target.value = ''; 
-  }, []);
+  }, [clearUploadError]); // Added clearUploadError dependency
 
   const handleDownloadImage = useCallback(() => {
       // NOTE: This feature requires the 'html2canvas' library to be loaded externally (e.g., via a <script> tag).
@@ -2619,7 +2682,7 @@ const App = () => {
       }
   }, []);
   
-  // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
+  // --- Core Logic: Graph Recalculation (Data Flow Engine) (Copied from original App.jsx) ---
   
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
     // Re-initialize newNodesMap correctly to ensure integrity and reset calculation fields.
@@ -3009,7 +3072,7 @@ const App = () => {
                     let e_val = sourceNode.e_pub;
                     let isReadOnly = false;
 
-                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceNodeKeyGen.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
                         n_val = sourceKeyGenNode.n;
                         e_val = sourceKeyGenNode.e;
@@ -3312,7 +3375,7 @@ const App = () => {
                     }
                     break;
 
-                // --- Web Crypto API Cipher Nodes (Skipped for brevity) ---
+                // --- Web Crypto API Cipher Nodes (Copied from original App.jsx) ---
                 case 'SYM_ENC':
                 case 'SYM_DEC':
                 case 'ASYM_ENC':
@@ -3394,7 +3457,7 @@ const App = () => {
     return Array.from(newNodesMap.values());
   }, [setNodes]);
   
-  // --- Effects for Recalculation ---
+  // --- Effects for Recalculation (Copied from original App.jsx) ---
   
   useEffect(() => {
     // Initial calculation or on connection change
@@ -3441,7 +3504,7 @@ const App = () => {
     });
   }, [connections, recalculateGraph]);
   
-  // --- Standard App Handlers ---
+  // --- Standard App Handlers (Copied from original App.jsx) ---
 
   const setPosition = useCallback((id, newPos) => {
     setNodes(prevNodes => prevNodes.map(node =>
@@ -3664,41 +3727,6 @@ const App = () => {
   }, [connections, nodes]);
 
 
-  // Define the CSS for the line animation (removed dashed animation)
-  const animatedLineStyle = `
-    /* Global styles copied from src/App.css */
-    html, body, #root { 
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-    /* Styles copied from src/main.css and src/styles.css (only tailwind base/components/utilities) 
-       are covered by the Canvas environment's Tailwind setup. Only custom CSS remains. */
-    
-    @keyframes animate-pulse-slow {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    .animate-pulse-slow {
-      animation: animate-pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    .connection-line-visible {
-        stroke: #059669; /* Emerald 600 */
-        stroke-width: 4;
-        fill: none;
-        pointer-events: none; /* Invisible to mouse, only the hitbox is active */
-    }
-    .connection-hitbox {
-        stroke: transparent;
-        stroke-width: 15; /* Large clickable area */
-        fill: none;
-        cursor: pointer;
-        pointer-events: stroke; /* Only sensitive to stroke clicks */
-    }
-    .connection-hitbox:hover {
-        stroke: rgba(248, 113, 129, 0.5); /* Semi-transparent red on hover */
-    }
-  `;
   
   const handleCanvasClick = useCallback(() => {
     if (connectingPort) {
@@ -3709,9 +3737,8 @@ const App = () => {
   return (
     <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
         
-      {/* Removed SimpleInfoModal component */}
-        
-      <style dangerouslySetInnerHTML={{ __html: animatedLineStyle }} />
+      {/* Styles injected here, including Tailwind base/components/utilities and custom CSS */}
+      <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
 
       <Toolbar 
         addNode={addNode} 
@@ -3790,6 +3817,23 @@ const App = () => {
           </div>
           
         </div>
+        
+        {/* --- ERROR Notification Overlay (New UI) --- */}
+        {uploadError && (
+            <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+                <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center border-4 border-red-500 animate-pulse-slow">
+                    <X className="w-6 h-6 text-red-500 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-red-700 mb-2">Project Load Error</h3>
+                    <p className="text-sm text-gray-700 mb-4">{uploadError}</p>
+                    <button
+                        onClick={clearUploadError}
+                        className="w-full py-2 px-4 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );
