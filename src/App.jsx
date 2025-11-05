@@ -356,14 +356,16 @@ const NODE_DEFINITIONS = {
 };
 
 // --- Defines the desired rendering order for the toolbar ---
+// 1. MODIFIED: Removed 'ADVANCED ASYMMETRIC (WEB CRYPTO)'
+// 2. MODIFIED: Renamed 'SYMMETRIC (AES)' to 'SYMMETRIC CRYPTO'
 const ORDERED_NODE_GROUPS = [
     // Consolidated 'DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP' into CORE TOOLS
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
     // MODIFIED: Changed name from 'SIMPLE RSA (MODULAR)' to 'SIMPLE RSA'
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
-    { name: 'SYMMETRIC (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },
-    { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
+    { name: 'SYMMETRIC CRYPTO', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] }, // MODIFIED: Renamed from 'SYMMETRIC (AES)'
+    // REMOVED: { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
     // Removed old 'BITWISE & HASH' category
 ];
 
@@ -2487,6 +2489,20 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                                         }}
                                         className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
                                         title="View Simple RSA Documentation"
+                                    >
+                                        <Info className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                                
+                                {/* ADDED: Info Button for SYMMETRIC CRYPTO Group */}
+                                {group.name === 'SYMMETRIC CRYPTO' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent toggling the group
+                                            handleInfoClick('https://www.youtube.com/watch?v=mlzxpkdXP58');
+                                        }}
+                                        className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
+                                        title="View AES Explanation Video"
                                     >
                                         <Info className="w-3.5 h-3.5" />
                                     </button>
