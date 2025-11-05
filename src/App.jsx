@@ -260,7 +260,7 @@ const NODE_DEFINITIONS = {
     inputPorts: [
         // CHANGED INPUT TYPE: from 'number' to 'data' to connect from Encrypt or Data Input
         { name: 'Ciphertext (c)', type: 'data', mandatory: true, id: 'cipher' }, 
-        { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
+        { name: 'Key Input', type: 'key', mandatory: true, id: 'key' } // MODIFIED: Changed from 'Private Key (d)' to 'Key Input' and type 'private' to 'key' (Sym Key)
     ],
     // CHANGED OUTPUT TYPE: from 'number' to 'data' to connect to Output Viewer
     outputPorts: [{ name: 'Plaintext (m)', type: 'data', keyField: 'dataOutput' }]
@@ -383,7 +383,7 @@ const BOX_SIZE = NODE_DIMENSIONS;
 
 
 // =================================================================
-// 2. CRYPTO & UTILITY FUNCTIONS (Copied from original App.jsx)
+// 2. CRYPTO & UTILITY FUNCTIONS (Modified Symmetric functions and helpers)
 // =================================================================
 
 /** Calculates (base^exponent) mod modulus using BigInt for large numbers. */
@@ -943,12 +943,14 @@ const calculateHash = async (str, algorithm) => {
 /** Generates an AES-GCM Symmetric Key. */
 const generateSymmetricKey = async (algorithm) => {
     try {
+        // We only support AES-256 for simplicity in the UI/demo
         const key = await crypto.subtle.generateKey(
             { name: algorithm, length: 256 },
             true, // extractable
             ["encrypt", "decrypt"]
         );
         
+        // The key is exported as raw bytes (Base64 encoded for transport/storage)
         const rawKey = await crypto.subtle.exportKey('raw', key);
         const base64Key = arrayBufferToBase64(rawKey);
         
@@ -1089,23 +1091,28 @@ const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64Key);
         
+        // Import raw key data into a CryptoKey object
         const key = await crypto.subtle.importKey(
             'raw', keyBuffer, { name: algorithm, length: 256 }, true, ['encrypt', 'decrypt']
         );
         
+        // Generate a random Initialization Vector (IV) for AES-GCM
         const iv = crypto.getRandomValues(new Uint8Array(12)); 
         
         const encoder = new TextEncoder();
         const dataBuffer = encoder.encode(dataStr);
 
+        // Encrypt the data
         const encryptedBuffer = await crypto.subtle.encrypt(
             { name: algorithm, iv: iv }, key, dataBuffer
         );
         
+        // Combine IV and ciphertext into a single ArrayBuffer/Uint8Array for output
         const fullCipher = new Uint8Array(iv.byteLength + encryptedBuffer.byteLength);
-        fullCipher.set(new Uint8Array(iv), 0);
-        fullCipher.set(new Uint8Array(encryptedBuffer), iv.byteLength);
+        fullCipher.set(new Uint8Array(iv), 0); // IV first
+        fullCipher.set(new Uint8Array(encryptedBuffer), iv.byteLength); // Ciphertext second
 
+        // Output the result as Base64 string
         return arrayBufferToBase64(fullCipher.buffer);
 
     } catch (error) {
@@ -1124,19 +1131,22 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64Key);
         
+        // Import raw key data into a CryptoKey object
         const key = await crypto.subtle.importKey(
             'raw', keyBuffer, { name: algorithm, length: 256 }, true, ['encrypt', 'decrypt']
         );
         
         const fullCipherBuffer = base64ToArrayBuffer(base64Ciphertext);
         
+        // IV is the first 12 bytes for AES-GCM
         if (fullCipherBuffer.byteLength < 12) {
-             throw new Error('Ciphertext is too short to contain IV.');
+             throw new Error('Ciphertext is too short to contain IV and tag.');
         }
 
         const iv = fullCipherBuffer.slice(0, 12);
         const ciphertext = fullCipherBuffer.slice(12);
 
+        // Decrypt the data
         const decryptedBuffer = await crypto.subtle.decrypt(
             { name: algorithm, iv: new Uint8Array(iv) }, key, ciphertext
         );
@@ -1146,6 +1156,7 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
 
     } catch (error) {
         console.error("Decryption failed:", error);
+        // This usually fails if the key or IV/tag is incorrect.
         return `ERROR: Decryption failed. ${error.message}. Check key/data integrity.`;
     }
 };
@@ -1322,7 +1333,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, generateKey } = node; 
   // FIX: Declare definition with const to avoid ReferenceError
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
@@ -2079,129 +2090,130 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-
-        {/* Simple RSA Private Key Generator (Modular Arithmetic Demo) */}
-        {isSimpleRSAKeyGen && (
+        {/* Symmetric Key Generator */}
+        {isKeyGen && (
             <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
-                <span className="text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0">KEY INPUTS (P, Q, E, D)</span>
+                <span className={`text-[10px] font-semibold text-gray-600 mb-2 flex-shrink-0`}>ALGORITHM ({keyAlgorithm} 256-bit)</span>
                 
-                {/* P Input */}
-                <input
-                    type="number"
-                    placeholder="Prime P (Autogenerates if empty)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
-                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
-                    value={p || ''}
-                    onChange={(e) => updateNodeContent(id, 'p', e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                    onClick={(e) => e.stopPropagation()}
-                />
-                {/* Q Input */}
-                <input
-                    type="number"
-                    placeholder="Prime Q (Autogenerates if empty)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
-                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
-                    value={q || ''}
-                    onChange={(e) => updateNodeContent(id, 'q', e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                    onClick={(e) => e.stopPropagation()}
-                />
-                 {/* E Input */}
-                <input
-                    type="number"
-                    placeholder="Exponent E (Autogenerates if empty)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
-                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
-                    value={e || ''}
-                    onChange={(e) => updateNodeContent(id, 'e', e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                    onClick={(e) => e.stopPropagation()}
-                />
-                 {/* D Input (MODIFICADO) */}
-                <input
-                    type="number"
-                    placeholder="Private Exponent D (Optional: Checked, then calculated)"
-                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3 flex-shrink-0
-                               text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition duration-200"
-                    value={d || ''}
-                    // BIND d to the input field
-                    onChange={(e) => updateNodeContent(id, 'd', e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                    onClick={(e) => e.stopPropagation()}
-                />
-
-
+                {/* Generate Button */}
                 <button
                     onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
-                    className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-purple-500 hover:bg-purple-600 flex-shrink-0`}
+                    className={`w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md 
+                                ${isProcessing ? 'bg-yellow-500 animate-pulse' : 'bg-orange-500 hover:bg-orange-600'} flex-shrink-0`}
+                    disabled={isProcessing}
                 >
                     <Key className="w-4 h-4" />
-                    <span>Calculate/Generate Keys</span>
+                    <span>{isProcessing ? 'Generating Key...' : 'Generate New Key'}</span>
                 </button>
                 
-                <span className={`font-semibold mt-2 ${n ? 'text-purple-600' : 'text-gray-500'} flex-shrink-0`}>
-                    {isProcessing ? 'Calculating...' : n ? 'Keys Ready' : 'Enter or Generate Primes'}
+                <span className={`font-semibold mt-4 ${dataOutput ? 'text-orange-600' : 'text-gray-500'} flex-shrink-0`}>
+                    {dataOutput ? 'Key Ready' : 'Key Not Generated'}
                 </span>
 
-                {/* Parameters Display should scroll if needed, using remaining space */}
-                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1 overflow-y-auto flex-grow">
-                    <label className="block text-[10px] font-semibold text-gray-600">Calculated Parameters:</label>
-                    <p className="text-[10px]">n (Modulus): <span className="font-mono text-gray-800">{n || 'N/A'}</span></p>
-                    <p className="text-[10px]">&phi;(n): <span className="font-mono text-gray-800">{phiN || 'N/A'}</span></p>
-                    <p className="text-[10px]">d (Private Exp.): <span className="font-mono text-gray-800">{d || 'N/A'}</span></p>
-                    {dStatus && (
-                        <p className={`text-[10px] font-bold ${dStatus.includes('CORRECT') ? 'text-green-600' : dStatus.includes('INCORRECT') || dStatus.includes('ERROR') ? 'text-red-600' : 'text-gray-600'}`}>
-                            D Status: {dStatus}
-                        </p>
-                    )}
-                </div>
-            </div>
-        )}
-        
-        {/* NEW Simple RSA Public Key Generator */}
-        {isSimpleRSAPubKeyGen && (
-            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
-                <span className="text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0">PUBLIC KEY INPUTS (N, E)</span>
-                
-                {/* N Input */}
-                <input
-                    type="number"
-                    placeholder="Modulus N"
-                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
-                               text-gray-700 focus:ring-2 focus:ring-lime-500 outline-none transition duration-200 ${isReadOnly ? 'bg-gray-100 cursor-default' : ''}`}
-                    value={n_pub || ''}
-                    onChange={(e) => updateNodeContent(id, 'n_pub', e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                    onClick={(e) => e.stopPropagation()}
-                    readOnly={isReadOnly}
-                />
-                {/* E Input */}
-                <input
-                    type="number"
-                    placeholder="Exponent E"
-                    className={`w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-3 flex-shrink-0
-                               text-gray-700 focus:ring-2 focus:ring-lime-500 outline-none transition duration-200 ${isReadOnly ? 'bg-gray-100 cursor-default' : ''}`}
-                    value={e_pub || ''}
-                    onChange={(e) => updateNodeContent(id, 'e_pub', e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                    onClick={(e) => e.stopPropagation()}
-                    readOnly={isReadOnly}
-                />
-
-                <span className={`font-semibold mt-2 ${dataOutputPublic ? 'text-lime-600' : 'text-gray-500'} flex-shrink-0`}>
-                    {dataOutputPublic ? 'Key Pair Ready' : 'Enter or Connect Key Source'}
-                </span>
-                <div className="w-full mt-2 p-1 text-gray-500 break-all text-left border-t border-gray-200 pt-1 space-y-1 overflow-y-auto flex-grow">
-                    <label className="block text-[10px] font-semibold text-gray-600">Public Key Output (n, e):</label>
-                    <p className="text-[10px] font-mono text-gray-800 break-all overflow-hidden">
-                        {dataOutputPublic || 'N/A'}
+                {/* Key Output Display */}
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {keyBase64 ? `Key (Base64): ${keyBase64}` : 'Waiting for generation...'}
                     </p>
+                    {/* Copy Button for Key Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, keyBase64)}
+                        disabled={!keyBase64 || keyBase64.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${keyBase64 && !keyBase64.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
                 </div>
             </div>
         )}
         
-        {/* Simple RSA Encrypt */}
+        {/* Symmetric Encrypt (AES-GCM) */}
+        {isSymEnc && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>ALGORITHM</span>
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
+                    value={symAlgorithm || 'AES-GCM'}
+                    onChange={(e) => updateNodeContent(id, 'symAlgorithm', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {SYM_ALGORITHMS.map(alg => (
+                        <option key={alg} value={alg}>{alg} (256-bit)</option>
+                    ))}
+                </select>
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-red-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Encrypting...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Ciphertext (Base64): ${dataOutput}` : 'Waiting for Data and Key...'}
+                    </p>
+                    {/* Copy Button for Ciphertext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Symmetric Decrypt (AES-GCM) */}
+        {isSymDec && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>ALGORITHM</span>
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition duration-200"
+                    value={symAlgorithm || 'AES-GCM'}
+                    onChange={(e) => updateNodeContent(id, 'symAlgorithm', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {SYM_ALGORITHMS.map(alg => (
+                        <option key={alg} value={alg}>{alg} (256-bit)</option>
+                    ))}
+                </select>
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-pink-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Decrypting...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Plaintext (UTF-8): ${dataOutput}` : 'Waiting for Cipher and Key...'}
+                    </p>
+                    {/* Copy Button for Plaintext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                    ${dataOutput && !dataOutput.startsWith('ERROR')
+                                        ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                        : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Simple RSA Encrypt/Decrypt/Sign/Verify nodes (Skipped for brevity) */}
         {isSimpleRSAEnc && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
@@ -2228,7 +2240,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {/* Simple RSA Decrypt */}
         {isSimpleRSADec && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
@@ -2375,7 +2386,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {/* Generic Output Preview */}
+        {/* Generic Output Preview (Fallback for unimplemented nodes) */}
         {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
@@ -2766,33 +2777,44 @@ const App = () => {
                 outputData = sourceNode.content || ''; 
             } else if (sourceNode.type === 'KEY_GEN') {
                 
-                if (sourceNode.key || sourceNode.generateKey) {
-                    isProcessing = true;
-                    if (!sourceNode.key || sourceNode.generateKey) {
-                         const algorithm = sourceNode.keyAlgorithm || 'AES-GCM';
-                         
-                         generateSymmetricKey(algorithm).then(({ keyObject, keyBase64 }) => {
-                            setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                     ? { ...n, dataOutput: keyBase64, key: keyObject, isProcessing: false, generateKey: false } 
-                                     : n
-                            ));
-                         }).catch(err => {
-                             setNodes(prevNodes => prevNodes.map(n => 
-                                 n.id === sourceId 
-                                     ? { ...n, dataOutput: `ERROR: Key generation failed. ${err.message}`, isProcessing: false, generateKey: false } 
-                                     : n
-                             ));
-                         });
-                         outputData = sourceNode.dataOutput || 'Generating Key...';
-                    } else {
-                        outputData = sourceNode.dataOutput || '';
-                        isProcessing = false;
-                    }
+                // Symmetric Key Generator Logic
+                const algorithm = sourceNode.keyAlgorithm || 'AES-GCM';
 
+                if (sourceNode.generateKey) {
+                    isProcessing = true;
+                    // Start asynchronous key generation
+                    generateSymmetricKey(algorithm).then(({ keyBase64 }) => {
+                        // Update node state after successful generation
+                        setNodes(prevNodes => prevNodes.map(n => 
+                            n.id === sourceId 
+                                ? { 
+                                    ...n, 
+                                    dataOutput: keyBase64, // Output key (Base64)
+                                    keyBase64: keyBase64, // Internal key storage
+                                    isProcessing: false, 
+                                    generateKey: false 
+                                  } 
+                                : n
+                        ));
+                    }).catch(err => {
+                         // Handle error during generation
+                         setNodes(prevNodes => prevNodes.map(n => 
+                             n.id === sourceId 
+                                 ? { ...n, dataOutput: `ERROR: Key generation failed. ${err.message}`, keyBase64: `ERROR: Key generation failed. ${err.message}`, isProcessing: false, generateKey: false } 
+                                 : n
+                         ));
+                    });
+                    outputData = 'Generating Key...'; // Keep placeholder while waiting
+                    
+                } else if (sourceNode.keyBase64) {
+                    // Key already generated, just output the stored Base64 key
+                    outputData = sourceNode.keyBase64; 
+                    isProcessing = false;
                 } else {
+                    // Initial state without generation trigger
                     outputData = 'Click "Generate New Key"';
                 }
+
             } else if (sourceNode.type === 'RSA_KEY_GEN' || sourceNode.type === 'SIMPLE_RSA_KEY_GEN') { 
                 
                  const publicExponentToUse = sourceNode.type === 'SIMPLE_RSA_KEY_GEN' ? 65537 : (sourceNode.publicExponent || 65537);
@@ -3401,16 +3423,13 @@ const App = () => {
                     }
                     break;
 
-                // --- Web Crypto API Cipher Nodes (Copied from original App.jsx) ---
+                // --- Web Crypto API Cipher Nodes (Symmetric/Asymmetric) ---
                 case 'SYM_ENC':
-                case 'SYM_DEC':
-                case 'ASYM_ENC':
-                case 'ASYM_DEC':
-                    // These nodes remain asynchronous or simple pass-through/error states
-                    // Logic remains as in previous version
-                    if (sourceNode.type === 'SYM_ENC' && inputs['data']?.data && inputs['key']?.data) {
+                    // Symmetric Encrypt Logic
+                    if (inputs['data']?.data && inputs['key']?.data) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
+                        
                         symmetricEncrypt(inputs['data'].data, inputs['key'].data, algorithm).then(ciphertext => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: ciphertext, isProcessing: false } : n));
                         }).catch(err => {
@@ -3418,9 +3437,18 @@ const App = () => {
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
-                    } else if (sourceNode.type === 'SYM_DEC' && inputs['cipher']?.data && inputs['key']?.data) {
+                    } else {
+                        outputData = 'Waiting for Data and Key inputs.';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                    }
+                    break;
+                
+                case 'SYM_DEC':
+                    // Symmetric Decrypt Logic
+                    if (inputs['cipher']?.data && inputs['key']?.data) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
+                        
                         symmetricDecrypt(inputs['cipher'].data, inputs['key'].data, algorithm).then(plaintext => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: plaintext, isProcessing: false } : n));
                         }).catch(err => {
@@ -3428,7 +3456,15 @@ const App = () => {
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
-                    } else if (sourceNode.type === 'ASYM_ENC' && inputs['data']?.data && inputs['publicKey']?.data) {
+                    } else {
+                        outputData = 'Waiting for Cipher and Key inputs.';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                    }
+                    break;
+
+                case 'ASYM_ENC':
+                    // Asymmetric Encrypt Logic (Web Crypto API - RSA-OAEP)
+                    if (inputs['data']?.data && inputs['publicKey']?.data) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
                         asymmetricEncrypt(inputs['data'].data, inputs['publicKey'].data, algorithm).then(ciphertext => {
@@ -3438,7 +3474,15 @@ const App = () => {
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
-                    } else if (sourceNode.type === 'ASYM_DEC' && inputs['cipher']?.data && inputs['privateKey']?.data) {
+                    } else {
+                        outputData = 'Waiting for Data and Public Key inputs.';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                    }
+                    break;
+                
+                case 'ASYM_DEC':
+                    // Asymmetric Decrypt Logic (Web Crypto API - RSA-OAEP)
+                    if (inputs['cipher']?.data && inputs['privateKey']?.data) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
                         asymmetricDecrypt(inputs['cipher'].data, inputs['privateKey'].data, algorithm).then(plaintext => {
@@ -3449,7 +3493,7 @@ const App = () => {
                         outputData = sourceNode.dataOutput || 'Decrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                     } else {
-                        outputData = 'Waiting for inputs.';
+                        outputData = 'Waiting for Cipher and Private Key inputs.';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                     }
                     break;
@@ -3505,6 +3549,9 @@ const App = () => {
                     shiftKey: (field === 'shiftKey' ? value : node.shiftKey), // New Caesar Key
                     keyword: (field === 'keyword' ? value : node.keyword), // New Vigenere Keyword
                     vigenereMode: (field === 'vigenereMode' ? value : node.vigenereMode), // New Vigenere Mode
+                    // Symmetric/Asymmetric Crypto Fields
+                    symAlgorithm: (field === 'symAlgorithm' ? value : node.symAlgorithm),
+                    asymAlgorithm: (field === 'asymAlgorithm' ? value : node.asymAlgorithm),
                     // Simple RSA specific
                     p: (field === 'p' ? value : node.p),
                     q: (field === 'q' ? value : node.q),
@@ -3612,7 +3659,8 @@ const App = () => {
       initialContent.hashAlgorithm = 'SHA-256'; // Default value
     } else if (type === 'KEY_GEN') {
       initialContent.keyAlgorithm = 'AES-GCM';
-      initialContent.key = null; 
+      initialContent.keyBase64 = ''; // Store the raw key (Base64)
+      initialContent.generateKey = false; // Trigger flag
     } else if (type === 'RSA_KEY_GEN') { 
       initialContent.keyAlgorithm = 'RSA-OAEP';
       initialContent.modulusLength = 2048;
@@ -3644,7 +3692,7 @@ const App = () => {
     } else if (type === 'SIMPLE_RSA_SIGN' || type === 'SIMPLE_RSA_VERIFY') { // New Signature nodes
       initialContent.outputFormat = type === 'SIMPLE_RSA_SIGN' ? 'Decimal' : 'Text (UTF-8)';
     } else if (type === 'SYM_ENC' || type === 'SYM_DEC') {
-      initialContent.symAlgorithm = 'AES-GCM';
+      initialContent.symAlgorithm = 'AES-GCM'; // Default AES mode
     } else if (type === 'ASYM_ENC' || type === 'ASYM_DEC') {
       initialContent.asymAlgorithm = 'RSA-OAEP';
     } else if (type === 'SHIFT_OP') {
