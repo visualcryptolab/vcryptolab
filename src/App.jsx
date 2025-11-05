@@ -356,15 +356,14 @@ const NODE_DEFINITIONS = {
 };
 
 // --- Defines the desired rendering order for the toolbar ---
-// 1. MODIFIED: Removed 'ADVANCED ASYMMETRIC (WEB CRYPTO)'
-// 2. MODIFIED: Renamed 'SYMMETRIC (AES)' to 'SYMMETRIC CRYPTO'
 const ORDERED_NODE_GROUPS = [
     // Consolidated 'DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP' into CORE TOOLS
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
     // MODIFIED: Changed name from 'SIMPLE RSA (MODULAR)' to 'SIMPLE RSA'
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
-    { name: 'SYMMETRIC CRYPTO', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] }, // MODIFIED: Renamed from 'SYMMETRIC (AES)'
+    // MODIFIED: Changed name from 'SYMMETRIC CRYPTO' to 'SYMMETRIC CRYPTO (AES)'
+    { name: 'SYMMETRIC CRYPTO (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] }, 
     // REMOVED: { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
     // Removed old 'BITWISE & HASH' category
 ];
@@ -2506,7 +2505,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                                 )}
                                 
                                 {/* ADDED: Info Button for SYMMETRIC CRYPTO Group */}
-                                {group.name === 'SYMMETRIC CRYPTO' && (
+                                {group.name === 'SYMMETRIC CRYPTO (AES)' && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation(); // Prevent toggling the group
