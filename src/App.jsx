@@ -2106,8 +2106,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     <span>{isProcessing ? 'Generating Key...' : 'Generate New Key'}</span>
                 </button>
                 
-                <span className={`font-semibold mt-4 ${dataOutput ? 'text-orange-600' : 'text-gray-500'} flex-shrink-0`}>
-                    {dataOutput ? 'Key Ready' : 'Key Not Generated'}
+                <span className={`font-semibold mt-4 ${dataOutput && !dataOutput.startsWith('ERROR') ? 'text-orange-600' : 'text-gray-500'} flex-shrink-0`}>
+                    {dataOutput && !dataOutput.startsWith('ERROR') ? 'Key Ready' : 'Key Not Generated'}
                 </span>
 
                 {/* Key Output Display */}
@@ -2737,20 +2737,23 @@ const App = () => {
         return [n.id, newNode];
     })); 
     
+    // --- Step 0: Identify nodes to process based on inputs/triggers ---
+    
+    // Start with nodes that have no inputs (Data Input, Key Generators)
     let initialQueue = new Set(currentNodes.filter(n => {
         const def = NODE_DEFINITIONS[n.type];
         return def && def.inputPorts && def.inputPorts.length === 0;
     }).map(n => n.id));
     
+    // If a node was explicitly changed (e.g., via a button click or input field change),
+    // we must recalculate it and its downstream dependents.
     if (changedNodeId) {
         initialQueue.add(changedNodeId);
-        currentConnections
-            .filter(c => c.source === changedNodeId)
-            .forEach(c => nodesToProcess.push(c.target)); // Add targets to be processed after the changed node
+        // The recalculation loop handles adding dependencies dynamically.
     }
     
-    // Convert initialQueue to an array for processing order
-    const nodesToProcess = Array.from(initialQueue);
+    // Convert initialQueue to an array for deterministic processing order
+    let nodesToProcess = Array.from(initialQueue);
     const processed = new Set();
     
     const findAllTargets = (sourceId) => {
@@ -2760,6 +2763,7 @@ const App = () => {
             .filter(targetId => !processed.has(targetId));
     };
 
+    // --- Step 1: Process nodes synchronously (Key generation, Data input, Crypto operations) ---
     while (nodesToProcess.length > 0) {
         const sourceId = nodesToProcess.shift();
         if (processed.has(sourceId) || !newNodesMap.has(sourceId)) continue; 
@@ -2770,7 +2774,7 @@ const App = () => {
         let outputData = sourceNode.dataOutput || '';
         let isProcessing = false;
         
-        // --- Source Nodes (No input ports) ---
+        // --- 1.1 Source Nodes (No input ports) ---
         if (sourceNodeDef.inputPorts.length === 0) {
             
             if (sourceNode.type === 'DATA_INPUT') {
@@ -2780,46 +2784,54 @@ const App = () => {
                 // Symmetric Key Generator Logic
                 const algorithm = sourceNode.keyAlgorithm || 'AES-GCM';
 
-                if (sourceNode.generateKey) {
+                // Check if key generation has been triggered OR the key is missing
+                if (sourceNode.generateKey || !sourceNode.keyBase64) {
                     isProcessing = true;
-                    // Start asynchronous key generation
+                    // --- Asynchronous operation starts here ---
+                    // The main loop stops for this node, but the promise resolves later
                     generateSymmetricKey(algorithm).then(({ keyBase64 }) => {
-                        // Update node state after successful generation
+                        // Use functional update to ensure atomicity and avoid stale state
                         setNodes(prevNodes => prevNodes.map(n => 
                             n.id === sourceId 
                                 ? { 
                                     ...n, 
-                                    dataOutput: keyBase64, // Output key (Base64)
-                                    keyBase64: keyBase64, // Internal key storage
+                                    dataOutput: keyBase64,
+                                    keyBase64: keyBase64,
                                     isProcessing: false, 
                                     generateKey: false 
                                   } 
                                 : n
                         ));
                     }).catch(err => {
-                         // Handle error during generation
                          setNodes(prevNodes => prevNodes.map(n => 
                              n.id === sourceId 
                                  ? { ...n, dataOutput: `ERROR: Key generation failed. ${err.message}`, keyBase64: `ERROR: Key generation failed. ${err.message}`, isProcessing: false, generateKey: false } 
                                  : n
                          ));
                     });
-                    outputData = 'Generating Key...'; // Keep placeholder while waiting
                     
+                    // Immediately set status and output in the current synchronous state for display/queue processing
+                    outputData = sourceNode.dataOutput || 'Generating Key...';
+                    sourceNode.isProcessing = isProcessing;
+                    sourceNode.generateKey = false;
+                    newNodesMap.set(sourceId, sourceNode);
+                    
+                    // Break early, but still add targets to the queue in case of fast resolution
+                    processed.add(sourceId);
+                    nodesToProcess.push(...findAllTargets(sourceId));
+                    continue; // Skip remaining synchronous processing for this node
+
                 } else if (sourceNode.keyBase64) {
-                    // Key already generated, just output the stored Base64 key
+                    // Key already generated, use stored key
                     outputData = sourceNode.keyBase64; 
                     isProcessing = false;
-                } else {
-                    // Initial state without generation trigger
-                    outputData = 'Click "Generate New Key"';
                 }
-
+                
             } else if (sourceNode.type === 'RSA_KEY_GEN' || sourceNode.type === 'SIMPLE_RSA_KEY_GEN') { 
                 
                  const publicExponentToUse = sourceNode.type === 'SIMPLE_RSA_KEY_GEN' ? 65537 : (sourceNode.publicExponent || 65537);
                  
-                 // --- Simple RSA Key Gen Logic ---
+                 // --- Simple RSA Key Gen Logic (Synchronous Calculation) ---
                  if (sourceNode.type === 'SIMPLE_RSA_KEY_GEN' && sourceNode.generateKey) {
                      isProcessing = true;
                      
@@ -2832,7 +2844,7 @@ const App = () => {
                      let p_val, q_val, e_val, d_val;
                      let n_val, phiN_val;
                      let error = null;
-                     let d_status = ''; // New status field
+                     let d_status = ''; 
 
                      
                      try {
@@ -2929,7 +2941,7 @@ const App = () => {
                      continue;
 
                  } else if (sourceNode.keyPairObject || sourceNode.generateKey) {
-                     // --- Web Crypto RSA Key Gen Logic (Advanced) ---
+                     // --- Web Crypto RSA Key Gen Logic (Advanced - ASYNC) ---
                      isProcessing = true;
                      
                      if (!sourceNode.keyPairObject || sourceNode.generateKey) {
@@ -2967,7 +2979,7 @@ const App = () => {
                  }
             }
         
-        // --- Processing/Sink Nodes (Have input ports) ---
+        // --- 1.2 Processing/Sink Nodes (Have input ports) ---
         } else {
             // Collect all incoming connections to this target node
             const incomingConns = currentConnections.filter(c => c.target === sourceId);
@@ -3335,20 +3347,19 @@ const App = () => {
                     
                 case 'HASH_FN':
                     const hashInput = inputs['data']?.data;
-                    if (hashInput) { 
+                    if (hashInput && !hashInput.startsWith('ERROR')) { 
                         isProcessing = true; 
                         const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
 
-                        // Calculate hash using async function
-                        const hashPromise = calculateHash(hashInput, algorithm).then(hashResult => {
-                            // Update node state after successful calculation
+                        // --- Asynchronous operation starts here ---
+                        // Update node to processing state and defer output setting to promise resolution
+                        calculateHash(hashInput, algorithm).then(hashResult => {
                             setNodes(prevNodes => prevNodes.map(n => 
                                 n.id === sourceId 
                                      ? { ...n, dataOutput: hashResult, isProcessing: false } 
                                      : n
                             ));
                         }).catch(err => {
-                             // Handle error during calculation
                              setNodes(prevNodes => prevNodes.map(n => 
                                  n.id === sourceId 
                                       ? { ...n, dataOutput: `ERROR: Hash calculation failed. ${err.message}`, isProcessing: false } 
@@ -3358,7 +3369,15 @@ const App = () => {
                         
                         // Output placeholder while processing
                         outputData = sourceNode.dataOutput || 'Calculating...';
-                    } else { 
+                        sourceNode.isProcessing = isProcessing;
+                        newNodesMap.set(sourceId, sourceNode);
+                        processed.add(sourceId);
+                        nodesToProcess.push(...findAllTargets(sourceId));
+                        continue; // Skip remaining synchronous processing for this node
+
+                    } else if (hashInput && hashInput.startsWith('ERROR')) {
+                        outputData = hashInput;
+                    } else {
                         outputData = 'Waiting for data input.'; 
                     }
                     break;
@@ -3369,7 +3388,7 @@ const App = () => {
                     const formatA = inputs['dataA']?.format; // Primary input format
                     const formatB = inputs['dataB']?.format;
 
-                    if (dataInputA && dataInputB) { 
+                    if (dataInputA && dataInputB && !dataInputA.startsWith('ERROR') && !dataInputB.startsWith('ERROR')) { 
                         // Note: XOR is a byte-wise operation, so conversion to Uint8Array is appropriate.
                         const bytesA = convertToUint8Array(dataInputA, formatA);
                         const bytesB = convertToUint8Array(dataInputB, formatB);
@@ -3383,6 +3402,10 @@ const App = () => {
                         outputData = convertDataFormat(base64Result, 'Base64', outputFormat);
                         sourceNode.outputFormat = outputFormat; 
                         isProcessing = false; 
+                    } else if (dataInputA?.startsWith('ERROR')) {
+                        outputData = dataInputA;
+                    } else if (dataInputB?.startsWith('ERROR')) {
+                        outputData = dataInputB;
                     } else if (dataInputA && !dataInputB) {
                         outputData = 'Waiting for Input B.';
                         sourceNode.outputFormat = formatA || ''; 
@@ -3401,7 +3424,7 @@ const App = () => {
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
                     
-                    if (shiftDataInput) {
+                    if (shiftDataInput && !shiftDataInput.startsWith('ERROR')) {
                         isProcessing = true;
                         
                         // Data formats considered single numbers: Decimal, Hexadecimal, Binary
@@ -3417,16 +3440,18 @@ const App = () => {
                         }
 
                         isProcessing = false; 
+                    } else if (shiftDataInput?.startsWith('ERROR')) {
+                         outputData = shiftDataInput;
                     } else { 
                         outputData = 'Waiting for data input.'; 
                         sourceNode.outputFormat = '';
                     }
                     break;
 
-                // --- Web Crypto API Cipher Nodes (Symmetric/Asymmetric) ---
+                // --- Web Crypto API Cipher Nodes (Symmetric/Asymmetric - ASYNC) ---
                 case 'SYM_ENC':
                     // Symmetric Encrypt Logic
-                    if (inputs['data']?.data && inputs['key']?.data) {
+                    if (inputs['data']?.data && inputs['key']?.data && !inputs['data'].data.startsWith('ERROR') && !inputs['key'].data.startsWith('ERROR')) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
                         
@@ -3437,6 +3462,18 @@ const App = () => {
                         });
                         outputData = sourceNode.dataOutput || 'Encrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                        
+                        // Break early (async)
+                        sourceNode.isProcessing = isProcessing;
+                        newNodesMap.set(sourceId, sourceNode);
+                        processed.add(sourceId);
+                        nodesToProcess.push(...findAllTargets(sourceId));
+                        continue; 
+
+                    } else if (inputs['data']?.data?.startsWith('ERROR')) {
+                        outputData = inputs['data'].data;
+                    } else if (inputs['key']?.data?.startsWith('ERROR')) {
+                        outputData = inputs['key'].data;
                     } else {
                         outputData = 'Waiting for Data and Key inputs.';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
@@ -3445,7 +3482,7 @@ const App = () => {
                 
                 case 'SYM_DEC':
                     // Symmetric Decrypt Logic
-                    if (inputs['cipher']?.data && inputs['key']?.data) {
+                    if (inputs['cipher']?.data && inputs['key']?.data && !inputs['cipher'].data.startsWith('ERROR') && !inputs['key'].data.startsWith('ERROR')) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
                         
@@ -3456,6 +3493,18 @@ const App = () => {
                         });
                         outputData = sourceNode.dataOutput || 'Decrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
+                        
+                        // Break early (async)
+                        sourceNode.isProcessing = isProcessing;
+                        newNodesMap.set(sourceId, sourceNode);
+                        processed.add(sourceId);
+                        nodesToProcess.push(...findAllTargets(sourceId));
+                        continue; 
+                        
+                    } else if (inputs['cipher']?.data?.startsWith('ERROR')) {
+                        outputData = inputs['cipher'].data;
+                    } else if (inputs['key']?.data?.startsWith('ERROR')) {
+                        outputData = inputs['key'].data;
                     } else {
                         outputData = 'Waiting for Cipher and Key inputs.';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
@@ -3531,6 +3580,7 @@ const App = () => {
   
   useEffect(() => {
     // Initial calculation or on connection change
+    // Trigger recalculation on component mount and whenever connections change.
     setNodes(prevNodes => recalculateGraph(prevNodes, connections));
   }, [connections, recalculateGraph]); 
 
