@@ -46,46 +46,50 @@ html, body, #root { /* Or the ID of your React app container */
 
 
 // --- Custom XOR Icon Component (The mathematical $\oplus$ symbol) ---
-const XORIcon = (props) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2.5" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className="w-6 h-6 absolute"
-    {...props}
-  >
-    {/* Circle part */}
-    <circle cx="12" cy="12" r="10" />
-    {/* Plus (XOR) part */}
-    <line x1="12" y1="8" x2="12" y2="16" />
-    <line x1="8" y1="12" x2="16" y2="12" />
-  </svg>
-);
+function XORIcon(props) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className="w-6 h-6 absolute"
+      {...props}
+    >
+      {/* Circle part */}
+      <circle cx="12" cy="12" r="10" />
+      {/* Plus (XOR) part */}
+      <line x1="12" y1="8" x2="12" y2="16" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+    </svg>
+  );
+};
 
 // --- Custom Bit Shift Icon Component (The $\rightleftharpoons$ symbol) ---
-const BitShiftIcon = (props) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2.5" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className="w-6 h-6 absolute"
-    {...props}
-  >
-    {/* Right Arrow (Top) */}
-    <polyline points="15 8 19 12 15 16" />
-    <line x1="19" y1="12" x2="5" y2="12" />
-    {/* Left Arrow (Bottom) - Flipped */}
-    <polyline points="9 16 5 12 9 8" />
-  </svg>
-);
+function BitShiftIcon(props) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className="w-6 h-6 absolute"
+      {...props}
+    >
+      {/* Right Arrow (Top) */}
+      <polyline points="15 8 19 12 15 16" />
+      <line x1="19" y1="12" x2="5" y2="12" />
+      {/* Left Arrow (Bottom) - Flipped */}
+      <polyline points="9 16 5 12 9 8" />
+    </svg>
+  );
+};
 
 
 // =================================================================
@@ -244,12 +248,9 @@ const NODE_DEFINITIONS = {
     color: 'maroon',
     icon: Lock,
     inputPorts: [
-        // Changed to 'data' for BigInt string message compatibility
         { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' }, 
-        // MODIFIED PORT TYPE: Public key input uses 'public' type port
         { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
     ],
-    // CHANGED OUTPUT TYPE: from 'number' to 'data' to connect to Output Viewer
     outputPorts: [{ name: 'Ciphertext (c)', type: 'data', keyField: 'dataOutput' }] 
   },
 
@@ -258,12 +259,9 @@ const NODE_DEFINITIONS = {
     color: 'rose',
     icon: Unlock,
     inputPorts: [
-        // CHANGED INPUT TYPE: from 'number' to 'data' to connect from Encrypt or Data Input
         { name: 'Ciphertext (c)', type: 'data', mandatory: true, id: 'cipher' }, 
-        // FIX: Changed type from 'key' to 'private' to correctly connect to key generator
         { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
     ],
-    // CHANGED OUTPUT TYPE: from 'number' to 'data' to connect to Output Viewer
     outputPorts: [{ name: 'Plaintext (m)', type: 'data', keyField: 'dataOutput' }]
   },
 
@@ -273,11 +271,9 @@ const NODE_DEFINITIONS = {
       color: 'fuchsia',
       icon: Signature, // Changed to Signature icon
       inputPorts: [
-          // CHANGED INPUT TYPE: from 'number' to 'data' for consistency
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
           { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
       ],
-      // CHANGED OUTPUT TYPE: from 'signature' to 'data' to connect to Output Viewer
       outputPorts: [{ name: 'Signature (s)', type: 'data', keyField: 'dataOutput' }]
   },
 
@@ -286,11 +282,8 @@ const NODE_DEFINITIONS = {
       color: 'fuchsia',
       icon: CheckCheck,
       inputPorts: [
-          // CHANGED INPUT TYPE: from 'number' to 'data' for consistency
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
-          // CHANGED INPUT TYPE: from 'signature' to 'data' to connect from Sign output
           { name: 'Signature (s)', type: 'data', mandatory: true, id: 'signature' },
-          // MODIFIED PORT TYPE: Public key input uses 'public' type port
           { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }
       ],
       outputPorts: [{ name: 'Verification Result', type: 'data', keyField: 'dataOutput' }]
@@ -375,8 +368,8 @@ const INITIAL_NODES = []; // Set to empty array to start clean
 const INITIAL_CONNECTIONS = []; // No initial connections
 
 // --- Node Dimension Constants (for initial and minimum size) ---
-// INCREASED initialWidth/Height and minWidth/Height to fit controls better
-const NODE_DIMENSIONS = { initialWidth: 256, initialHeight: 256, minWidth: 200, minHeight: 180 };
+// Dimensiones ajustadas para garantizar visibilidad del Bit Shift
+const NODE_DIMENSIONS = { initialWidth: 300, initialHeight: 280, minWidth: 250, minHeight: 250 };
 
 // Used for initial placement reference. All components should use NODE_DIMENSIONS now.
 const BOX_SIZE = NODE_DIMENSIONS; 
@@ -804,28 +797,87 @@ const getOutputFormat = (nodeType) => {
     }
 }
 
-/** * Performs XOR operation on two input byte arrays.
- * Returns the result as a Base64 string (standard output format for operations).
+/** * Performs XOR operation on two input strings (data) of the same format.
+ * Returns the result maintaining the input format and length.
  */
-const performBitwiseXor = (bytesA, bytesB) => {
-    if (bytesA.length === 0 || bytesB.length === 0) {
-        return "ERROR: Missing one or both inputs or inputs failed conversion to bytes.";
+const performBitwiseXor = (dataAStr, formatA, dataBStr, formatB) => {
+    
+    // Ensure inputs are present and same numerical format
+    if (!dataAStr || !dataBStr || dataAStr.startsWith('ERROR') || dataBStr.startsWith('ERROR')) {
+        return { output: "ERROR: Missing one or both inputs or inputs failed conversion.", format: formatA };
+    }
+    
+    // XOR is only meaningful for Binary and Hexadecimal single numbers or byte streams.
+    // If Text or Base64 is used, we fall back to byte-level XOR (original logic, but less precise for bit length).
+    if (formatA !== formatB || !['Binary', 'Hexadecimal'].includes(formatA)) {
+        // Fallback to byte-level XOR for mismatched or non-precise formats (like text/base64)
+        const bytesA = convertToUint8Array(dataAStr, formatA);
+        const bytesB = convertToUint8Array(dataBStr, formatB);
+        const base64Result = arrayBufferToBase64(performRawXor(bytesA, bytesB).buffer);
+        // We convert the byte result back to formatA (or Base64 if A is non-standard)
+        const finalFormat = formatA === 'N/A' || formatA === 'Decimal' ? 'Base64' : formatA;
+        const output = convertDataFormat(base64Result, 'Base64', finalFormat);
+        
+        return { output: output, format: finalFormat };
     }
 
+    // --- LOGIC FOR BIT/HEX PRECISION (Single Large Number/Contiguous Stream) ---
+    
+    // 1. Clean strings (remove potential spaces added by viewer)
+    const cleanA = dataAStr.replace(/\s/g, '');
+    const cleanB = dataBStr.replace(/\s/g, '');
+    
+    // 2. Determine the target length (always the longer one for XOR)
+    const targetLength = Math.max(cleanA.length, cleanB.length);
+    
+    // 3. Pad the shorter string with '0's on the left to match the length
+    const paddedA = cleanA.padStart(targetLength, '0');
+    const paddedB = cleanB.padStart(targetLength, '0');
+    
+    // 4. Convert padded strings to BigInt for XOR operation
+    let bigIntA;
+    let bigIntB;
+    
     try {
-        const len = Math.min(bytesA.length, bytesB.length);
-        const result = new Uint8Array(len);
-
-        for (let i = 0; i < len; i++) {
-            result[i] = bytesA[i] ^ bytesB[i];
+        if (formatA === 'Binary') {
+            bigIntA = BigInt(`0b${paddedA}`);
+            bigIntB = BigInt(`0b${paddedB}`);
+        } else if (formatA === 'Hexadecimal') {
+            bigIntA = BigInt(`0x${paddedA}`);
+            bigIntB = BigInt(`0x${paddedB}`);
+        } else {
+             // Should not happen due to initial check, but safety fallback
+             return { output: "ERROR: Unsupported XOR numerical format.", format: formatA };
         }
-
-        return arrayBufferToBase64(result.buffer);
-    } catch (error) {
-        console.error("XOR operation failed:", error);
-        return `ERROR: XOR failed. ${error.message}`;
+    } catch (e) {
+         return { output: "ERROR: Data too large for BigInt XOR or invalid numerical input.", format: formatA };
     }
+
+    // 5. Perform BigInt XOR
+    const resultBigInt = bigIntA ^ bigIntB;
+    
+    // 6. Convert result back to string, maintaining the target length
+    let resultStr;
+    if (formatA === 'Binary') {
+        resultStr = bigIntToString(resultBigInt, 'Binary', targetLength);
+    } else { // Hexadecimal
+        // Hexadecimal is represented by 4 bits per character
+        resultStr = bigIntToString(resultBigInt, 'Hexadecimal', targetLength, true);
+    }
+    
+    return { output: resultStr, format: formatA };
 };
+
+/** Performs XOR on two Uint8Arrays (used for byte-stream fallback). */
+const performRawXor = (bytesA, bytesB) => {
+    const len = Math.min(bytesA.length, bytesB.length);
+    const result = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        result[i] = bytesA[i] ^ bytesB[i];
+    }
+    return result;
+};
+
 
 /** Converts a large number represented as a string (Decimal, Hex, or Binary) to a BigInt.
  * Returns BigInt or null if conversion fails.
@@ -852,7 +904,9 @@ const stringToBigInt = (dataStr, format) => {
         }
         if (format === 'Binary') {
             if (!/^[01]+$/.test(cleanedStr)) return null;
-            return BigInt(`0b${cleanedStr}`);
+            // Pad binary string to be a multiple of 4 bits (a nibble) for safety if not already
+            const paddedBinary = cleanedStr.padStart(Math.ceil(cleanedStr.length / 4) * 4, '0');
+            return BigInt(`0b${paddedBinary}`);
         }
     } catch (e) {
         // BigInt parsing failure (e.g., number too large or invalid structure)
@@ -862,61 +916,137 @@ const stringToBigInt = (dataStr, format) => {
 };
 
 /** Converts a BigInt back to a string in the specified format (Decimal, Hex, Binary). */
-const bigIntToString = (bigIntValue, format) => {
+const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = false) => {
     if (bigIntValue === null) return 'N/A';
     
     switch (format) {
         case 'Decimal':
             return bigIntValue.toString(10);
         case 'Hexadecimal':
-            return bigIntValue.toString(16).toUpperCase();
+            let hexString = bigIntValue.toString(16).toUpperCase();
+            if (originalLength > 0) {
+                 // originalLength here represents the desired *hex character count* if isHexLength is true
+                 const hexLength = isHexLength ? originalLength : Math.ceil(originalLength / 4);
+                 hexString = hexString.padStart(hexLength, '0');
+                 // Si es más largo, lo recortamos por la izquierda (bits más significativos)
+                 if (hexString.length > hexLength) {
+                     hexString = hexString.substring(hexString.length - hexLength);
+                 }
+            }
+            return hexString;
         case 'Binary':
-            return bigIntValue.toString(2);
+            let binaryString = bigIntValue.toString(2);
+            // Rellenar con ceros a la izquierda si se proporciona la longitud original
+            if (originalLength > 0) {
+                binaryString = binaryString.padStart(originalLength, '0');
+                // Si es más largo, lo recortamos por la izquierda (bits más significativos)
+                 if (binaryString.length > originalLength) {
+                     binaryString = binaryString.substring(binaryString.length - originalLength);
+                 }
+            }
+            return binaryString;
         default:
             return bigIntValue.toString(10);
     }
 };
 
 /** * Performs a bit shift operation on the input number (represented by a string).
- * This function now specifically expects the input data to represent a SINGLE large number.
+ * If the input is Binary or Hexadecimal, it performs a Rotational Shift (Circular).
+ * For Decimal input, it performs a standard Arithmetic/Logical Shift.
+ * @returns {{output: string, description: string}} The output data and a description of the shift performed.
  */
 const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) => {
-    if (!dataStr) return "ERROR: Missing data input.";
+    let shiftDescription = `Arithmetic/Logical ${shiftType} Shift (${shiftAmount} bits)`; // Default
     
-    // 1. **REJECT TEXT INPUT** (from previous requirement)
+    if (!dataStr) return { output: "ERROR: Missing data input.", description: shiftDescription };
+    
+    // 1. **REJECT TEXT/BASE64 INPUT**
     if (inputFormat === 'Text (UTF-8)' || inputFormat === 'Base64') {
-        return "ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary), not Text or Base64 byte stream.";
+        return { output: `ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary). Received: ${inputFormat}.`, description: shiftDescription };
     }
     
     // 2. **VALIDATE AND CONVERT TO BIGINT**
-    const bigIntData = stringToBigInt(dataStr, inputFormat);
+    const cleanedStr = dataStr.replace(/\s/g, ''); 
+    const bigIntData = stringToBigInt(cleanedStr, inputFormat);
+    
     if (bigIntData === null) {
-        // Now, this check will correctly catch inputs like "10 20" because of the space check added to stringToBigInt
-        return `ERROR: Data must represent a single, contiguous number in ${inputFormat} format. Spaces are not allowed.`;
+        return { output: `ERROR: Data must represent a single, contiguous number in ${inputFormat} format. Spaces are not allowed.`, description: shiftDescription };
     }
     
     const amount = BigInt(Math.max(0, parseInt(shiftAmount) || 0));
     let resultBigInt;
-
-    // 3. **PERFORM BIT SHIFT**
+    
+    // 3. **DETERMINE BIT LENGTH & ROTATIONAL FLAG**
+    let bitLength = 0;
+    const isRotational = inputFormat === 'Binary' || inputFormat === 'Hexadecimal';
+    
+    if (isRotational) {
+        if (inputFormat === 'Binary') {
+            bitLength = cleanedStr.length;
+        } else if (inputFormat === 'Hexadecimal') {
+            // Cada dígito hexadecimal son 4 bits
+            bitLength = cleanedStr.length * 4;
+        } 
+    }
+    
+    const amountMod = amount % BigInt(bitLength || 1); 
+    
+    
+    // 4. **PERFORM BIT SHIFT (Rotational or Logical/Arithmetic)**
     try {
-        if (shiftType === 'Left') {
-            // Shift Left: multiplication by 2^amount
-            resultBigInt = bigIntData << amount;
-        } else if (shiftType === 'Right') {
-            // Shift Right: division by 2^amount (integer division)
-            resultBigInt = bigIntData >> amount;
+        if (isRotational && bitLength > 0) {
+             // --- ROTATIONAL SHIFT (ROL / ROR) ---
+             const L = BigInt(bitLength);
+             const data = bigIntData;
+
+             if (shiftType === 'Left') {
+                 // Rotational Left Shift (ROL). Bit de más a la izquierda -> Bit de más a la derecha.
+                 // ROL: (x << a) | (x >> (L - a))
+                 
+                 const shiftedLeft = data << amountMod;
+                 const shiftedRight = data >> (L - amountMod);
+                 
+                 // Máscara para mantener la longitud original
+                 const mask = (BigInt(1) << L) - BigInt(1);
+                 resultBigInt = (shiftedLeft | shiftedRight) & mask;
+                 
+                 shiftDescription = `Rotational Left Shift (ROL) (${shiftAmount} bits)`; 
+             } else if (shiftType === 'Right') {
+                 // Rotational Right Shift (ROR). Bit de más a la derecha -> Bit de más a la izquierda.
+                 // ROR: (x >> a) | (x << (L - a))
+                 const shiftedRight = data >> amountMod;
+                 const shiftedLeft = data << (L - amountMod);
+                 
+                 // Máscara para mantener la longitud original
+                 const mask = (BigInt(1) << L) - BigInt(1);
+                 resultBigInt = (shiftedRight | shiftedLeft) & mask;
+                 
+                 shiftDescription = `Rotational Right Shift (ROR) (${shiftAmount} bits)`; 
+             }
+
         } else {
-            return "ERROR: Invalid shift type.";
+            // --- ARITHMETIC/LOGICAL SHIFT (Default for Decimal, or if bitLength=0) ---
+            if (shiftType === 'Left') {
+                resultBigInt = bigIntData << amount;
+            } else { // Right
+                resultBigInt = bigIntData >> amount;
+            }
+            // La descripción predeterminada ya es 'Arithmetic/Logical...'
         }
     } catch (error) {
         console.error("Bit Shift operation failed:", error);
-        return `ERROR: Bit Shift calculation failed. ${error.message}`;
+        return { output: `ERROR: Bit Shift calculation failed. ${error.message}`, description: shiftDescription };
     }
 
-    // 4. **CONVERT BACK** to the original input format
-    return bigIntToString(resultBigInt, inputFormat);
+    // 5. **CONVERT BACK**
+    const finalLength = isRotational ? bitLength : 0;
+    
+    return { 
+        output: bigIntToString(resultBigInt, inputFormat, finalLength, inputFormat === 'Hexadecimal'), 
+        description: shiftDescription 
+    };
 };
+
 
 /** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
@@ -1333,7 +1463,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, generateKey } = node; 
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, generateKey, shiftDescription } = node; 
   // FIX: Declare definition with const to avoid ReferenceError
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
@@ -1540,7 +1670,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         document.body.appendChild(tempTextArea);
         
         // FIX: Select and execute copy command
-        tempTextArea.select();
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
@@ -1644,9 +1773,19 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       specificClasses = `border-yellow-500 ring-4 ring-yellow-300 animate-pulse transition duration-200`; 
   }
   
-  // Determine if the node is currently auto-sizing (e.g., OutputViewer expanded)
-  // We use the node's height, but enforce a minimum.
-  const effectiveMinHeight = isOutputViewer && isConversionExpanded ? 280 : NODE_DIMENSIONS.minHeight;
+  // APLICANDO EL AJUSTE DE ALTURA AQUÍ
+  let requiredMinHeight = NODE_DIMENSIONS.minHeight;
+  
+  if (isOutputViewer) {
+      requiredMinHeight = isConversionExpanded ? 280 : 250;
+  }
+  
+  // Ajuste específico para Bit Shift
+  if (isBitShift) {
+      requiredMinHeight = 300; 
+  }
+
+  const effectiveMinHeight = requiredMinHeight;
 
   const baseClasses = 
     `h-auto flex flex-col justify-start items-center p-3 
@@ -1658,8 +1797,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       left: `${position.x}px`,
       top: `${position.y}px`,
       width: `${width}px`,
-      minHeight: `${effectiveMinHeight}px`,
-      height: `${height}px`, // Use controlled height for port calculation
+      // Usar initialBoxHeight para la altura inicial de la caja,
+      // mientras que minHeight está definido por la validación
+      minHeight: `${effectiveMinHeight}px`, 
+      height: `${height}px`, 
   };
   
   // Calculate remaining space inside the box for growing components
@@ -1715,11 +1856,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       >
         {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
-          {/* Custom icons need size and color applied to the container/SVG itself */}
-          {definition.icon && typeof definition.icon === 'function' ? (
+          {/* Componente Icono (Lógica Simplificada para evitar errores de tipo React) */}
+          {definition.icon && (
               <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
-          ) : (
-              definition.icon && <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
           )}
           <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
           {/* Show algorithm name for functional nodes */}
@@ -1764,7 +1903,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           
           {/* Show status/algorithm for XOR and Bit Shift */}
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
-          {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bit Shift'})</span>}
+          {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : (shiftDescription || 'Bit Shift')})</span>}
           {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>} 
 
 
@@ -1884,7 +2023,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 {/* Primary Output Box (RAW UNCONVERTED Input Data - uses relative height) */}
                 <div 
                     className={`relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200`}
-                    style={{ flexGrow: isConversionExpanded ? 0.5 : 1 }} // Share space when expanded
+                    // Ajuste de altura dinámica para la salida
+                    style={{ flexGrow: isConversionExpanded ? 0.5 : 1.2, minHeight: '40px' }} 
                 >
                     <p>{rawInputData || 'Not connected or no data.'}</p>
                     
@@ -1922,7 +2062,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         {/* Converted Output Box */}
                         <div 
                             className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200"
-                            style={{ flexGrow: 1 }} // Takes remaining space
+                            style={{ flexGrow: 1, minHeight: '40px' }} // Takes remaining space
                         >
                             <p>{convertedData || 'Select conversion type...'}</p>
 
@@ -2004,6 +2144,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
+        {/* Vigenere Cipher */}
         {isVigenereCipher && (
              <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
                 <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>KEYWORD (A-Z only)</span>
@@ -2389,6 +2530,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
+        {/* Simple RSA Decrypt */}
         {isSimpleRSADec && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
@@ -2415,6 +2557,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
+        {/* Simple RSA Sign */}
         {isSimpleRSASign && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'} flex-shrink-0`}>
@@ -2441,6 +2584,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
+        {/* Simple RSA Verify */}
         {isSimpleRSAVerify && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'} flex-shrink-0`}>
@@ -2455,15 +2599,16 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
         
-        {/* XOR Operation (Skipped for brevity) */}
+        {/* XOR Operation */}
         {type === 'XOR_OP' && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
                 <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-lime-600'} flex-shrink-0`}>
                     {isProcessing ? 'Calculating XOR...' : 'Active'}
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
-                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
-                        {dataOutput ? `Result (${node.outputFormat || 'Base64'}): ${dataOutput?.substring(0, 10) + '...'}` : 'Waiting for two data inputs...'}
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {/* Muestra la salida completa de XOR */}
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for two data inputs...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2507,16 +2652,19 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     onTouchStart={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <option value="Left">Left (&lt;&lt;)</option>
-                    <option value="Right">Right (&gt;&gt;)</option>
+                    <option value="Left">Left Shift (ROL)</option>
+                    <option value="Right">Right Shift (ROR)</option>
                 </select>
 
                 <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'} flex-shrink-0`}>
-                    {isProcessing ? 'Shifting...' : 'Active (Single Number Mode)'}
+                    {isProcessing ? 'Shifting...' : (shiftDescription || 'Active (Rotational)')}
                 </span>
-                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow"
+                     // Altura mínima garantizada para la salida (60px)
+                     style={{ minHeight: '60px' }} 
+                >
                     <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'} overflow-y-auto h-full`}>
-                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput?.substring(0, 10) + '...'}` : 'Waiting for single numeric input...'}
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for single numeric input...'}
                     </p>
                     <button
                         onClick={(e) => handleCopyToClipboard(e, dataOutput)}
@@ -2543,204 +2691,6 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     </div>
   );
 };
-
-// --- Helper Component for Toolbar Actions ---
-const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInput }) => {
-    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[color] || 'hover:border-gray-400';
-    const iconTextColorClass = TEXT_ICON_CLASSES[color] || 'text-gray-600';
-    const inputRef = useRef(null);
-
-    const handleClick = () => {
-        if (isFileInput) {
-            inputRef.current.click();
-        } else if (onClick) {
-            onClick();
-        }
-    };
-
-    return (
-        <div className="relative flex-shrink">
-            <button 
-                onClick={handleClick}
-                className={`w-full p-2 flex items-center justify-center // Simplified size and layout
-                            bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
-                            transition duration-150 text-gray-700 rounded-lg shadow-sm`}
-                title={label} // Use label as tooltip
-            >
-                {Icon && <Icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />}
-            </button>
-            
-            {isFileInput && (
-                <input 
-                    type="file" 
-                    ref={inputRef} 
-                    onChange={onChange} 
-                    accept=".json"
-                    className="hidden"
-                />
-            )}
-        </div>
-    );
-};
-
-// --- Toolbar Component ---
-
-const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoomOut }) => {
-    const [collapsedGroups, setCollapsedGroups] = useState(() => {
-        // Initialize all groups to open (false)
-        return ORDERED_NODE_GROUPS.reduce((acc, group) => {
-            acc[group.name] = false;
-            return acc;
-        }, {});
-    });
-
-    const toggleGroup = useCallback((groupName) => {
-        setCollapsedGroups(prev => ({
-            ...prev,
-            [groupName]: !prev[groupName]
-        }));
-    }, []);
-    
-    // Function to handle the Info button click
-    const handleInfoClick = (url) => {
-        // Open the specified URL in a new browser tab
-        window.open(url, '_blank');
-    };
-
-    return (
-        <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
-            {/* Title/Logo Container */}
-            <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
-                <img 
-          // NOTE: The original path was 'VCL - Horizonal logo + name.png'.
-          // Assuming the Canvas environment handles path resolution for the uploaded files in 'public/'.
-          src="VCL - Horizonal logo + name.png"
-          alt="VisualCryptoLab Logo and Name" 
-          className="w-full h-auto max-w-[180px]"
-          // Fallback if image fails to load
-          onError={(e) => {
-              e.target.onerror = null; 
-              e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
-              e.target.alt = "VisualCryptoLab Logo Placeholder";
-          }}
-        />
-            </div>
-
-            <div className="flex flex-col space-y-3 p-3 overflow-y-auto pt-4 flex-grow">
-                
-                {ORDERED_NODE_GROUPS.map((group, groupIndex) => (
-                    <React.Fragment key={group.name}>
-                        {/* Group Header (Clickable) */}
-                        <div 
-                            className="flex justify-between items-center text-xs font-bold uppercase text-gray-500 pt-2 pb-1 border-b border-gray-200 cursor-pointer hover:text-gray-700 transition"
-                            onClick={() => toggleGroup(group.name)}
-                        >
-                            <span className="flex items-center space-x-1">
-                                <span>{group.name}</span>
-                                
-                                {/* Info Button for Simple RSA Group */}
-                                {group.name === 'SIMPLE RSA' && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation(); // Prevent toggling the group
-                                            handleInfoClick('https://github.com/visualcryptolab/vcryptolab/blob/main/docs/SimpleRSA.md');
-                                        }}
-                                        className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
-                                        title="View Simple RSA Documentation"
-                                    >
-                                        <Info className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                                
-                                {/* ADDED: Info Button for SYMMETRIC CRYPTO Group */}
-                                {group.name === 'SYMMETRIC CRYPTO (AES)' && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation(); // Prevent toggling the group
-                                            handleInfoClick('https://www.youtube.com/watch?v=mlzxpkdXP58');
-                                        }}
-                                        className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
-                                        title="View AES Explanation Video"
-                                    >
-                                        <Info className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </span>
-                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsedGroups[group.name] ? 'rotate-180' : ''}`} />
-                        </div>
-                        
-                        {/* Group Content (Conditionally Rendered/Collapsed) */}
-                        {!collapsedGroups[group.name] && (
-                            <div className="space-y-1">
-                                {group.types.map((type) => {
-                                    const def = NODE_DEFINITIONS[type];
-                                    if (!def) return null; // Safety check
-                                    
-                                    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
-                                    const iconTextColorClass = TEXT_ICON_CLASSES[def.color] || 'text-gray-600';
-
-                                    return (
-                                        <button 
-                                            key={type}
-                                            onClick={() => addNode(type, def.label, def.color)}
-                                            className={`w-full py-3 px-4 flex items-center justify-start space-x-3 
-                                                         bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
-                                                         transition duration-150 text-gray-700 rounded-lg shadow-sm`}
-                                        >
-                                            {/* Render the custom icon component or the default Lucide icon */}
-                                            {def.icon && typeof def.icon === 'function' ? (
-                                                <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
-                                            ) : (
-                                                def.icon && <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
-                                            )}
-                                            <span className="font-medium text-left">{def.label}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </React.Fragment>
-                ))}
-                
-            </div>
-            
-            {/* Action Buttons Section at the bottom */}
-            <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
-                
-                <ToolbarButton 
-                    icon={Download} 
-                    label="Download Project (JSON)" 
-                    color="blue" 
-                    onClick={onDownloadProject}
-                />
-                
-                <ToolbarButton 
-                    icon={Upload} 
-                    label="Upload Project (JSON)" 
-                    color="orange" 
-                    onChange={onUploadProject}
-                    isFileInput={true} 
-                />
-                
-                {/* NEW: Zoom Out Button */}
-                <ToolbarButton 
-                    icon={ZoomOut} 
-                    label="Zoom Out" 
-                    color="teal" 
-                    onClick={onZoomOut}
-                />
-
-                {/* NEW: Zoom In Button */}
-                <ToolbarButton 
-                    icon={ZoomIn} 
-                    label="Zoom In" 
-                    color="teal" 
-                    onClick={onZoomIn}
-                />
-            </div>
-        </div>
-    );
-}
 
 // --- Main Application Component ---
 
@@ -3283,7 +3233,7 @@ const App = () => {
                     if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
                         n_val = sourceKeyGenNode.n;
-                        e_val = sourceKeyGenNode.e;
+                        e_val = sourceNodeKeyGen.e;
                         isReadOnly = true;
                     } 
                     
@@ -3502,11 +3452,7 @@ const App = () => {
                         // --- Asynchronous operation starts here ---
                         // Update node to processing state and defer output setting to promise resolution
                         calculateHash(hashInput, algorithm).then(hashResult => {
-                            setNodes(prevNodes => prevNodes.map(n => 
-                                n.id === sourceId 
-                                    ? { ...n, dataOutput: hashResult, isProcessing: false } 
-                                    : n
-                            ));
+                            setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: hashResult, isProcessing: false } : n));
                         }).catch(err => {
                              setNodes(prevNodes => prevNodes.map(n => 
                                  n.id === sourceId 
@@ -3536,20 +3482,15 @@ const App = () => {
                     const formatA = inputs['dataA']?.format; // Primary input format
                     const formatB = inputs['dataB']?.format;
 
+                    // --- NUEVA LÓGICA XOR ---
                     if (dataInputA && dataInputB && !dataInputA.startsWith('ERROR') && !dataInputB.startsWith('ERROR')) { 
-                        // Note: XOR is a byte-wise operation, so conversion to Uint8Array is appropriate.
-                        const bytesA = convertToUint8Array(dataInputA, formatA);
-                        const bytesB = convertToUint8Array(dataInputB, formatB);
-
-                        isProcessing = true; 
-                        const base64Result = performBitwiseXor(bytesA, bytesB); 
-                        // For XOR, the output format is defaulted to the first input's format, but must be Base64 internally
-                        let outputFormat = formatA; 
-                        if (outputFormat === 'N/A' || outputFormat === 'Decimal') outputFormat = 'Base64'; // Fallback if format is weird or Decimal bytes assumed
+                        isProcessing = true;
                         
-                        outputData = convertDataFormat(base64Result, 'Base64', outputFormat);
-                        sourceNode.outputFormat = outputFormat; 
-                        isProcessing = false; 
+                        const result = performBitwiseXor(dataInputA, formatA, dataInputB, formatB);
+                        outputData = result.output;
+                        sourceNode.outputFormat = result.format;
+                        isProcessing = false;
+                        
                     } else if (dataInputA?.startsWith('ERROR')) {
                         outputData = dataInputA;
                     } else if (dataInputB?.startsWith('ERROR')) {
@@ -3564,6 +3505,8 @@ const App = () => {
                         outputData = 'Waiting for two data inputs.'; 
                         sourceNode.outputFormat = '';
                     }
+                    // --- FIN NUEVA LÓGICA XOR ---
+
                     break;
                 
                 case 'SHIFT_OP':
@@ -3578,7 +3521,9 @@ const App = () => {
                         // Data formats considered single numbers: Decimal, Hexadecimal, Binary
                         if (shiftFormat === 'Decimal' || shiftFormat === 'Hexadecimal' || shiftFormat === 'Binary') {
                             
-                            outputData = performBitShiftOperation(shiftDataInput, shiftType, shiftAmount, shiftFormat);
+                            const result = performBitShiftOperation(shiftDataInput, shiftType, shiftAmount, shiftFormat);
+                            outputData = result.output;
+                            sourceNode.shiftDescription = result.description; // Update description safely
                             sourceNode.outputFormat = shiftFormat;
                             
                         } else {
@@ -3593,6 +3538,7 @@ const App = () => {
                     } else { 
                         outputData = 'Waiting for data input.'; 
                         sourceNode.outputFormat = '';
+                        sourceNode.shiftDescription = 'Active (Rotational)';
                     }
                     break;
 
@@ -3802,12 +3748,22 @@ const App = () => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
+    // Usar la altura ajustada aquí para Bit Shift
+    let initialNodeHeight = NODE_DIMENSIONS.initialHeight;
+    let initialNodeWidth = NODE_DIMENSIONS.initialWidth;
+    
+    if (type === 'SHIFT_OP' || type === 'XOR_OP') {
+        // Altura específica para Bit Shift y XOR (similares en estructura)
+        initialNodeHeight = 300; 
+        initialNodeWidth = 300;
+    }
+    
     const initialContent = { 
         dataOutput: '', 
         isProcessing: false, 
         outputFormat: getOutputFormat(type),
-        width: NODE_DIMENSIONS.initialWidth, // Initial width
-        height: NODE_DIMENSIONS.initialHeight, // Initial height
+        width: initialNodeWidth, // Initial width
+        height: initialNodeHeight, // Initial height
     };
     
     // --- Determine a sensible starting position near the center/previous nodes ---
@@ -3819,8 +3775,8 @@ const App = () => {
     const canvasHeight = canvas?.clientHeight > 100 ? canvas.clientHeight : 600;
     
     // Base position near the center
-    let x = (canvasWidth / 2) - (NODE_DIMENSIONS.initialWidth / 2);
-    let y = (canvasHeight / 2) - (NODE_DIMENSIONS.initialHeight / 2);
+    let x = (canvasWidth / 2) - (initialNodeWidth / 2);
+    let y = (canvasHeight / 2) - (initialNodeHeight / 2);
     
     // Add small random offset (max 100px) to prevent direct overlap
     // Range is -100 to 100
@@ -3829,8 +3785,8 @@ const App = () => {
     y += randomOffset();
 
     // Ensure bounds are not violated by the random offset
-    x = Math.max(20, Math.min(x, canvasWidth - NODE_DIMENSIONS.initialWidth - 20));
-    y = Math.max(20, Math.min(y, canvasHeight - NODE_DIMENSIONS.initialHeight - 20));
+    x = Math.max(20, Math.min(x, canvasWidth - initialNodeWidth - 20));
+    y = Math.max(20, Math.min(y, canvasHeight - initialNodeHeight - 20));
     
     const position = { x, y };
     // --------------------------------------------------------------------------
@@ -3897,9 +3853,10 @@ const App = () => {
     } else if (type === 'SHIFT_OP') {
       initialContent.shiftType = 'Left';
       initialContent.shiftAmount = 1;
-      initialContent.outputFormat = ''; // Dynamic output format
+      initialContent.outputFormat = 'Binary'; // Dynamic output format, default to Binary
+      initialContent.shiftDescription = 'Active (Rotational)';
     } else if (type === 'XOR_OP') {
-      initialContent.outputFormat = ''; // Dynamic output format
+      initialContent.outputFormat = 'Binary'; // Default output for precise operation
     }
 
     setNodes(prevNodes => [
@@ -4111,5 +4068,201 @@ const App = () => {
     </div>
   );
 };
+
+// --- Helper Component for Toolbar Actions ---
+const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInput }) => {
+    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[color] || 'hover:border-gray-400';
+    const iconTextColorClass = TEXT_ICON_CLASSES[color] || 'text-gray-600';
+    const inputRef = useRef(null);
+
+    const handleClick = () => {
+        if (isFileInput) {
+            inputRef.current.click();
+        } else if (onClick) {
+            onClick();
+        }
+    };
+
+    return (
+        <div className="relative flex-shrink">
+            <button 
+                onClick={handleClick}
+                className={`w-full p-2 flex items-center justify-center // Simplified size and layout
+                            bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
+                            transition duration-150 text-gray-700 rounded-lg shadow-sm`}
+                title={label} // Use label as tooltip
+            >
+                {Icon && <Icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />}
+            </button>
+            
+            {isFileInput && (
+                <input 
+                    type="file" 
+                    ref={inputRef} 
+                    onChange={onChange} 
+                    accept=".json"
+                    className="hidden"
+                />
+            )}
+        </div>
+    );
+};
+
+// --- Toolbar Component ---
+
+const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoomOut }) => {
+    const [collapsedGroups, setCollapsedGroups] = useState(() => {
+        // Initialize all groups to open (false)
+        return ORDERED_NODE_GROUPS.reduce((acc, group) => {
+            acc[group.name] = false;
+            return acc;
+        }, {});
+    });
+
+    const toggleGroup = useCallback((groupName) => {
+        setCollapsedGroups(prev => ({
+            ...prev,
+            [groupName]: !prev[groupName]
+        }));
+    }, []);
+    
+    // Function to handle the Info button click
+    const handleInfoClick = (url) => {
+        // Open the specified URL in a new browser tab
+        window.open(url, '_blank');
+    };
+
+    return (
+        <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
+            {/* Title/Logo Container */}
+            <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
+                <img 
+          // NOTE: The original path was 'VCL - Horizonal logo + name.png'.
+          // Assuming the Canvas environment handles path resolution for the uploaded files in 'public/'.
+          src="VCL - Horizonal logo + name.png"
+          alt="VisualCryptoLab Logo and Name" 
+          className="w-full h-auto max-w-[180px]"
+          // Fallback if image fails to load
+          onError={(e) => {
+              e.target.onerror = null; 
+              e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
+              e.target.alt = "VisualCryptoLab Logo Placeholder";
+          }}
+        />
+            </div>
+
+            <div className="flex flex-col space-y-3 p-3 overflow-y-auto pt-4 flex-grow">
+                
+                {ORDERED_NODE_GROUPS.map((group, groupIndex) => (
+                    <React.Fragment key={group.name}>
+                        {/* Group Header (Clickable) */}
+                        <div 
+                            className="flex justify-between items-center text-xs font-bold uppercase text-gray-500 pt-2 pb-1 border-b border-gray-200 cursor-pointer hover:text-gray-700 transition"
+                            onClick={() => toggleGroup(group.name)}
+                        >
+                            <span className="flex items-center space-x-1">
+                                <span>{group.name}</span>
+                                
+                                {/* Info Button for Simple RSA Group */}
+                                {group.name === 'SIMPLE RSA' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent toggling the group
+                                            handleInfoClick('https://github.com/visualcryptolab/vcryptolab/blob/main/docs/SimpleRSA.md');
+                                        }}
+                                        className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
+                                        title="View Simple RSA Documentation"
+                                    >
+                                        <Info className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                                
+                                {/* ADDED: Info Button for SYMMETRIC CRYPTO Group */}
+                                {group.name === 'SYMMETRIC CRYPTO (AES)' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent toggling the group
+                                            handleInfoClick('https://www.youtube.com/watch?v=mlzxpkdXP58');
+                                        }}
+                                        className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
+                                        title="View AES Explanation Video"
+                                    >
+                                        <Info className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsedGroups[group.name] ? 'rotate-180' : ''}`} />
+                        </div>
+                        
+                        {/* Group Content (Conditionally Rendered/Collapsed) */}
+                        {!collapsedGroups[group.name] && (
+                            <div className="space-y-1">
+                                {group.types.map((type) => {
+                                    const def = NODE_DEFINITIONS[type];
+                                    if (!def) return null; // Safety check
+                                    
+                                    const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
+                                    const iconTextColorClass = TEXT_ICON_CLASSES[def.color] || 'text-gray-600';
+
+                                    return (
+                                        <button 
+                                            key={type}
+                                            onClick={() => addNode(type, def.label, def.color)}
+                                            className={`w-full py-3 px-4 flex items-center justify-start space-x-3 
+                                                         bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
+                                                         transition duration-150 text-gray-700 rounded-lg shadow-sm`}
+                                        >
+                                            {/* Render the custom icon component or the default Lucide icon */}
+                                            {def.icon && (
+                                                <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
+                                            )}
+                                            <span className="font-medium text-left">{def.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </React.Fragment>
+                ))}
+                
+            </div>
+            
+            {/* Action Buttons Section at the bottom */}
+            <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
+                
+                <ToolbarButton 
+                    icon={Download} 
+                    label="Download Project (JSON)" 
+                    color="blue" 
+                    onClick={onDownloadProject}
+                />
+                
+                <ToolbarButton 
+                    icon={Upload} 
+                    label="Upload Project (JSON)" 
+                    color="orange" 
+                    onChange={onUploadProject}
+                    isFileInput={true} 
+                />
+                
+                {/* NEW: Zoom Out Button */}
+                <ToolbarButton 
+                    icon={ZoomOut} 
+                    label="Zoom Out" 
+                    color="teal" 
+                    onClick={onZoomOut}
+                />
+
+                {/* NEW: Zoom In Button */}
+                <ToolbarButton 
+                    icon={ZoomIn} 
+                    label="Zoom In" 
+                    color="teal" 
+                    onClick={onZoomIn}
+                />
+            </div>
+        </div>
+    );
+}
 
 export default App;
