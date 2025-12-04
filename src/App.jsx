@@ -5,6 +5,11 @@ import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, 
 // needs to be loaded globally in the consuming environment. This is assumed to be handled
 // by the Canvas environment or an external script tag (as seen in the original index.html).
 
+// --- Project Schema Versioning ---
+// V1.0: Initial core features (pre-migration logic)
+// V1.1: Standardized Data Input outputFormat to match input format (e.g., Binary, not Text) for math nodes. Added width/height defaults.
+const PROJECT_SCHEMA_VERSION = '1.1';
+
 // --- CSS Styles (Consolidated from src/App.css, src/main.css, and src/styles.css) ---
 const globalStyles = `
 /* Styles from src/main.css and src/styles.css (Tailwind directives) */
@@ -2527,7 +2532,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </div>
             </div>
         )}
-        
+
         {/* Symmetric Encrypt (AES-GCM) */}
         {isSymEnc && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
@@ -2709,7 +2714,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         {/* XOR Operation */}
         {type === 'XOR_OP' && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
-                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-lime-600'} flex-shrink-0`}>
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-lime-600'} flex-shrink-0`}>
                     {isProcessing ? 'Calculating XOR...' : 'Active'}
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
@@ -2850,6 +2855,73 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
 // --- Main Application Component ---
 
+// Function to handle the migration of old project structures
+const migrateProjectData = (projectData) => {
+    // Current application schema version (hardcoded at the top of the file)
+    const currentVersion = PROJECT_SCHEMA_VERSION;
+    // Version of the imported file
+    const importedVersion = projectData.schemaVersion || '1.0'; // Default old version if missing
+
+    // Check if migration is necessary
+    if (importedVersion === currentVersion) {
+        return projectData;
+    }
+    
+    // Create a working copy of the project data
+    let migratedData = { ...projectData };
+
+    // --- Migration Logic ---
+    
+    // Migration from pre-1.1 (V1.0) to V1.1
+    // V1.0 issues:
+    // 1. DATA_INPUT nodes often had outputFormat: "Text (UTF-8)" even if input was binary/hex, breaking math nodes.
+    // 2. Nodes might lack required dimensions (width, height) which are now crucial for responsive layout.
+    // 3. XOR_OP and SHIFT_OP sizes might be too small (250px)
+
+    if (importedVersion < '1.1') {
+        migratedData.nodes = migratedData.nodes.map(node => {
+            const newNode = { ...node };
+
+            // 1. Fix DATA_INPUT outputFormat mismatch (Crucial for V1.0 files like the one provided)
+            if (newNode.type === 'DATA_INPUT' && newNode.format && newNode.outputFormat === 'Text (UTF-8)') {
+                // If content type is numeric (Binary/Hex/Decimal), we force outputFormat to match the input format.
+                if (['Binary', 'Hexadecimal', 'Decimal'].includes(newNode.format)) {
+                    newNode.outputFormat = newNode.format;
+                }
+            }
+
+            // 2. Add default dimensions if missing or too small for V1.1 UI standards
+            if (!newNode.width || newNode.width < NODE_DIMENSIONS.minWidth) {
+                newNode.width = NODE_DIMENSIONS.initialWidth;
+            }
+            if (!newNode.height || newNode.height < NODE_DIMENSIONS.minHeight) {
+                // Use the larger initial height for functional nodes that need it
+                if (newNode.type === 'XOR_OP' || newNode.type === 'SHIFT_OP' || newNode.type === 'DATA_SPLIT') {
+                    newNode.height = 300;
+                } else {
+                    newNode.height = NODE_DIMENSIONS.initialHeight;
+                }
+            }
+            
+            // 3. Clear unnecessary fields from XOR_OP nodes that might be relics
+            if (newNode.type === 'XOR_OP') {
+                 delete newNode.shiftType;
+                 delete newNode.shiftAmount;
+                 delete newNode.shiftDescription;
+            }
+
+
+            return newNode;
+        });
+    }
+
+    // Set the new version stamp
+    migratedData.schemaVersion = currentVersion;
+    console.log(`Project migrated from version ${importedVersion} to ${currentVersion}.`);
+    return migratedData;
+};
+
+
 const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
   const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
@@ -2893,6 +2965,7 @@ const App = () => {
 
   const handleDownloadProject = useCallback(() => {
     const projectData = {
+        schemaVersion: PROJECT_SCHEMA_VERSION, // Export current version
         nodes: nodes,
         connections: connections
     };
@@ -2920,10 +2993,14 @@ const App = () => {
               return;
           }
 
-          // 2. Validate the essential structure
+          // 2. Validate essential structure and migrate if necessary
           if (projectData && Array.isArray(projectData.nodes) && Array.isArray(projectData.connections)) {
-              setNodes(projectData.nodes);
-              setConnections(projectData.connections);
+              
+              // --- CORE MIGRATION STEP ---
+              const migratedData = migrateProjectData(projectData);
+              
+              setNodes(migratedData.nodes);
+              setConnections(migratedData.connections);
               // Recalculation is triggered by the useEffect hook watching nodes/connections
           } else {
               console.error("Invalid project file structure:", projectData);
