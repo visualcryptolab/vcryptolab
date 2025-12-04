@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut, Info } from 'lucide-react'; 
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut, Info, Split } from 'lucide-react'; 
 
 // NOTE: For the 'Download Diagram (JPG)' feature to work, the html2canvas library 
 // needs to be loaded globally in the consuming environment. This is assumed to be handled
@@ -93,7 +93,7 @@ function BitShiftIcon(props) {
 
 
 // =================================================================
-// 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS (Copied from original App.jsx)
+// 1. HELPER CONSTANTS & STATIC TAILWIND CLASS MAPS
 // =================================================================
 
 // --- Static Tailwind Class Maps (Ensures no dynamic class generation) ---
@@ -107,6 +107,8 @@ const BORDER_CLASSES = {
   amber: 'border-amber-500', // Caesar Cipher
   yellow: 'border-yellow-400', // Vigenere Cipher
   fuchsia: 'border-fuchsia-600', // RSA Signature
+  // Data Split Node Color
+  green: 'border-green-600',
 };
 
 const HOVER_BORDER_CLASSES = {
@@ -118,6 +120,8 @@ const HOVER_BORDER_CLASSES = {
   amber: 'hover:border-amber-400',
   yellow: 'hover:border-yellow-300',
   fuchsia: 'hover:border-fuchsia-500',
+  // Data Split Node Color
+  green: 'hover:border-green-500',
 };
 
 const TEXT_ICON_CLASSES = {
@@ -129,18 +133,28 @@ const TEXT_ICON_CLASSES = {
   amber: 'text-amber-500',
   yellow: 'text-yellow-400',
   fuchsia: 'text-fuchsia-600',
-  // REMOVED DUPLICATE 'lime' KEY: lime: 'text-lime-600',
+  // Data Split Node Color
+  green: 'text-green-600',
 };
 
 const HOVER_BORDER_TOOLBAR_CLASSES = {
-  blue: 'hover:border-blue-400', red: 'hover:border-red-400', orange: 'hover:border-orange-400', cyan: 'hover:border-cyan-400', pink: 'hover:border-pink-400', 
-  teal: 'hover:border-teal-400', gray: 'hover:border-gray-400', lime: 'hover:border-lime-400', indigo: 'hover:border-indigo-400',
+  blue: 'hover:border-blue-400', 
+  red: 'hover:border-red-400', 
+  orange: 'hover:border-orange-400', 
+  cyan: 'hover:border-cyan-400', 
+  pink: 'hover:border-pink-400', 
+  teal: 'hover:border-teal-400', 
+  gray: 'hover:border-gray-400', 
+  lime: 'hover:border-lime-400', 
+  indigo: 'hover:border-indigo-400',
   purple: 'hover:border-purple-400',
   maroon: 'hover:border-red-600',
   rose: 'hover:border-pink-600',
   amber: 'hover:border-amber-400',
   yellow: 'hover:border-yellow-300',
   fuchsia: 'hover:border-fuchsia-400',
+  // Data Split Node Color
+  green: 'hover:border-green-400',
 };
 
 // --- Port Configuration ---
@@ -179,6 +193,36 @@ const NODE_DEFINITIONS = {
     outputPorts: [{ name: 'Viewer Data Output', type: 'data', keyField: 'dataOutput' }] 
   },
   
+  // --- Core Utility Nodes ---
+  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, 
+    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
+    outputPorts: [{ name: 'Hash Output', type: 'data', keyField: 'dataOutput' }] },
+
+  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: XORIcon, // Updated icon
+    inputPorts: [
+        { name: 'Input A', type: 'data', mandatory: true, id: 'dataA' }, 
+        { name: 'Input B', type: 'data', mandatory: true, id: 'dataB' }
+    ], 
+    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
+    
+  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: BitShiftIcon, // Updated icon
+    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
+    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
+    
+  // Data Split Node (Divide data in two halves)
+  DATA_SPLIT: { 
+    label: 'Data Split', // Removed (Half)
+    color: 'green', 
+    icon: Split, // Lucide icon for splitting
+    inputPorts: [
+        { name: 'Data Input', type: 'data', mandatory: true, id: 'data' }
+    ], 
+    outputPorts: [
+        { name: 'Chunk 1', type: 'data', keyField: 'chunk1' }, // Output to store the first half
+        { name: 'Chunk 2', type: 'data', keyField: 'chunk2' }  // Output to store the second half
+    ] 
+  },
+
   // --- Classic Cipher Nodes ---
   CAESAR_CIPHER: {
     label: 'Caesar Cipher',
@@ -215,7 +259,7 @@ const NODE_DEFINITIONS = {
     ]
   },
     
-  // NEW: Simple RSA Public Key Generator
+  // Simple RSA Public Key Generator
   SIMPLE_RSA_PUBKEY_GEN: {
     label: 'Simple RSA PubKey Gen',
     color: 'lime', 
@@ -331,28 +375,12 @@ const NODE_DEFINITIONS = {
     ], 
     outputPorts: [{ name: 'Plaintext', type: 'data', keyField: 'dataOutput' }]
   },
-
-  // --- Utility Nodes ---
-  HASH_FN: { label: 'Hash Function', color: 'gray', icon: Hash, 
-    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
-    outputPorts: [{ name: 'Hash Output', type: 'data', keyField: 'dataOutput' }] },
-
-  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: XORIcon, // Updated icon
-    inputPorts: [
-        { name: 'Input A', type: 'data', mandatory: true, id: 'dataA' }, 
-        { name: 'Input B', type: 'data', mandatory: true, id: 'dataB' }
-    ], 
-    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
-    
-  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: BitShiftIcon, // Updated icon
-    inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
-    outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
 };
 
 // --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
-    // Consolidated 'DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP' into CORE TOOLS
-    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP'] },
+    // MODIFIED: Added 'DATA_SPLIT' to CORE TOOLS
+    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP', 'DATA_SPLIT'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
     // MODIFIED: Changed name from 'SIMPLE RSA (MODULAR)' to 'SIMPLE RSA'
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
@@ -368,7 +396,7 @@ const INITIAL_NODES = []; // Set to empty array to start clean
 const INITIAL_CONNECTIONS = []; // No initial connections
 
 // --- Node Dimension Constants (for initial and minimum size) ---
-// Dimensiones ajustadas para garantizar visibilidad del Bit Shift
+// Dimensions adjusted to ensure Bit Shift visibility
 const NODE_DIMENSIONS = { initialWidth: 300, initialHeight: 280, minWidth: 250, minHeight: 250 };
 
 // Used for initial placement reference. All components should use NODE_DIMENSIONS now.
@@ -376,7 +404,7 @@ const BOX_SIZE = NODE_DIMENSIONS;
 
 
 // =================================================================
-// 2. CRYPTO & UTILITY FUNCTIONS (Modified Symmetric functions and helpers)
+// 2. CRYPTO & UTILITY FUNCTIONS
 // =================================================================
 
 /** Calculates (base^exponent) mod modulus using BigInt for large numbers. */
@@ -652,6 +680,7 @@ const hexToArrayBuffer = (hex) => {
     const len = paddedHex.length / 2;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
+        // Parse two hex characters as one byte (base 16)
         bytes[i] = parseInt(paddedHex.substring(i * 2, i * 2 + 2), 16);
     }
     return bytes.buffer;
@@ -774,7 +803,9 @@ const getOutputFormat = (nodeType) => {
             return 'Text (UTF-8)'; 
         case 'KEY_GEN':
         case 'SYM_ENC':
-        // REMOVED XOR_OP, SHIFT_OP from here as they are dynamic
+        // DATA_SPLIT outputs data chunks in Binary format by default (as it is the most raw representation of bits)
+        case 'DATA_SPLIT': 
+            return 'Binary';
         case 'ASYM_ENC':
         case 'SIMPLE_RSA_KEY_GEN':
         case 'RSA_KEY_GEN':
@@ -928,7 +959,7 @@ const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = f
                  // originalLength here represents the desired *hex character count* if isHexLength is true
                  const hexLength = isHexLength ? originalLength : Math.ceil(originalLength / 4);
                  hexString = hexString.padStart(hexLength, '0');
-                 // Si es más largo, lo recortamos por la izquierda (bits más significativos)
+                 // If it's longer, we trim from the left (most significant bits)
                  if (hexString.length > hexLength) {
                      hexString = hexString.substring(hexString.length - hexLength);
                  }
@@ -936,10 +967,10 @@ const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = f
             return hexString;
         case 'Binary':
             let binaryString = bigIntValue.toString(2);
-            // Rellenar con ceros a la izquierda si se proporciona la longitud original
+            // Pad with leading zeros if original length is provided
             if (originalLength > 0) {
                 binaryString = binaryString.padStart(originalLength, '0');
-                // Si es más largo, lo recortamos por la izquierda (bits más significativos)
+                // If it's longer, we trim from the left (most significant bits)
                  if (binaryString.length > originalLength) {
                      binaryString = binaryString.substring(binaryString.length - originalLength);
                  }
@@ -984,7 +1015,7 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
         if (inputFormat === 'Binary') {
             bitLength = cleanedStr.length;
         } else if (inputFormat === 'Hexadecimal') {
-            // Cada dígito hexadecimal son 4 bits
+            // Each hexadecimal digit is 4 bits
             bitLength = cleanedStr.length * 4;
         } 
     }
@@ -1000,24 +1031,24 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
              const data = bigIntData;
 
              if (shiftType === 'Left') {
-                 // Rotational Left Shift (ROL). Bit de más a la izquierda -> Bit de más a la derecha.
+                 // Rotational Left Shift (ROL). Leftmost bit -> Rightmost bit.
                  // ROL: (x << a) | (x >> (L - a))
                  
                  const shiftedLeft = data << amountMod;
                  const shiftedRight = data >> (L - amountMod);
                  
-                 // Máscara para mantener la longitud original
+                 // Mask to keep the original length
                  const mask = (BigInt(1) << L) - BigInt(1);
                  resultBigInt = (shiftedLeft | shiftedRight) & mask;
                  
                  shiftDescription = `Rotational Left Shift (ROL) (${shiftAmount} bits)`; 
              } else if (shiftType === 'Right') {
-                 // Rotational Right Shift (ROR). Bit de más a la derecha -> Bit de más a la izquierda.
+                 // Rotational Right Shift (ROR). Rightmost bit -> Leftmost bit.
                  // ROR: (x >> a) | (x << (L - a))
                  const shiftedRight = data >> amountMod;
                  const shiftedLeft = data << (L - amountMod);
                  
-                 // Máscara para mantener la longitud original
+                 // Mask to keep the original length
                  const mask = (BigInt(1) << L) - BigInt(1);
                  resultBigInt = (shiftedRight | shiftedLeft) & mask;
                  
@@ -1031,7 +1062,7 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
             } else { // Right
                 resultBigInt = bigIntData >> amount;
             }
-            // La descripción predeterminada ya es 'Arithmetic/Logical...'
+            // The default description is already 'Arithmetic/Logical...'
         }
     } catch (error) {
         console.error("Bit Shift operation failed:", error);
@@ -1047,6 +1078,80 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
     };
 };
 
+// Data Split Utility Function
+/** * Splits the input data string into two equal chunks. 
+ * Returns the result in the original format (or a standardized one like Binary)
+ * If data length is odd, the first chunk gets the extra element.
+ * @param {string} dataStr The data string (in its source format).
+ * @param {string} format The source format of the data.
+ * @returns {{chunk1: string, chunk2: string, outputFormat: string}} The two chunks and the resulting format.
+ */
+const splitDataIntoChunks = (dataStr, format) => {
+    if (!dataStr || dataStr.startsWith('ERROR')) {
+        const error = dataStr || 'Missing data input.';
+        return { chunk1: `ERROR: ${error}`, chunk2: `ERROR: ${error}`, outputFormat: format };
+    }
+
+    // 1. Convert to the most appropriate intermediary representation for splitting
+    let cleanData = dataStr.replace(/\s/g, '');
+    let representation;
+    let splitUnit; // How we measure length (characters, binary digits, etc.)
+
+    // Use Binary representation for precise splitting if it's a numeric format.
+    // Use raw characters if it's Text/Base64 (less precise, but often what's desired).
+
+    if (format === 'Text (UTF-8)' || format === 'Base64') {
+        representation = cleanData;
+        splitUnit = 'char';
+    } else if (format === 'Hexadecimal') {
+        // Hex splitting: 1 hex char = 4 bits. We split by hex characters.
+        representation = cleanData;
+        splitUnit = 'hex';
+    } else if (format === 'Decimal') {
+        // Decimal splitting is problematic as a single decimal string represents one large number. 
+        // We warn and convert to a binary stream of bytes first.
+        return { chunk1: `ERROR: Cannot split a single Decimal number. Convert to Base64/Hex/Binary stream first.`, 
+                 chunk2: `ERROR: Cannot split a single Decimal number. Convert to Base64/Hex/Binary stream first.`, 
+                 outputFormat: 'Text (UTF-8)' };
+    } else { // Binary, or any other assumed stream
+        representation = cleanData;
+        splitUnit = 'bin';
+    }
+    
+    // 2. Perform the split
+    const length = representation.length;
+    const midPoint = Math.ceil(length / 2); // First chunk gets the extra char/bit if length is odd
+    
+    const chunk1 = representation.substring(0, midPoint);
+    const chunk2 = representation.substring(midPoint);
+    
+    // 3. Format the chunks back to the original format
+    const outputFormat = format; 
+    
+    // Re-introduce spacing for Hex/Binary for readability if they were originally spaced
+    const formatChunk = (chunk, originalFormat) => {
+        if (originalFormat === 'Hexadecimal' && splitUnit === 'hex') {
+             // Re-add byte separation (2 hex chars). This is only valid if the original hex string had an even length
+             // and the split point respects byte boundaries (which it may not if splitting by character).
+             // However, for consistency with the display of input hex stream, we try to format it.
+             const spacedChunk = chunk.match(/.{1,2}/g)?.join(' ') || chunk;
+             return spacedChunk.trim(); // Trim leading/trailing spaces
+        }
+        if (originalFormat === 'Binary' && splitUnit === 'bin') {
+             // Re-add byte separation (8 binary chars).
+             const spacedChunk = chunk.match(/.{1,8}/g)?.join(' ') || chunk;
+             return spacedChunk.trim();
+        }
+        return chunk;
+    };
+
+
+    return { 
+        chunk1: formatChunk(chunk1, format), 
+        chunk2: formatChunk(chunk2, format), 
+        outputFormat: format
+    };
+};
 
 /** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
@@ -1332,7 +1437,7 @@ const isContentCompatible = (content, targetFormat) => {
 
 
 // =================================================================
-// 3. UI COMPONENTS & GRAPH LOGIC (Copied from original App.jsx)
+// 3. UI COMPONENTS & GRAPH LOGIC
 // =================================================================
 
 /**
@@ -1463,11 +1568,11 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize }) => {
   // Destructure node props and look up definition
-  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, generateKey, shiftDescription } = node; 
-  // FIX: Declare definition with const to avoid ReferenceError
+  const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, generateKey, shiftDescription, chunk1, chunk2 } = node; 
+  // Get node definition
   const definition = NODE_DEFINITIONS[type];
   const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false); // New resizing state
+  const [isResizing, setIsResizing] = useState(false); // Resizing state
   const boxRef = useRef(null);
   const offset = useRef({ x: 0, y: 0 });
   const resizeOffset = useRef({ x: 0, y: 0 }); // Stores the difference between mouse and corner
@@ -1478,20 +1583,21 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isOutputViewer = type === 'OUTPUT_VIEWER'; 
   const isHashFn = type === 'HASH_FN';
   const isKeyGen = type === 'KEY_GEN';
-  const isSimpleRSAKeyGen = type === 'SIMPLE_RSA_KEY_GEN'; // Private Key Gen
-  const isSimpleRSAPubKeyGen = type === 'SIMPLE_RSA_PUBKEY_GEN'; // Public Key Gen
+  const isSimpleRSAKeyGen = type === 'SIMPLE_RSA_KEY_GEN'; 
+  const isSimpleRSAPubKeyGen = type === 'SIMPLE_RSA_PUBKEY_GEN'; 
   const isRSAKeyGen = type === 'RSA_KEY_GEN'; 
-  const isSimpleRSAEnc = type === 'SIMPLE_RSA_ENC'; // New Flag
-  const isSimpleRSADec = type === 'SIMPLE_RSA_DEC'; // New Flag
-  const isSimpleRSASign = type === 'SIMPLE_RSA_SIGN'; // New Flag
-  const isSimpleRSAVerify = type === 'SIMPLE_RSA_VERIFY'; // New Flag
+  const isSimpleRSAEnc = type === 'SIMPLE_RSA_ENC'; 
+  const isSimpleRSADec = type === 'SIMPLE_RSA_DEC'; 
+  const isSimpleRSASign = type === 'SIMPLE_RSA_SIGN'; 
+  const isSimpleRSAVerify = type === 'SIMPLE_RSA_VERIFY'; 
   const isSymEnc = type === 'SYM_ENC';
   const isSymDec = type === 'SYM_DEC';
   const isAsymEnc = type === 'ASYM_ENC'; 
   const isAsymDec = type === 'ASYM_DEC'; 
   const isBitShift = type === 'SHIFT_OP'; 
-  const isCaesarCipher = type === 'CAESAR_CIPHER'; // New Flag
-  const isVigenereCipher = type === 'VIGENERE_CIPHER'; // New Flag
+  const isCaesarCipher = type === 'CAESAR_CIPHER'; 
+  const isVigenereCipher = type === 'VIGENERE_CIPHER'; 
+  const isDataSplit = type === 'DATA_SPLIT'; // Data Split Flag
   
   const FORMATS = ALL_FORMATS;
   
@@ -1669,7 +1775,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
         document.body.appendChild(tempTextArea);
         
-        // FIX: Select and execute copy command
+        // Use document.execCommand('copy') for iframe compatibility
+        tempTextArea.select();
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
@@ -1773,15 +1880,15 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       specificClasses = `border-yellow-500 ring-4 ring-yellow-300 animate-pulse transition duration-200`; 
   }
   
-  // APLICANDO EL AJUSTE DE ALTURA AQUÍ
+  // Apply height adjustment here
   let requiredMinHeight = NODE_DIMENSIONS.minHeight;
   
   if (isOutputViewer) {
       requiredMinHeight = isConversionExpanded ? 280 : 250;
   }
   
-  // Ajuste específico para Bit Shift
-  if (isBitShift) {
+  // Specific height adjustment for Bit Shift, XOR and Data Split (similar structure)
+  if (isBitShift || type === 'XOR_OP' || isDataSplit) {
       requiredMinHeight = 300; 
   }
 
@@ -1797,8 +1904,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       left: `${position.x}px`,
       top: `${position.y}px`,
       width: `${width}px`,
-      // Usar initialBoxHeight para la altura inicial de la caja,
-      // mientras que minHeight está definido por la validación
+      // Use initialBoxHeight for the box initial height
       minHeight: `${effectiveMinHeight}px`, 
       height: `${height}px`, 
   };
@@ -1856,7 +1962,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       >
         {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
-          {/* Componente Icono (Lógica Simplificada para evitar errores de tipo React) */}
+          {/* Icon Component (Simplified logic to prevent React type errors) */}
           {definition.icon && (
               <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
           )}
@@ -1905,9 +2011,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : (shiftDescription || 'Bit Shift')})</span>}
           {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>} 
+          {isDataSplit && <span className={`text-xs text-gray-500 mt-1`}>Split by: Character/Hex/Bit</span>}
 
 
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -1919,7 +2026,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                            outline-none transition duration-200"
               placeholder="Enter data here..."
               value={content || ''}
-              // FIX: Handle content change with format detection
+              // Handle content change with format detection
               onChange={(e) => {
                   const newContent = e.target.value;
                   const currentFormat = node.format;
@@ -1959,7 +2066,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                            bg-white appearance-none cursor-pointer text-gray-700 
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
               value={format || 'Text (UTF-8)'}
-              // FIX: Add auto-correction logic when user manually selects an incompatible format
+              // Add auto-correction logic when user manually selects an incompatible format
               onChange={(e) => {
                 e.stopPropagation();
                 const selectedFormat = e.target.value;
@@ -2023,7 +2130,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 {/* Primary Output Box (RAW UNCONVERTED Input Data - uses relative height) */}
                 <div 
                     className={`relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200`}
-                    // Ajuste de altura dinámica para la salida
+                    // Dynamic height adjustment for output
                     style={{ flexGrow: isConversionExpanded ? 0.5 : 1.2, minHeight: '40px' }} 
                 >
                     <p>{rawInputData || 'Not connected or no data.'}</p>
@@ -2607,7 +2714,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
                     <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
-                        {/* Muestra la salida completa de XOR */}
+                        {/* Display the complete XOR output */}
                         {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for two data inputs...'}
                     </p>
                     <button
@@ -2660,7 +2767,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     {isProcessing ? 'Shifting...' : (shiftDescription || 'Active (Rotational)')}
                 </span>
                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow"
-                     // Altura mínima garantizada para la salida (60px)
+                     // Minimum guaranteed height for the output (60px)
                      style={{ minHeight: '60px' }} 
                 >
                     <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'} overflow-y-auto h-full`}>
@@ -2680,9 +2787,58 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </div>
             </div>
         )}
+        
+        {/* Data Split */}
+        {isDataSplit && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow space-y-2">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-green-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Splitting...' : 'Active (Splitting by Character/Hex/Bit)'}
+                </span>
+                
+                {/* Chunk 1 Output Display - Fixed Height for Stable Layout */}
+                <div className="relative w-full text-left flex-shrink-0">
+                    <span className={`block text-[10px] font-semibold text-green-700 mb-0.5`}>CHUNK 1 ({node.outputFormat || 'N/A'})</span>
+                    <div className={`text-[10px] p-1 bg-gray-100 rounded border overflow-y-auto break-all h-20 
+                                     ${chunk1?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        <p>{chunk1 || 'Awaiting Input...'}</p>
+                    </div>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, chunk1)}
+                        disabled={!chunk1 || chunk1.startsWith('ERROR')}
+                        className={`absolute top-6 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${chunk1 && !chunk1.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+
+                {/* Chunk 2 Output Display - Fixed Height for Stable Layout */}
+                <div className="relative w-full text-left flex-shrink-0">
+                    <span className={`block text-[10px] font-semibold text-green-700 mb-0.5`}>CHUNK 2 ({node.outputFormat || 'N/A'})</span>
+                    <div className={`text-[10px] p-1 bg-gray-100 rounded border overflow-y-auto break-all h-20 
+                                     ${chunk2?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        <p>{chunk2 || 'Awaiting Input...'}</p>
+                    </div>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, chunk2)}
+                        disabled={!chunk2 || chunk2.startsWith('ERROR')}
+                        className={`absolute top-6 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${chunk2 && !chunk2.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
 
         {/* Generic Output Preview (Fallback for unimplemented nodes) */}
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && (
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -2721,7 +2877,7 @@ const App = () => {
     
   const canvasRef = useRef(null);
   
-  // --- Project Management Handlers (Copied from original App.jsx) ---
+  // --- Project Management Handlers ---
   
   const downloadFile = (data, filename, type) => {
     const blob = new Blob([data], { type: type });
@@ -2816,7 +2972,7 @@ const App = () => {
       }
   }, []);
   
-  // --- Core Logic: Graph Recalculation (Data Flow Engine) (Copied from original App.jsx) ---
+  // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
     // Re-initialize newNodesMap correctly to ensure integrity and reset calculation fields.
@@ -2831,6 +2987,9 @@ const App = () => {
              newNode.isConversionExpanded = newNode.isConversionExpanded || false;
              newNode.sourceFormat = newNode.sourceFormat || ''; // New field for source format
              newNode.rawInputData = newNode.rawInputData || ''; // New field to store UNCONVERTED input
+        } else if (newNode.type === 'DATA_SPLIT') { // Reset split chunks
+             newNode.chunk1 = '';
+             newNode.chunk2 = '';
         }
         return [n.id, newNode];
     })); 
@@ -3102,7 +3261,7 @@ const App = () => {
                 // Determine the format of the output data
                 const sourceFormat = inputSourceNode.type === 'DATA_INPUT' 
                     ? inputSourceNode.format 
-                    : (inputSourceNode.outputFormat || getOutputFormat(inputSourceNode.type)); // FIX: Use node.outputFormat if set
+                    : (inputSourceNode.outputFormat || getOutputFormat(inputSourceNode.type)); // Use node.outputFormat if set
 
                 // Store the data and format using the input port ID
                 if (!inputs[conn.targetPortId]) { 
@@ -3145,7 +3304,7 @@ const App = () => {
                         if (sourceNode.isConversionExpanded && convertedDataOutput && !convertedDataOutput.startsWith('ERROR')) {
                             // Output converted data if expansion is active AND conversion was successful
                             outputData = convertedDataOutput;
-                            // FIX: Set the advertised output format to the converted format
+                            // Set the advertised output format to the converted format
                             sourceNode.outputFormat = sourceNode.convertedFormat; 
                         } else {
                             // Otherwise, output the raw input (as raw input format)
@@ -3168,7 +3327,7 @@ const App = () => {
                     break;
                 
                 case 'CAESAR_CIPHER':
-                    // FIX: Key input is now taken from node's internal state (shiftKey), not a port
+                    // Key input is taken from node's internal state (shiftKey)
                     const plaintextInput = inputs['plaintext']?.data;
                     const plainFormat = inputs['plaintext']?.format;
                     const shiftKey = sourceNode.shiftKey; // Read key from internal state
@@ -3176,7 +3335,7 @@ const App = () => {
                     if (plaintextInput !== undefined && plaintextInput !== null) {
                         isProcessing = true;
                         
-                        // Handle Text (Latin alphabet shift) or Numeric (Byte shift)
+                        // Handle Text (Latin alphabet shift)
                         const k = parseInt(shiftKey) || 0;
 
                         const { output, format } = caesarEncrypt(plaintextInput, plainFormat, k);
@@ -3233,7 +3392,7 @@ const App = () => {
                     if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
                         n_val = sourceKeyGenNode.n;
-                        e_val = sourceNodeKeyGen.e;
+                        e_val = sourceKeyGenNode.e;
                         isReadOnly = true;
                     } 
                     
@@ -3262,8 +3421,8 @@ const App = () => {
                     
                 case 'SIMPLE_RSA_ENC':
                     try {
-                        const mStr = inputs['message']?.data; // FIX: Now accepts data type
-                        // NEW LOGIC: Use 'publicKey' port to find the source node and extract N and E.
+                        const mStr = inputs['message']?.data; 
+                        // Use 'publicKey' port to find the source node and extract N and E.
                         const pkInputObj = inputs['publicKey'];
                         const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
                         const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
@@ -3391,7 +3550,7 @@ const App = () => {
                     try {
                         const mStr = inputs['message']?.data;
                         const sStr = inputs['signature']?.data;
-                        // NEW LOGIC: Use 'publicKey' port to find the source node and extract N and E.
+                        // Use 'publicKey' port to find the source node and extract N and E.
                         const pkInputObj = inputs['publicKey'];
                         const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
                         const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
@@ -3463,6 +3622,7 @@ const App = () => {
                         
                         // Output placeholder while processing
                         outputData = sourceNode.dataOutput || 'Calculating...';
+                        sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                         sourceNode.isProcessing = isProcessing;
                         newNodesMap.set(sourceId, sourceNode);
                         processed.add(sourceId);
@@ -3482,7 +3642,7 @@ const App = () => {
                     const formatA = inputs['dataA']?.format; // Primary input format
                     const formatB = inputs['dataB']?.format;
 
-                    // --- NUEVA LÓGICA XOR ---
+                    // --- XOR LOGIC ---
                     if (dataInputA && dataInputB && !dataInputA.startsWith('ERROR') && !dataInputB.startsWith('ERROR')) { 
                         isProcessing = true;
                         
@@ -3505,7 +3665,7 @@ const App = () => {
                         outputData = 'Waiting for two data inputs.'; 
                         sourceNode.outputFormat = '';
                     }
-                    // --- FIN NUEVA LÓGICA XOR ---
+                    // --- END XOR LOGIC ---
 
                     break;
                 
@@ -3540,6 +3700,35 @@ const App = () => {
                         sourceNode.outputFormat = '';
                         sourceNode.shiftDescription = 'Active (Rotational)';
                     }
+                    break;
+                    
+                case 'DATA_SPLIT': // DATA SPLIT LOGIC
+                    const splitDataInput = inputs['data']?.data;
+                    const splitFormat = inputs['data']?.format;
+
+                    if (splitDataInput && !splitDataInput.startsWith('ERROR')) {
+                        isProcessing = true;
+                        
+                        const { chunk1, chunk2, outputFormat } = splitDataIntoChunks(splitDataInput, splitFormat);
+                        
+                        sourceNode.chunk1 = chunk1;
+                        sourceNode.chunk2 = chunk2;
+                        sourceNode.outputFormat = outputFormat; // Update output format to match chunk output
+                        
+                        isProcessing = false;
+                        
+                    } else if (splitDataInput?.startsWith('ERROR')) {
+                        sourceNode.chunk1 = splitDataInput;
+                        sourceNode.chunk2 = splitDataInput;
+                        sourceNode.outputFormat = splitFormat;
+                    } else {
+                        sourceNode.chunk1 = 'Awaiting Input...';
+                        sourceNode.chunk2 = 'Awaiting Input...';
+                        sourceNode.outputFormat = splitFormat;
+                    }
+                    
+                    // The main output is typically not used for split nodes, but we update the chunk fields.
+                    outputData = '';
                     break;
 
                 // --- Web Crypto API Cipher Nodes (Symmetric/Asymmetric - ASYNC) ---
@@ -3654,7 +3843,7 @@ const App = () => {
             sourceNode.dataOutput = outputData; 
         } else if (!primaryOutputPort) {
             // Manually set dataOutput for SINK nodes (viewers)
-            if (sourceNode.type !== 'OUTPUT_VIEWER') {
+            if (sourceNode.type !== 'OUTPUT_VIEWER' && sourceNode.type !== 'DATA_SPLIT') {
                 sourceNode.dataOutput = outputData;
             }
         }
@@ -3670,7 +3859,7 @@ const App = () => {
     return Array.from(newNodesMap.values());
   }, [setNodes]);
   
-  // --- Effects for Recalculation (Copied from original App.jsx) ---
+  // --- Effects for Recalculation ---
   
   useEffect(() => {
     // Initial calculation or on connection change
@@ -3690,9 +3879,9 @@ const App = () => {
                     publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
                     shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
-                    shiftKey: (field === 'shiftKey' ? value : node.shiftKey), // New Caesar Key
-                    keyword: (field === 'keyword' ? value : node.keyword), // New Vigenere Keyword
-                    vigenereMode: (field === 'vigenereMode' ? value : node.vigenereMode), // New Vigenere Mode
+                    shiftKey: (field === 'shiftKey' ? value : node.shiftKey), // Caesar Key
+                    keyword: (field === 'keyword' ? value : node.keyword), // Vigenere Keyword
+                    vigenereMode: (field === 'vigenereMode' ? value : node.vigenereMode), // Vigenere Mode
                     // Symmetric/Asymmetric Crypto Fields
                     symAlgorithm: (field === 'symAlgorithm' ? value : node.symAlgorithm),
                     asymAlgorithm: (field === 'asymAlgorithm' ? value : node.asymAlgorithm),
@@ -3701,9 +3890,9 @@ const App = () => {
                     q: (field === 'q' ? value : node.q),
                     e: (field === 'e' ? value : node.e),
                     d: (field === 'd' ? value : node.d), // PRESERVE D BEFORE RECALC
-                    n_pub: (field === 'n_pub' ? value : node.n_pub), // NEW PUBKEY FIELD
-                    e_pub: (field === 'e_pub' ? value : node.e_pub), // NEW PUBKEY FIELD
-                    isReadOnly: node.isReadOnly, // NEW PUBKEY FIELD
+                    n_pub: (field === 'n_pub' ? value : node.n_pub), // PUBKEY FIELD
+                    e_pub: (field === 'e_pub' ? value : node.e_pub), // PUBKEY FIELD
+                    isReadOnly: node.isReadOnly, // PUBKEY FIELD
                     // Conversion Feature State:
                     isConversionExpanded: (field === 'isConversionExpanded' ? value : node.isConversionExpanded),
                     convertedFormat: (field === 'convertedFormat' ? value : node.convertedFormat),
@@ -3721,7 +3910,7 @@ const App = () => {
     });
   }, [connections, recalculateGraph]);
   
-  // --- Standard App Handlers (Copied from original App.jsx) ---
+  // --- Standard App Handlers ---
 
   const setPosition = useCallback((id, newPos) => {
     setNodes(prevNodes => prevNodes.map(node =>
@@ -3748,12 +3937,12 @@ const App = () => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
-    // Usar la altura ajustada aquí para Bit Shift
+    // Use adjusted height for nodes like Bit Shift and Data Split
     let initialNodeHeight = NODE_DIMENSIONS.initialHeight;
     let initialNodeWidth = NODE_DIMENSIONS.initialWidth;
     
-    if (type === 'SHIFT_OP' || type === 'XOR_OP') {
-        // Altura específica para Bit Shift y XOR (similares en estructura)
+    // Adjusted height for Data Split and other complex nodes
+    if (type === 'SHIFT_OP' || type === 'XOR_OP' || type === 'DATA_SPLIT') {
         initialNodeHeight = 300; 
         initialNodeWidth = 300;
     }
@@ -3793,14 +3982,14 @@ const App = () => {
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
-      initialContent.format = 'Binary'; // MODIFIED: Default to Binary (most restrictive)
+      initialContent.format = 'Binary'; // Default to Binary (most restrictive)
     } else if (type === 'OUTPUT_VIEWER') { 
       initialContent.dataOutput = ''; // Will hold the final data (raw or converted)
-      initialContent.rawInputData = ''; // New field to hold the raw input string
+      initialContent.rawInputData = ''; // Field to hold the raw input string
       initialContent.viewFormat = 'Text (UTF-8)'; 
-      initialContent.isConversionExpanded = false; // New state
-      initialContent.convertedData = ''; // New state
-      initialContent.convertedFormat = 'Base64'; // New state
+      initialContent.isConversionExpanded = false; 
+      initialContent.convertedData = ''; 
+      initialContent.convertedFormat = 'Base64'; 
       initialContent.sourceFormat = '';
     } else if (type === 'CAESAR_CIPHER') {
       initialContent.shiftKey = 3; // Default shift key
@@ -3829,7 +4018,7 @@ const App = () => {
       initialContent.p = '';
       initialContent.q = '';
       initialContent.e = '';
-      initialContent.d = ''; // MODIFICADO: Initialize d as empty string to allow input
+      initialContent.d = ''; // Initialize d as empty string to allow input
       initialContent.n = '';
       initialContent.phiN = '';
       initialContent.dataOutputPublic = '';
@@ -3857,6 +4046,10 @@ const App = () => {
       initialContent.shiftDescription = 'Active (Rotational)';
     } else if (type === 'XOR_OP') {
       initialContent.outputFormat = 'Binary'; // Default output for precise operation
+    } else if (type === 'DATA_SPLIT') { // Data Split Initialization
+      initialContent.outputFormat = 'Binary'; // Default output format for consistency/precision
+      initialContent.chunk1 = ''; 
+      initialContent.chunk2 = ''; 
     }
 
     setNodes(prevNodes => [
@@ -3974,7 +4167,7 @@ const App = () => {
         addNode={addNode} 
         onDownloadProject={handleDownloadProject}
         onUploadProject={handleUploadProject}
-        onDownloadImage={handleDownloadImage}
+        // Removed onDownloadImage as it was not used in the original call
         onZoomIn={handleZoomIn} // Passed new zoom handler
         onZoomOut={handleZoomOut} // Passed new zoom handler
       />
@@ -4048,7 +4241,7 @@ const App = () => {
           
         </div>
         
-        {/* --- ERROR Notification Overlay (New UI) --- */}
+        {/* --- ERROR Notification Overlay --- */}
         {uploadError && (
             <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
                 <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center border-4 border-red-500 animate-pulse-slow">
@@ -4177,7 +4370,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                                     </button>
                                 )}
                                 
-                                {/* ADDED: Info Button for SYMMETRIC CRYPTO Group */}
+                                {/* Info Button for SYMMETRIC CRYPTO Group */}
                                 {group.name === 'SYMMETRIC CRYPTO (AES)' && (
                                     <button
                                         onClick={(e) => {
@@ -4245,7 +4438,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                     isFileInput={true} 
                 />
                 
-                {/* NEW: Zoom Out Button */}
+                {/* Zoom Out Button */}
                 <ToolbarButton 
                     icon={ZoomOut} 
                     label="Zoom Out" 
@@ -4253,7 +4446,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                     onClick={onZoomOut}
                 />
 
-                {/* NEW: Zoom In Button */}
+                {/* Zoom In Button */}
                 <ToolbarButton 
                     icon={ZoomIn} 
                     label="Zoom In" 
