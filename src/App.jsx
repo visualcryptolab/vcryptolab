@@ -8,7 +8,8 @@ import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, 
 // --- Project Schema Versioning ---
 // V1.0: Initial core features (pre-migration logic)
 // V1.1: Standardized Data Input outputFormat to match input format (e.g., Binary, not Text) for math nodes. Added width/height defaults.
-const PROJECT_SCHEMA_VERSION = '1.1';
+// V1.2: Added Data Concatenate node.
+const PROJECT_SCHEMA_VERSION = '1.2';
 
 // --- CSS Styles (Consolidated from src/App.css, src/main.css, and src/styles.css) ---
 const globalStyles = `
@@ -105,7 +106,8 @@ function BitShiftIcon(props) {
 
 const BORDER_CLASSES = {
   blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-500', 
-  teal: 'border-teal-600', gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
+  teal: 'border-teal-600', // Used by ASYM_DEC and DATA_CONCAT
+  gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
   purple: 'border-purple-600', // Simple RSA PrivKey Gen
   maroon: 'border-red-800', // Simple RSA Encrypt
   rose: 'border-pink-700', // Simple RSA Decrypt
@@ -118,7 +120,8 @@ const BORDER_CLASSES = {
 
 const HOVER_BORDER_CLASSES = {
   blue: 'hover:border-blue-500', red: 'hover:border-red-500', orange: 'hover:border-orange-500', cyan: 'hover:border-cyan-500', pink: 'hover:border-pink-500', 
-  teal: 'hover:border-teal-500', gray: 'hover:border-gray-500', lime: 'hover:border-lime-500', indigo: 'hover:border-indigo-500',
+  teal: 'hover:border-teal-500', // Used by ASYM_DEC and DATA_CONCAT
+  gray: 'hover:border-gray-500', lime: 'hover:border-lime-500', indigo: 'hover:border-indigo-500',
   purple: 'hover:border-purple-500',
   maroon: 'hover:border-red-700',
   rose: 'hover:border-pink-600',
@@ -131,7 +134,8 @@ const HOVER_BORDER_CLASSES = {
 
 const TEXT_ICON_CLASSES = {
   blue: 'text-blue-600', red: 'text-red-600', orange: 'text-orange-600', cyan: 'text-cyan-600', pink: 'text-pink-500', 
-  teal: 'text-teal-600', gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
+  teal: 'text-teal-600', // Used by ASYM_DEC and DATA_CONCAT
+  gray: 'text-gray-600', lime: 'text-lime-600', indigo: 'text-indigo-600',
   purple: 'text-purple-600',
   maroon: 'text-red-800',
   rose: 'text-pink-700',
@@ -148,7 +152,7 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
   orange: 'hover:border-orange-400', 
   cyan: 'hover:border-cyan-400', 
   pink: 'hover:border-pink-400', 
-  teal: 'hover:border-teal-400', 
+  teal: 'hover:border-teal-400', // Used by ASYM_DEC and DATA_CONCAT
   gray: 'hover:border-gray-400', 
   lime: 'hover:border-lime-400', 
   indigo: 'hover:border-indigo-400',
@@ -225,6 +229,20 @@ const NODE_DEFINITIONS = {
     outputPorts: [
         { name: 'Chunk 1', type: 'data', keyField: 'chunk1' }, // Output to store the first half
         { name: 'Chunk 2', type: 'data', keyField: 'chunk2' }  // Output to store the second half
+    ] 
+  },
+  
+  // NEW: Data Concatenate Node (Join two data inputs)
+  DATA_CONCAT: { 
+    label: 'Data Concatenate', 
+    color: 'teal', 
+    icon: Cpu, // Using CPU for generic logic/tooling
+    inputPorts: [
+        { name: 'Data A', type: 'data', mandatory: true, id: 'dataA' }, 
+        { name: 'Data B', type: 'data', mandatory: true, id: 'dataB' }
+    ], 
+    outputPorts: [
+        { name: 'Concatenated Output', type: 'data', keyField: 'dataOutput' }
     ] 
   },
 
@@ -384,8 +402,8 @@ const NODE_DEFINITIONS = {
 
 // --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
-    // MODIFIED: Added 'DATA_SPLIT' to CORE TOOLS
-    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP', 'DATA_SPLIT'] },
+    // MODIFIED: Added 'DATA_CONCAT' to CORE TOOLS
+    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP', 'DATA_SPLIT', 'DATA_CONCAT'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
     // MODIFIED: Changed name from 'SIMPLE RSA (MODULAR)' to 'SIMPLE RSA'
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
@@ -810,6 +828,7 @@ const getOutputFormat = (nodeType) => {
         case 'SYM_ENC':
         // DATA_SPLIT outputs data chunks in Binary format by default (as it is the most raw representation of bits)
         case 'DATA_SPLIT': 
+        case 'DATA_CONCAT': // Concatenate outputs Binary by default for precision
             return 'Binary';
         case 'ASYM_ENC':
         case 'SIMPLE_RSA_KEY_GEN':
@@ -1157,6 +1176,45 @@ const splitDataIntoChunks = (dataStr, format) => {
         outputFormat: format
     };
 };
+
+/** * Concatenates two data inputs (A and B) into a single output (A + B).
+ * Inputs are converted to Uint8Array for concatenation before being returned in a common format.
+ * If formats don't match, it will use the most precise common representation (Binary/Hex) or fallback to byte stream.
+ */
+const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
+    // If input A or B is missing, return the valid input as the output, or an error if both are missing.
+    if (!dataAStr || dataAStr.startsWith('ERROR')) {
+        return { output: dataBStr || "ERROR: Missing data input A and B.", format: formatB || 'Binary' };
+    }
+    if (!dataBStr || dataBStr.startsWith('ERROR')) {
+        return { output: dataAStr, format: formatA || 'Binary' };
+    }
+    
+    try {
+        // Use the raw byte representation (Uint8Array) for concatenation
+        const bytesA = convertToUint8Array(dataAStr, formatA);
+        const bytesB = convertToUint8Array(dataBStr, formatB);
+
+        const combinedBytes = new Uint8Array(bytesA.length + bytesB.length);
+        combinedBytes.set(bytesA, 0);
+        combinedBytes.set(bytesB, bytesA.length);
+        
+        // Choose a stable output format (Binary or the format of A)
+        // If one of the inputs is Binary/Hex, use that format for the output display for consistency.
+        const outputFormat = formatA === 'Binary' || formatB === 'Binary' ? 'Binary' : 
+                             formatA === 'Hexadecimal' || formatB === 'Hexadecimal' ? 'Hexadecimal' : 'Base64';
+
+        // Convert the combined ArrayBuffer back to the chosen string format
+        const output = convertDataFormat(arrayBufferToBase64(combinedBytes.buffer), 'Base64', outputFormat);
+        
+        return { output, format: outputFormat };
+
+    } catch (e) {
+        console.error("Concatenation failed:", e);
+        return { output: `ERROR: Concatenation failed. Check data formats.`, format: formatA };
+    }
+};
+
 
 /** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
@@ -1603,6 +1661,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isCaesarCipher = type === 'CAESAR_CIPHER'; 
   const isVigenereCipher = type === 'VIGENERE_CIPHER'; 
   const isDataSplit = type === 'DATA_SPLIT'; // Data Split Flag
+  const isDataConcat = type === 'DATA_CONCAT'; // Data Concatenate Flag
   
   const FORMATS = ALL_FORMATS;
   
@@ -1892,8 +1951,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       requiredMinHeight = isConversionExpanded ? 280 : 250;
   }
   
-  // Specific height adjustment for Bit Shift, XOR and Data Split (similar structure)
-  if (isBitShift || type === 'XOR_OP' || isDataSplit) {
+  // Specific height adjustment for Bit Shift, XOR, Data Split, and Data Concatenate (similar structure)
+  if (isBitShift || type === 'XOR_OP' || isDataSplit || isDataConcat) {
       requiredMinHeight = 300; 
   }
 
@@ -2017,9 +2076,10 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : (shiftDescription || 'Bit Shift')})</span>}
           {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>} 
           {isDataSplit && <span className={`text-xs text-gray-500 mt-1`}>Split by: Character/Hex/Bit</span>}
+          {isDataConcat && <span className={`text-xs text-gray-500 mt-1`}>Concatenation: Data A + Data B</span>}
 
 
-          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
+          {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && !isDataConcat && <span className={`text-xs text-gray-500 mt-1`}>({definition.label})</span>}
         </div>
         
         {isDataInput && (
@@ -2532,7 +2592,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </div>
             </div>
         )}
-
+        
         {/* Symmetric Encrypt (AES-GCM) */}
         {isSymEnc && (
              <div className="text-xs w-full text-center flex flex-col flex-grow">
@@ -2841,9 +2901,35 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </div>
             </div>
         )}
+        
+        {/* Data Concatenate */}
+        {isDataConcat && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-teal-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Concatenating...' : 'Active (A + B)'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {/* Display the complete Concatenated output */}
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for two data inputs...'}
+                    </p>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
 
         {/* Generic Output Preview (Fallback for unimplemented nodes) */}
-        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && (
+        {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && !isDataConcat && (
             <div className="text-xs text-gray-500 mt-2">
                 <p>Output: {dataOutput ? dataOutput.substring(0, 10) + '...' : 'Waiting for connection'}</p>
             </div>
@@ -2896,7 +2982,7 @@ const migrateProjectData = (projectData) => {
             }
             if (!newNode.height || newNode.height < NODE_DIMENSIONS.minHeight) {
                 // Use the larger initial height for functional nodes that need it
-                if (newNode.type === 'XOR_OP' || newNode.type === 'SHIFT_OP' || newNode.type === 'DATA_SPLIT') {
+                if (newNode.type === 'XOR_OP' || newNode.type === 'SHIFT_OP' || newNode.type === 'DATA_SPLIT' || newNode.type === 'DATA_CONCAT') {
                     newNode.height = 300;
                 } else {
                     newNode.height = NODE_DIMENSIONS.initialHeight;
@@ -2914,6 +3000,10 @@ const migrateProjectData = (projectData) => {
             return newNode;
         });
     }
+    
+    // --- Migration V1.1 to V1.2 ---
+    // V1.2 added DATA_CONCAT. No breaking changes requiring node modification, 
+    // but the default height is covered by V1.1 check above.
 
     // Set the new version stamp
     migratedData.schemaVersion = currentVersion;
@@ -3460,7 +3550,7 @@ const App = () => {
                 
                 case 'SIMPLE_RSA_PUBKEY_GEN':
                     const keySourceConn = incomingConns.find(c => c.targetPortId === 'keySource');
-                    const sourceKeyGenNode = keySourceConn ? newNodesMap.get(keySourceConn.source) : null;
+                    const sourceKeyGenNode = newNodesMap.get(keySourceConn?.source);
                     
                     let n_val = sourceNode.n_pub;
                     let e_val = sourceNode.e_pub;
@@ -3714,30 +3804,30 @@ const App = () => {
                     break;
                 
                 case 'XOR_OP':
-                    const dataInputA = inputs['dataA']?.data; 
-                    const dataInputB = inputs['dataB']?.data; 
-                    const formatA = inputs['dataA']?.format; // Primary input format
-                    const formatB = inputs['dataB']?.format;
+                    const xorInputA = inputs['dataA']?.data; 
+                    const xorInputB = inputs['dataB']?.data; 
+                    const xorFormatA = inputs['dataA']?.format; // Primary input format
+                    const xorFormatB = inputs['dataB']?.format;
 
                     // --- XOR LOGIC ---
-                    if (dataInputA && dataInputB && !dataInputA.startsWith('ERROR') && !dataInputB.startsWith('ERROR')) { 
+                    if (xorInputA && xorInputB && !xorInputA.startsWith('ERROR') && !xorInputB.startsWith('ERROR')) { 
                         isProcessing = true;
                         
-                        const result = performBitwiseXor(dataInputA, formatA, dataInputB, formatB);
+                        const result = performBitwiseXor(xorInputA, xorFormatA, xorInputB, xorFormatB);
                         outputData = result.output;
                         sourceNode.outputFormat = result.format;
                         isProcessing = false;
                         
-                    } else if (dataInputA?.startsWith('ERROR')) {
-                        outputData = dataInputA;
-                    } else if (dataInputB?.startsWith('ERROR')) {
-                        outputData = dataInputB;
-                    } else if (dataInputA && !dataInputB) {
+                    } else if (xorInputA?.startsWith('ERROR')) {
+                        outputData = xorInputA;
+                    } else if (xorInputB?.startsWith('ERROR')) {
+                        outputData = xorInputB;
+                    } else if (xorInputA && !xorInputB) {
                         outputData = 'Waiting for Input B.';
-                        sourceNode.outputFormat = formatA || ''; 
-                    } else if (!dataInputA && dataInputB) {
+                        sourceNode.outputFormat = xorFormatA || ''; 
+                    } else if (!xorInputA && xorInputB) {
                         outputData = 'Waiting for Input A.';
-                        sourceNode.outputFormat = formatB || ''; 
+                        sourceNode.outputFormat = xorFormatB || ''; 
                     } else {
                         outputData = 'Waiting for two data inputs.'; 
                         sourceNode.outputFormat = '';
@@ -3807,6 +3897,27 @@ const App = () => {
                     // The main output is typically not used for split nodes, but we update the chunk fields.
                     outputData = '';
                     break;
+                    
+                case 'DATA_CONCAT': // DATA CONCATENATE LOGIC (NEW)
+                    const concatInputA = inputs['dataA']?.data; 
+                    const concatInputB = inputs['dataB']?.data; 
+                    const concatFormatA = inputs['dataA']?.format;
+                    const concatFormatB = inputs['dataB']?.format;
+                    
+                    if (concatInputA || concatInputB) {
+                        isProcessing = true;
+                        
+                        const { output, format } = concatenateData(concatInputA, concatFormatA, concatInputB, concatFormatB);
+                        outputData = output;
+                        sourceNode.outputFormat = format;
+                        isProcessing = false;
+                        
+                    } else {
+                        outputData = 'Waiting for data inputs A and B.';
+                        sourceNode.outputFormat = 'Binary';
+                    }
+                    break;
+
 
                 // --- Web Crypto API Cipher Nodes (Symmetric/Asymmetric - ASYNC) ---
                 case 'SYM_ENC':
@@ -3860,7 +3971,7 @@ const App = () => {
                         processed.add(sourceId);
                         nodesToProcess.push(...findAllTargets(sourceId));
                         continue; 
-                        
+
                     } else if (inputs['cipher']?.data?.startsWith('ERROR')) {
                         outputData = inputs['cipher'].data;
                     } else if (inputs['key']?.data?.startsWith('ERROR')) {
@@ -4019,7 +4130,7 @@ const App = () => {
     let initialNodeWidth = NODE_DIMENSIONS.initialWidth;
     
     // Adjusted height for Data Split and other complex nodes
-    if (type === 'SHIFT_OP' || type === 'XOR_OP' || type === 'DATA_SPLIT') {
+    if (type === 'SHIFT_OP' || type === 'XOR_OP' || type === 'DATA_SPLIT' || type === 'DATA_CONCAT') {
         initialNodeHeight = 300; 
         initialNodeWidth = 300;
     }
@@ -4127,6 +4238,8 @@ const App = () => {
       initialContent.outputFormat = 'Binary'; // Default output format for consistency/precision
       initialContent.chunk1 = ''; 
       initialContent.chunk2 = ''; 
+    } else if (type === 'DATA_CONCAT') { // Data Concatenate Initialization
+      initialContent.outputFormat = 'Binary'; // Default output format
     }
 
     setNodes(prevNodes => [
