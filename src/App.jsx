@@ -871,7 +871,7 @@ const performBitwiseXor = (dataAStr, formatA, dataBStr, formatB) => {
         const base64Result = arrayBufferToBase64(performRawXor(bytesA, bytesB).buffer);
         // We convert the byte result back to formatA (or Base64 if A is non-standard)
         const finalFormat = formatA === 'N/A' || formatA === 'Decimal' ? 'Base64' : formatA;
-        const output = convertDataFormat(base64Result, 'Base64', finalFormat);
+        const output = convertDataFormat(arrayBufferToBase64(combinedBytes.buffer), 'Base64', finalFormat);
         
         return { output: output, format: finalFormat };
     }
@@ -1190,8 +1190,25 @@ const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
         return { output: dataAStr, format: formatA || 'Binary' };
     }
     
+    const cleanA = dataAStr.replace(/\s/g, '');
+    const cleanB = dataBStr.replace(/\s/g, '');
+    const outputFormat = formatA; // Use format A as primary output format
+
+    // **FIX: Special case 1: Bit/Hex Concatenation (simple string join)**
+    // This is the desired behavior for bit streams where padding to bytes would be incorrect.
+    if (formatA === 'Binary' && formatB === 'Binary') {
+        return { output: cleanA + cleanB, format: 'Binary' };
+    }
+    if (formatA === 'Hexadecimal' && formatB === 'Hexadecimal') {
+        const concatenatedHex = cleanA + cleanB;
+        // Re-apply byte spacing for readability if it was originally spaced
+        const spacedOutput = concatenatedHex.toUpperCase().match(/.{1,2}/g)?.join(' ') || concatenatedHex;
+        return { output: spacedOutput, format: 'Hexadecimal' };
+    }
+    
+    // Default case: Concatenate via Byte Array (for Base64, Text, or mismatched numeric formats)
     try {
-        // Use the raw byte representation (Uint8Array) for concatenation
+        // Use the raw byte representation (Uint8Array) for byte-level concatenation
         const bytesA = convertToUint8Array(dataAStr, formatA);
         const bytesB = convertToUint8Array(dataBStr, formatB);
 
@@ -1199,18 +1216,13 @@ const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
         combinedBytes.set(bytesA, 0);
         combinedBytes.set(bytesB, bytesA.length);
         
-        // Choose a stable output format (Binary or the format of A)
-        // If one of the inputs is Binary/Hex, use that format for the output display for consistency.
-        const outputFormat = formatA === 'Binary' || formatB === 'Binary' ? 'Binary' : 
-                             formatA === 'Hexadecimal' || formatB === 'Hexadecimal' ? 'Hexadecimal' : 'Base64';
-
-        // Convert the combined ArrayBuffer back to the chosen string format
+        // Convert the combined ArrayBuffer back to the chosen string format (Base64 is safest intermediate)
         const output = convertDataFormat(arrayBufferToBase64(combinedBytes.buffer), 'Base64', outputFormat);
         
         return { output, format: outputFormat };
 
     } catch (e) {
-        console.error("Concatenation failed:", e);
+        console.error("Byte-level Concatenation failed:", e);
         return { output: `ERROR: Concatenation failed. Check data formats.`, format: formatA };
     }
 };
