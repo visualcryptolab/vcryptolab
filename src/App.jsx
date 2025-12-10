@@ -167,9 +167,9 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
 
 // --- Port Configuration ---
 const PORT_SIZE = 4; // w-4 h-4
-// const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels
-// CORREGIDO: Eliminar offset visual ya que las coordenadas P1 y P2 deben ser los bordes del nodo
-const PORT_VISUAL_OFFSET_PX = 0; 
+// CORREGIDO: Offset es solo para el elemento DIV que contiene el puerto visual
+// El cálculo de la línea debe ir justo hasta el borde del nodo (donde el puerto está pegado).
+const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels + padding offset (approx 2px)
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
 const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input 
 const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Data Output
@@ -957,7 +957,7 @@ const stringToBigInt = (dataStr, format) => {
         }
         if (format === 'Hexadecimal') {
             if (!/^[0-9a-fA-F]+$/.test(cleanedStr)) return null;
-            return BigInt(`0x${cleanedStr}`);
+            return BigInt(`0x${cleanedContent}`);
         }
         if (format === 'Binary') {
             if (!/^[01]+$/.test(cleanedStr)) return null;
@@ -1106,7 +1106,7 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
 
 // Data Split Utility Function
 /** * Splits the input data string into two equal chunks. 
- * Returns the result in the original format (or a standardized one like Binary)
+ * Returns the result in the original format (o a standardized one like Binary)
  * If data length is odd, the first chunk gets the extra element.
  * @param {string} dataStr The data string (in its source format).
  * @param {string} format The source format of the data.
@@ -1139,7 +1139,7 @@ const splitDataIntoChunks = (dataStr, format) => {
         return { chunk1: `ERROR: Cannot split a single Decimal number. Convert to Base64/Hex/Binary stream first.`, 
                  chunk2: `ERROR: Cannot split a single Decimal number. Convert to Base64/Hex/Binary stream first.`, 
                  outputFormat: 'Text (UTF-8)' };
-    } else { // Binary, or any other assumed stream
+    } else { // Binary, o any other assumed stream
         representation = cleanData;
         splitUnit = 'bin';
     }
@@ -1544,15 +1544,15 @@ const getLinePath = (sourceNode, targetNode, connection) => {
     const targetVerticalPos = getVerticalPosition(targetDef, targetPortIndex, true, targetNode.height);
 
     // P1: Source connection point 
-    // CORREGIDO: Eliminar PORT_VISUAL_OFFSET_PX para que la línea toque el borde del nodo
+    // CORREGIDO: Eliminar PORT_VISUAL_OFFSET_PX del cálculo.
     const p1 = { 
-      x: sourceNode.position.x + sourceNode.width, 
+      x: sourceNode.position.x + sourceNode.width, // Borde derecho del nodo fuente
       y: sourceNode.position.y + sourceVerticalPos 
     }; 
     
     // P2: Target connection point
     const p2 = { 
-      x: targetNode.position.x, 
+      x: targetNode.position.x, // Borde izquierdo del nodo destino
       y: targetNode.position.y + targetVerticalPos
     }; 
     
@@ -1630,6 +1630,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     // Port styles rely on absolute positioning determined by the parent DraggableBox
     return (
         <div 
+            // Ajuste: usar -left-2 / -right-2 para empujar el puerto visual fuera del borde
             className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${portColor} absolute transform -translate-x-1/2 -translate-y-1/2 
                            shadow-md border-2 border-white cursor-pointer ${interactionClasses}`}
             onClick={clickHandler}
@@ -1888,7 +1889,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         return (
             <div 
                 key={portId}
-                // CORREGIDO: Ajustar la posición para que el puerto coincida con el borde del nodo
+                // Ajuste: usar -left-2 para empujar el puerto visual fuera del borde
                 className="absolute -left-2 transform -translate-y-1/2 z-20"
                 style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
@@ -1923,7 +1924,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         return (
             <div 
                 key={portDef.name}
-                // CORREGIDO: Ajustar la posición para que el puerto coincida con el borde del nodo
+                // Ajuste: usar -right-2 para empujar el puerto visual fuera del borde
                 className="absolute -right-2 transform -translate-y-1/2 z-20"
                 style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
@@ -3436,7 +3437,14 @@ const App = () => {
                 // Determine which data field to use from the source node
                 if (sourceDef && sourceDef.outputPorts.length > conn.sourcePortIndex) {
                     const keyField = sourceDef.outputPorts[conn.sourcePortIndex].keyField;
-                    dataToUse = inputSourceNode[keyField];
+                    
+                    // --- CORRECCIÓN CLAVE PARA DATA_SPLIT ---
+                    if (inputSourceNode.type === 'DATA_SPLIT' && (keyField === 'chunk1' || keyField === 'chunk2')) {
+                        // Leer el valor específico del chunk
+                        dataToUse = inputSourceNode[keyField];
+                    } else {
+                        dataToUse = inputSourceNode[keyField]; // Usa dataOutput, dataOutputPrivate, etc.
+                    }
                 } else {
                     dataToUse = inputSourceNode.dataOutput; // Fallback for simple nodes
                 }
@@ -3572,10 +3580,10 @@ const App = () => {
                     let e_val = sourceNode.e_pub;
                     let isReadOnly = false;
 
-                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceNodeKeyGen.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
-                        n_val = sourceKeyGenNode.n;
-                        e_val = sourceKeyGenNode.e;
+                        n_val = sourceNodeKeyGen.n;
+                        e_val = sourceNodeKeyGen.e;
                         isReadOnly = true;
                     } 
                     
@@ -3826,14 +3834,21 @@ const App = () => {
                     const xorFormatB = inputs['dataB']?.format;
 
                     // --- XOR LOGIC ---
-                    if (xorInputA && xorInputB && !xorInputA.startsWith('ERROR') && !xorInputB.startsWith('ERROR')) { 
-                        isProcessing = true;
-                        
-                        const result = performBitwiseXor(xorInputA, xorFormatA, xorInputB, xorFormatB);
-                        outputData = result.output;
-                        sourceNode.outputFormat = result.format;
-                        isProcessing = false;
-                        
+                    if (xorInputA && xorInputB) { 
+                        // Corregido: Verificar si alguno de los inputs es un error
+                        if (xorInputA.startsWith('ERROR')) {
+                            outputData = xorInputA;
+                        } else if (xorInputB.startsWith('ERROR')) {
+                            outputData = xorInputB;
+                        } else {
+                            // Ambos inputs están presentes y no son errores, proceder al cálculo
+                            isProcessing = true;
+                            
+                            const result = performBitwiseXor(xorInputA, xorFormatA, xorInputB, xorFormatB);
+                            outputData = result.output;
+                            sourceNode.outputFormat = result.format;
+                            isProcessing = false;
+                        }
                     } else if (xorInputA?.startsWith('ERROR')) {
                         outputData = xorInputA;
                     } else if (xorInputB?.startsWith('ERROR')) {
@@ -3910,7 +3925,9 @@ const App = () => {
                         sourceNode.outputFormat = splitFormat;
                     }
                     
-                    // The main output is typically not used for split nodes, but we update the chunk fields.
+                    // Al ser un nodo con múltiples salidas de datos (chunk1, chunk2), no tiene un "dataOutput" principal
+                    // pero necesitamos asegurarnos de que la información se propague por las salidas correctas.
+                    // Los campos chunk1/chunk2 se usan como campos de salida directamente.
                     outputData = '';
                     break;
                     
@@ -4042,15 +4059,23 @@ const App = () => {
         
         // Update the node's output field(s) and processing status
         
-        const primaryOutputPort = sourceNodeDef.outputPorts?.[0];
-        if (primaryOutputPort && primaryOutputPort.keyField === 'dataOutput') {
-            sourceNode.dataOutput = outputData; 
-        } else if (!primaryOutputPort) {
-            // Manually set dataOutput for SINK nodes (viewers)
-            if (sourceNode.type !== 'OUTPUT_VIEWER' && sourceNode.type !== 'DATA_SPLIT') {
-                sourceNode.dataOutput = outputData;
-            }
+        // El nodo Data Split usa campos específicos (chunk1/chunk2) en lugar de dataOutput
+        if (sourceNode.type === 'DATA_SPLIT') {
+             // Asegurarse de que los outputs específicos (chunk1/chunk2) se persistan en el mapa
+             // Ya se actualizaron en el switch/case, solo nos aseguramos de que el mapa las tenga
+             // para que los nodos downstream las puedan leer.
+        } else {
+             const primaryOutputPort = sourceNodeDef.outputPorts?.[0];
+             if (primaryOutputPort && primaryOutputPort.keyField === 'dataOutput') {
+                 sourceNode.dataOutput = outputData; 
+             } else if (!primaryOutputPort) {
+                 // Manually set dataOutput for SINK nodes (viewers)
+                 if (sourceNode.type !== 'OUTPUT_VIEWER') {
+                     sourceNode.dataOutput = outputData;
+                 }
+             }
         }
+
 
         sourceNode.isProcessing = isProcessing;
         newNodesMap.set(sourceId, sourceNode);
@@ -4338,22 +4363,39 @@ const App = () => {
   }, []);
   
   const connectionPaths = useMemo(() => {
-    return connections.map(conn => {
-      const sourceNode = nodes.find(n => n.id === conn.source);
-      const targetNode = nodes.find(n => n.id === conn.target);
-      
-      if (sourceNode && targetNode) {
-        return {
-            path: getLinePath(sourceNode, targetNode, conn), // Passes connection object for precise path calculation
-            source: conn.source,
-            target: conn.target,
-            sourcePortIndex: conn.sourcePortIndex,
-            targetPortId: conn.targetPortId,
-        };
-      }
-      return null;
-    }).filter(p => p !== null);
-  }, [connections, nodes]);
+    // Calcular el tamaño virtual del lienzo para el SVG
+    let maxX = 0;
+    let maxY = 0;
+    const padding = 50; // Margen de seguridad
+
+    nodes.forEach(node => {
+        // La posición del nodo es la esquina superior izquierda
+        maxX = Math.max(maxX, node.position.x + node.width);
+        maxY = Math.max(maxY, node.position.y + node.height);
+    });
+
+    const svgWidth = Math.max(maxX + padding, (canvasRef.current?.clientWidth || 0) / scale);
+    const svgHeight = Math.max(maxY + padding, (canvasRef.current?.clientHeight || 0) / scale);
+
+    return {
+        size: { width: svgWidth, height: svgHeight },
+        paths: connections.map(conn => {
+            const sourceNode = nodes.find(n => n.id === conn.source);
+            const targetNode = nodes.find(n => n.id === conn.target);
+            
+            if (sourceNode && targetNode) {
+                return {
+                    path: getLinePath(sourceNode, targetNode, conn), // Passes connection object for precise path calculation
+                    source: conn.source,
+                    target: conn.target,
+                    sourcePortIndex: conn.sourcePortIndex,
+                    targetPortId: conn.targetPortId,
+                };
+            }
+            return null;
+        }).filter(p => p !== null)
+    };
+  }, [connections, nodes, scale]); // Añadir scale como dependencia
 
 
   
@@ -4391,32 +4433,24 @@ const App = () => {
               style={{ 
                   transform: `scale(${scale})`, 
                   transformOrigin: 'top left',
-                  // EXPANDED VIRTUAL SIZE: The scrollable container sees this large size
-                  // Usar un tamaño muy grande (ej. 10000x10000px) o basado en el factor de escala * 100%
-                  // para asegurar que el scroll capture todo el contenido virtual.
-                  width: `${(100 / scale) * 100}%`,
-                  height: `${(100 / scale) * 100}%`,
-                  // Fijar un mínimo razonable para evitar que el div se encoja demasiado en zoom-in
+                  // EXPANDED VIRTUAL SIZE: Usar el tamaño calculado + un margen para la corrección
+                  width: `${connectionPaths.size.width}px`,
+                  height: `${connectionPaths.size.height}px`,
+                  // Fijar un mínimo basado en el contenedor visible
                   minWidth: `100%`,
                   minHeight: `100%`,
               }} 
               className="absolute top-0 left-0"
           >
               <svg 
-                  className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0" 
+                  className="absolute top-0 left-0 pointer-events-auto z-0" 
                   style={{ 
-                      // NO APLICAR transform: scale(${1 / scale}) aquí. 
-                      // Dejar que el SVG sea escalado por el DIV padre, pero dibujar sus contenidos
-                      // en las coordenadas del espacio de píxeles original.
-
-                      // Asegurar que el SVG cubra todo el espacio virtual del DIV contenedor escalado
-                      width: '100%', 
-                      height: '100%',
-                      // Los paths se dibujan en coordenadas no escaladas, y el SVG es escalado por el padre.
-                      // Esto debería hacer que las líneas se muevan y se vean correctamente con el zoom.
+                      // Establecer el tamaño del SVG al tamaño virtual calculado
+                      width: `${connectionPaths.size.width}px`, 
+                      height: `${connectionPaths.size.height}px`,
                   }} 
               >
-                {connectionPaths.map((conn, index) => (
+                {connectionPaths.paths.map((conn, index) => (
                   <g 
                     key={`${conn.source}-${conn.target}-${conn.sourcePortIndex}-${conn.targetPortId}`}
                     onClick={(e) => { 
