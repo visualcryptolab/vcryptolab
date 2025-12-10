@@ -32,15 +32,14 @@ html, body, #root { /* Or the ID of your React app container */
 .animate-pulse-slow {
     animation: animate-pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+/* Base styles for the lines - stroke-width will be modified inline */
 .connection-line-visible {
     stroke: #059669; /* Emerald 600 */
-    stroke-width: 4;
     fill: none;
     pointer-events: none; /* Invisible to mouse, only the hitbox is active */
 }
 .connection-hitbox {
     stroke: transparent;
-    stroke-width: 15; /* Large clickable area */
     fill: none;
     cursor: pointer;
     pointer-events: stroke; /* Only sensitive to stroke clicks */
@@ -168,7 +167,9 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
 
 // --- Port Configuration ---
 const PORT_SIZE = 4; // w-4 h-4
-const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels
+// const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels
+// CORREGIDO: Eliminar offset visual ya que las coordenadas P1 y P2 deben ser los bordes del nodo
+const PORT_VISUAL_OFFSET_PX = 0; 
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
 const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input 
 const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Data Output
@@ -868,7 +869,8 @@ const performBitwiseXor = (dataAStr, formatA, dataBStr, formatB) => {
         // Fallback to byte-level XOR for mismatched or non-precise formats (like text/base64)
         const bytesA = convertToUint8Array(dataAStr, formatA);
         const bytesB = convertToUint8Array(dataBStr, formatB);
-        const base64Result = arrayBufferToBase64(performRawXor(bytesA, bytesB).buffer);
+        const combinedBytes = performRawXor(bytesA, bytesB); // Use combinedBytes instead of raw output
+        const base64Result = arrayBufferToBase64(combinedBytes.buffer);
         // We convert the byte result back to formatA (or Base64 if A is non-standard)
         const finalFormat = formatA === 'N/A' || formatA === 'Decimal' ? 'Base64' : formatA;
         const output = convertDataFormat(arrayBufferToBase64(combinedBytes.buffer), 'Base64', finalFormat);
@@ -1542,15 +1544,15 @@ const getLinePath = (sourceNode, targetNode, connection) => {
     const targetVerticalPos = getVerticalPosition(targetDef, targetPortIndex, true, targetNode.height);
 
     // P1: Source connection point 
-    // Use sourceNode.width
+    // CORREGIDO: Eliminar PORT_VISUAL_OFFSET_PX para que la línea toque el borde del nodo
     const p1 = { 
-      x: sourceNode.position.x + sourceNode.width + PORT_VISUAL_OFFSET_PX, 
+      x: sourceNode.position.x + sourceNode.width, 
       y: sourceNode.position.y + sourceVerticalPos 
     }; 
     
     // P2: Target connection point
     const p2 = { 
-      x: targetNode.position.x - PORT_VISUAL_OFFSET_PX, 
+      x: targetNode.position.x, 
       y: targetNode.position.y + targetVerticalPos
     }; 
     
@@ -1886,6 +1888,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         return (
             <div 
                 key={portId}
+                // CORREGIDO: Ajustar la posición para que el puerto coincida con el borde del nodo
                 className="absolute -left-2 transform -translate-y-1/2 z-20"
                 style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
@@ -1920,6 +1923,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         return (
             <div 
                 key={portDef.name}
+                // CORREGIDO: Ajustar la posición para que el puerto coincida con el borde del nodo
                 className="absolute -right-2 transform -translate-y-1/2 z-20"
                 style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
@@ -4387,17 +4391,30 @@ const App = () => {
               style={{ 
                   transform: `scale(${scale})`, 
                   transformOrigin: 'top left',
-                  // Ensure the scalable area is large enough to contain nodes without clipping when scaled down
-                  minWidth: `calc(100% / ${scale})`,
-                  minHeight: `calc(100% / ${scale})`,
-                  width: `calc(100% / ${scale})`, // Fix to ensure contents start at top-left
-                  height: `calc(100% / ${scale})`,
+                  // EXPANDED VIRTUAL SIZE: The scrollable container sees this large size
+                  // Usar un tamaño muy grande (ej. 10000x10000px) o basado en el factor de escala * 100%
+                  // para asegurar que el scroll capture todo el contenido virtual.
+                  width: `${(100 / scale) * 100}%`,
+                  height: `${(100 / scale) * 100}%`,
+                  // Fijar un mínimo razonable para evitar que el div se encoja demasiado en zoom-in
+                  minWidth: `100%`,
+                  minHeight: `100%`,
               }} 
               className="absolute top-0 left-0"
           >
               <svg 
                   className="absolute top-0 left-0 w-full h-full pointer-events-auto z-0" 
-                  style={{ width: `calc(100% * ${scale})`, height: `calc(100% * ${scale})` }} // Scaled back up to cover the transformed div
+                  style={{ 
+                      // NO APLICAR transform: scale(${1 / scale}) aquí. 
+                      // Dejar que el SVG sea escalado por el DIV padre, pero dibujar sus contenidos
+                      // en las coordenadas del espacio de píxeles original.
+
+                      // Asegurar que el SVG cubra todo el espacio virtual del DIV contenedor escalado
+                      width: '100%', 
+                      height: '100%',
+                      // Los paths se dibujan en coordenadas no escaladas, y el SVG es escalado por el padre.
+                      // Esto debería hacer que las líneas se muevan y se vean correctamente con el zoom.
+                  }} 
               >
                 {connectionPaths.map((conn, index) => (
                   <g 
@@ -4408,15 +4425,17 @@ const App = () => {
                     }}
                     className="cursor-pointer" // Add cursor style to the group
                   >
-                    {/* Invisible Hitbox (must come first) */}
+                    {/* Invisible Hitbox (Ajustar stroke-width por la escala) */}
                     <path
                         d={conn.path}
                         className="connection-hitbox"
+                        style={{ strokeWidth: `${15 / scale}px` }} // Re-escalar el área de clic
                     />
-                    {/* Visible Line */}
+                    {/* Visible Line (Ajustar stroke-width por la escala) */}
                     <path
                         d={conn.path}
                         className="connection-line-visible"
+                        style={{ strokeWidth: `${4 / scale}px` }} // Re-escalar el grosor de la línea
                     />
                   </g>
                 ))}
