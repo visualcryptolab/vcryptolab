@@ -2966,7 +2966,7 @@ const migrateProjectData = (projectData) => {
 
     // Check if migration is necessary
     if (importedVersion === currentVersion) {
-        return projectData;
+        return { migratedData: projectData, wasMigrated: false };
     }
     
     // Create a working copy of the project data
@@ -3034,25 +3034,26 @@ const migrateProjectData = (projectData) => {
 
 // Helper component for displaying floating notifications
 const StatusNotification = ({ status, message, onClose }) => {
-    let bgColor, icon: React.FC;
+    let bgColor;
+    /** @type {React.FC} */
+    let IconComponent;
     
     switch (status) {
         case 'success':
             bgColor = 'bg-green-500';
-            icon = CheckCheck;
+            IconComponent = CheckCheck;
             break;
         case 'warning':
             bgColor = 'bg-yellow-600';
-            icon = Info;
+            IconComponent = Info;
             break;
         case 'error':
         default:
             bgColor = 'bg-red-500';
-            icon = X;
+            IconComponent = X;
             break;
     }
 
-    const IconComponent = icon;
 
     return (
         <div 
@@ -3128,10 +3129,10 @@ const App = () => {
   }, [nodes, connections, clearStatusMessage]);
 
   /** Imports a project state from a JSON file, handling version compatibility. */
-  const handleUploadProject = useCallback((event) => {
+  const handleUploadProject = useCallback((fileInput) => {
       clearStatusMessage();
       
-      const file = event.files?.[0]; // Use files[0] for input type="file"
+      const file = fileInput.files?.[0]; // Use files[0] for input type="file"
       if (!file) return;
 
       const reader = new FileReader();
@@ -3154,11 +3155,10 @@ const App = () => {
                   throw new Error("Invalid schema structure");
               }
               
-              // 3. Validate: Check for version field (optional in old files, but important for migration)
+              // 3. Validate and Migrate: Handle version field and migration
               const importedVersion = projectData.schemaVersion || '1.0';
               const currentVersion = PROJECT_SCHEMA_VERSION;
               
-              // 4. Migrate and Load Data (handles backward/forward compatibility)
               const { migratedData, wasMigrated } = migrateProjectData(projectData);
               
               setNodes(migratedData.nodes);
@@ -3171,11 +3171,10 @@ const App = () => {
                       message: `Project loaded successfully, but imported version (${importedVersion}) required migration to ${currentVersion}. Minor feature differences may exist.` 
                   };
               } else if (importedVersion !== currentVersion) {
-                   // Forward compatibility (new file loaded by older app version) is not handled here, 
-                   // but this case covers a newer file loaded by the current version without needing full migration.
+                   // This covers forward compatibility (newer file loaded by current app)
                    importStatus = { 
                       type: 'warning', 
-                      message: `Project loaded successfully. Version mismatch (Imported: ${importedVersion}, Current: ${currentVersion}), proceeding without migration.` 
+                      message: `Project loaded successfully. Version mismatch (Imported: ${importedVersion}, Current: ${currentVersion}).` 
                   };
               } else {
                   importStatus = { type: 'success', message: 'Project imported successfully!' };
@@ -3198,7 +3197,7 @@ const App = () => {
       
       reader.readAsText(file);
       // Clear file input value after reading
-      event.target.value = ''; 
+      fileInput.value = ''; 
   }, [clearStatusMessage, setNodes, setConnections]);
 
   const handleDownloadImage = useCallback(() => {
