@@ -957,7 +957,7 @@ const stringToBigInt = (dataStr, format) => {
         }
         if (format === 'Hexadecimal') {
             if (!/^[0-9a-fA-F]+$/.test(cleanedStr)) return null;
-            return BigInt(`0x${cleanedContent}`);
+            return BigInt(`0x${cleanedStr}`);
         }
         if (format === 'Binary') {
             if (!/^[01]+$/.test(cleanedStr)) return null;
@@ -1104,7 +1104,6 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
     };
 };
 
-// Data Split Utility Function
 /** * Splits the input data string into two equal chunks. 
  * Returns the result in the original format (o a standardized one like Binary)
  * If data length is odd, the first chunk gets the extra element.
@@ -1859,8 +1858,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         document.execCommand('copy');
         
         document.body.removeChild(tempTextArea);
-        setCopyStatus('Copied!'); 
-        setTimeout(() => setCopyStatus('Copy'), 1500); 
+        setCopyStatus('Copied!'); // Changed to English for consistency with other internal strings
+        setTimeout(() => setCopyStatus('Copy'), 1500); // Changed to English for consistency with other internal strings
         
     } catch (err) {
         console.error('Failed to copy text:', err);
@@ -2972,6 +2971,7 @@ const migrateProjectData = (projectData) => {
     
     // Create a working copy of the project data
     let migratedData = { ...projectData };
+    let wasMigrated = false;
 
     // --- Migration Logic ---
     
@@ -2982,6 +2982,7 @@ const migrateProjectData = (projectData) => {
     // 3. XOR_OP and SHIFT_OP sizes might be too small (250px)
 
     if (importedVersion < '1.1') {
+        wasMigrated = true;
         migratedData.nodes = migratedData.nodes.map(node => {
             const newNode = { ...node };
 
@@ -3025,7 +3026,49 @@ const migrateProjectData = (projectData) => {
     // Set the new version stamp
     migratedData.schemaVersion = currentVersion;
     console.log(`Project migrated from version ${importedVersion} to ${currentVersion}.`);
-    return migratedData;
+    
+    // Return migrated data and a flag indicating if migration occurred
+    return { migratedData, wasMigrated };
+};
+
+
+// Helper component for displaying floating notifications
+const StatusNotification = ({ status, message, onClose }) => {
+    let bgColor, icon: React.FC;
+    
+    switch (status) {
+        case 'success':
+            bgColor = 'bg-green-500';
+            icon = CheckCheck;
+            break;
+        case 'warning':
+            bgColor = 'bg-yellow-600';
+            icon = Info;
+            break;
+        case 'error':
+        default:
+            bgColor = 'bg-red-500';
+            icon = X;
+            break;
+    }
+
+    const IconComponent = icon;
+
+    return (
+        <div 
+            className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white max-w-sm z-50 
+                        flex items-start space-x-3 transition-opacity duration-300 ${bgColor}`}
+        >
+            <IconComponent className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="flex-grow">
+                <p className="font-semibold text-sm">{status.toUpperCase()}</p>
+                <p className="text-sm">{message}</p>
+            </div>
+            <button onClick={onClose} className="p-1 -mr-2 -mt-2 opacity-75 hover:opacity-100 transition">
+                <X className="w-4 h-4" />
+            </button>
+        </div>
+    );
 };
 
 
@@ -3035,8 +3078,8 @@ const App = () => {
   const [connectingPort, setConnectingPort] = useState(null); 
   const [scale, setScale] = useState(1.0); // New state for zoom level
     
-  // --- NEW: State for handling upload errors ---
-  const [uploadError, setUploadError] = useState(null);
+  // --- NEW: State for handling status messages (success, warning, error) ---
+  const [statusMessage, setStatusMessage] = useState(null); // { type: 'success' | 'warning' | 'error', message: string }
   
   const MAX_SCALE = 2.0;
   const MIN_SCALE = 0.5;
@@ -3051,13 +3094,14 @@ const App = () => {
       setScale(prevScale => Math.max(MIN_SCALE, prevScale - ZOOM_STEP));
   }, []);
 
-  // Handler to clear the error notification
-  const clearUploadError = useCallback(() => setUploadError(null), []);
+  // Handler to clear the status notification
+  const clearStatusMessage = useCallback(() => setStatusMessage(null), []);
     
   const canvasRef = useRef(null);
   
   // --- Project Management Handlers ---
   
+  /** Helper function to trigger file download. */
   const downloadFile = (data, filename, type) => {
     const blob = new Blob([data], { type: type });
     const url = URL.createObjectURL(blob);
@@ -3070,19 +3114,22 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
+  /** Exports the current project state (nodes, connections) to a JSON file. */
   const handleDownloadProject = useCallback(() => {
     const projectData = {
-        schemaVersion: PROJECT_SCHEMA_VERSION, // Export current version
+        schemaVersion: PROJECT_SCHEMA_VERSION, // Mandatory version field
         nodes: nodes,
         connections: connections
     };
     const data = JSON.stringify(projectData, null, 2);
-    downloadFile(data, 'visual_crypto_project.json', 'application/json');
-  }, [nodes, connections]);
+    downloadFile(data, `visual_crypto_project_v${PROJECT_SCHEMA_VERSION}.json`, 'application/json');
+    setStatusMessage({ type: 'success', message: `Project exported successfully! Version: ${PROJECT_SCHEMA_VERSION}` });
+    setTimeout(clearStatusMessage, 5000);
+  }, [nodes, connections, clearStatusMessage]);
 
+  /** Imports a project state from a JSON file, handling version compatibility. */
   const handleUploadProject = useCallback((event) => {
-      // Clear previous error
-      clearUploadError();
+      clearStatusMessage();
       
       const file = event.files?.[0]; // Use files[0] for input type="file"
       if (!file) return;
@@ -3090,40 +3137,69 @@ const App = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
           let projectData = null;
+          let importStatus = { type: 'error', message: 'Import failed due to an unknown error.' };
           
           try {
-              // 1. Attempt to parse JSON
-              projectData = JSON.parse(e.target.result);
-          } catch (error) {
-              console.error("Error parsing project file:", error);
-              setUploadError("The file could not be read as valid JSON. This may indicate the file is corrupted or belongs to an older application version.");
-              return;
-          }
+              // 1. Validate: Attempt to parse JSON
+              try {
+                  projectData = JSON.parse(e.target.result);
+              } catch (error) {
+                  importStatus = { type: 'error', message: 'Import failed: File is not a valid JSON structure.' };
+                  throw new Error("Invalid JSON");
+              }
 
-          // 2. Validate essential structure and migrate if necessary
-          if (projectData && Array.isArray(projectData.nodes) && Array.isArray(projectData.connections)) {
+              // 2. Validate: Check for essential structure
+              if (!projectData || !Array.isArray(projectData.nodes) || !Array.isArray(projectData.connections)) {
+                  importStatus = { type: 'error', message: "Import failed: JSON file is missing the required 'nodes' or 'connections' structure." };
+                  throw new Error("Invalid schema structure");
+              }
               
-              // --- CORE MIGRATION STEP ---
-              const migratedData = migrateProjectData(projectData);
+              // 3. Validate: Check for version field (optional in old files, but important for migration)
+              const importedVersion = projectData.schemaVersion || '1.0';
+              const currentVersion = PROJECT_SCHEMA_VERSION;
+              
+              // 4. Migrate and Load Data (handles backward/forward compatibility)
+              const { migratedData, wasMigrated } = migrateProjectData(projectData);
               
               setNodes(migratedData.nodes);
               setConnections(migratedData.connections);
-              // Recalculation is triggered by the useEffect hook watching nodes/connections
-          } else {
-              console.error("Invalid project file structure:", projectData);
-              setUploadError("The JSON file is missing the required 'nodes' or 'connections' data structure. This suggests the file might be from an incompatible or older version of the application.");
+              
+              // 5. Set appropriate success/warning status message
+              if (wasMigrated) {
+                  importStatus = { 
+                      type: 'warning', 
+                      message: `Project loaded successfully, but imported version (${importedVersion}) required migration to ${currentVersion}. Minor feature differences may exist.` 
+                  };
+              } else if (importedVersion !== currentVersion) {
+                   // Forward compatibility (new file loaded by older app version) is not handled here, 
+                   // but this case covers a newer file loaded by the current version without needing full migration.
+                   importStatus = { 
+                      type: 'warning', 
+                      message: `Project loaded successfully. Version mismatch (Imported: ${importedVersion}, Current: ${currentVersion}), proceeding without migration.` 
+                  };
+              } else {
+                  importStatus = { type: 'success', message: 'Project imported successfully!' };
+              }
+
+          } catch (error) {
+              // Log error and use the most specific error message set in importStatus
+              console.error("Import process failed:", error);
           }
+          
+          setStatusMessage(importStatus);
+          setTimeout(clearStatusMessage, 8000);
       };
       
       reader.onerror = (e) => {
-            console.error("Error reading file:", e);
-            setUploadError("An error occurred while reading the file from disk.");
+          const message = "Import failed: An error occurred while reading the file from disk.";
+          setStatusMessage({ type: 'error', message });
+          setTimeout(clearStatusMessage, 8000);
       };
       
       reader.readAsText(file);
       // Clear file input value after reading
       event.target.value = ''; 
-  }, [clearUploadError]); // Added clearUploadError dependency
+  }, [clearStatusMessage, setNodes, setConnections]);
 
   const handleDownloadImage = useCallback(() => {
       // NOTE: This feature requires the 'html2canvas' library to be loaded externally (e.g., via a <script> tag).
@@ -3131,6 +3207,8 @@ const App = () => {
       
       if (typeof window.html2canvas !== 'function') {
           console.error("Image download failed: html2canvas library is required for canvas capture. Please ensure the <script> tag for html2canvas is loaded globally in your index.html file.");
+          setStatusMessage({ type: 'error', message: 'Image export failed: Missing required external library (html2canvas).' });
+          setTimeout(clearStatusMessage, 5000);
           return;
       }
       
@@ -3150,11 +3228,15 @@ const App = () => {
               a.click();
               document.body.removeChild(a);
               URL.revokeObjectURL(imageURL);
+              setStatusMessage({ type: 'success', message: 'Diagram exported as JPG successfully!' });
+              setTimeout(clearStatusMessage, 5000);
           }).catch(err => {
               console.error("Error capturing canvas image:", err);
+              setStatusMessage({ type: 'error', message: `Image export failed: ${err.message}` });
+              setTimeout(clearStatusMessage, 5000);
           });
       }
-  }, []);
+  }, [clearStatusMessage]);
   
   // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
@@ -3580,10 +3662,10 @@ const App = () => {
                     let e_val = sourceNode.e_pub;
                     let isReadOnly = false;
 
-                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceNodeKeyGen.e) {
+                    if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
                         // Connected to Simple RSA PrivKey Gen: pull values and set read-only
-                        n_val = sourceNodeKeyGen.n;
-                        e_val = sourceNodeKeyGen.e;
+                        n_val = sourceKeyGenNode.n;
+                        e_val = sourceKeyGenNode.e;
                         isReadOnly = true;
                     } 
                     
@@ -4415,7 +4497,6 @@ const App = () => {
         addNode={addNode} 
         onDownloadProject={handleDownloadProject}
         onUploadProject={handleUploadProject}
-        // Removed onDownloadImage as it was not used in the original call
         onZoomIn={handleZoomIn} // Passed new zoom handler
         onZoomOut={handleZoomOut} // Passed new zoom handler
       />
@@ -4496,21 +4577,13 @@ const App = () => {
           
         </div>
         
-        {/* --- ERROR Notification Overlay --- */}
-        {uploadError && (
-            <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-                <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center border-4 border-red-500 animate-pulse-slow">
-                    <X className="w-6 h-6 text-red-500 mx-auto mb-3" />
-                    <h3 className="text-lg font-bold text-red-700 mb-2">Project Load Error</h3>
-                    <p className="text-sm text-gray-700 mb-4">{uploadError}</p>
-                    <button
-                        onClick={clearUploadError}
-                        className="w-full py-2 px-4 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition"
-                    >
-                        Dismiss
-                    </button>
-                </div>
-            </div>
+        {/* --- STATUS Notification Overlay --- */}
+        {statusMessage && (
+            <StatusNotification 
+                status={statusMessage.type} 
+                message={statusMessage.message} 
+                onClose={clearStatusMessage} 
+            />
         )}
       </div>
     </div>
@@ -4525,6 +4598,7 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
 
     const handleClick = () => {
         if (isFileInput) {
+            // Trigger the file input click
             inputRef.current.click();
         } else if (onClick) {
             onClick();
@@ -4547,7 +4621,14 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
                 <input 
                     type="file" 
                     ref={inputRef} 
-                    onChange={onChange} 
+                    onChange={(e) => {
+                        // Pass the event object containing the file list to the handler
+                        if (e.target.files.length > 0) {
+                            onChange(e.target); 
+                        }
+                        // Reset input value to allow the same file to be loaded again
+                        e.target.value = null;
+                    }} 
                     accept=".json"
                     className="hidden"
                 />
@@ -4678,16 +4759,18 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
             {/* Action Buttons Section at the bottom */}
             <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
                 
+                {/* Export JSON Button */}
                 <ToolbarButton 
                     icon={Download} 
-                    label="Download Project (JSON)" 
+                    label="Export JSON" 
                     color="blue" 
                     onClick={onDownloadProject}
                 />
                 
+                {/* Import JSON Button */}
                 <ToolbarButton 
                     icon={Upload} 
-                    label="Upload Project (JSON)" 
+                    label="Import JSON" 
                     color="orange" 
                     onChange={onUploadProject}
                     isFileInput={true} 
