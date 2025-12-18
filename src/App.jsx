@@ -3356,17 +3356,29 @@ const App = () => {
 
   
   const handleDeleteNode = useCallback((nodeIdToDelete) => {
-      setNodes(prevNodes => prevNodes.filter(n => n.id !== nodeIdToDelete));
+      let idsToDelete = new Set();
+
+      // Check if the node to delete is part of the current selection
+      if (selectedNodeIds.has(nodeIdToDelete)) {
+          // If so, we intend to delete the entire selection group
+          idsToDelete = new Set(selectedNodeIds);
+      } else {
+          // Otherwise, just delete the specific node (single delete)
+          idsToDelete.add(nodeIdToDelete);
+      }
+
+      setNodes(prevNodes => prevNodes.filter(n => !idsToDelete.has(n.id)));
       setConnections(prevConnections => 
-          prevConnections.filter(c => c.source !== nodeIdToDelete && c.target !== nodeIdToDelete)
+          prevConnections.filter(c => !idsToDelete.has(c.source) && !idsToDelete.has(c.target))
       );
-      // Remove from selection if deleted
+      
+      // Update selection state to remove deleted nodes
       setSelectedNodeIds(prev => {
           const newSet = new Set(prev);
-          newSet.delete(nodeIdToDelete);
+          idsToDelete.forEach(id => newSet.delete(id));
           return newSet;
       });
-  }, []);
+  }, [selectedNodeIds]);
 
   const handleConnectStart = useCallback((nodeId, portIndex, outputType) => {
     setConnectingPort({ sourceId: nodeId, sourcePortIndex: portIndex, outputType: outputType });
