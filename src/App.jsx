@@ -18,8 +18,8 @@ const globalStyles = `
 @tailwind components;
 @tailwind utilities;
 
-/* Essential Overrides and Selection Styles */
-html, body, #root {
+/* Styles from src/App.css */
+html, body, #root { /* Or the ID of your React app container */
   height: 100%;
   margin: 0;
   padding: 0;
@@ -32,39 +32,20 @@ html, body, #root {
 .animate-pulse-slow {
     animation: animate-pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-
+/* Base styles for the lines - stroke-width will be modified inline */
 .connection-line-visible {
     stroke: #059669; /* Emerald 600 */
     fill: none;
-    pointer-events: none;
+    pointer-events: none; /* Invisible to mouse, only the hitbox is active */
 }
 .connection-hitbox {
     stroke: transparent;
     fill: none;
     cursor: pointer;
-    pointer-events: stroke;
+    pointer-events: stroke; /* Only sensitive to stroke clicks */
 }
 .connection-hitbox:hover {
-    stroke: rgba(248, 113, 129, 0.5);
-}
-
-/* --- Multi-Selection Styles --- */
-
-/* The selection box (blue rectangle) */
-.selection-marquee {
-    position: absolute;
-    border: 1px dashed #3b82f6; /* Blue-500 */
-    background-color: rgba(59, 130, 246, 0.1); /* Blue-500 with opacity */
-    pointer-events: none; /* Allow clicks to pass through */
-    z-index: 1000;
-}
-
-/* Visual state for selected nodes */
-.node-selected {
-    /* Use Tailwind-like ring effect via box-shadow to avoid conflict with border classes */
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.6), 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-    border-color: #2563eb !important; /* Force Blue-600 border */
-    z-index: 50 !important; /* Bring to front */
+    stroke: rgba(248, 113, 129, 0.5); /* Semi-transparent red on hover */
 }
 `;
 
@@ -126,9 +107,9 @@ const BORDER_CLASSES = {
   blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-500', 
   teal: 'border-teal-600', // Used by ASYM_DEC and DATA_CONCAT
   gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
-  purple: 'border-purple-600', // RSA PrivKey Gen
-  maroon: 'border-red-800', // RSA Encrypt
-  rose: 'border-pink-700', // RSA Decrypt
+  purple: 'border-purple-600', // Simple RSA PrivKey Gen
+  maroon: 'border-red-800', // Simple RSA Encrypt
+  rose: 'border-pink-700', // Simple RSA Decrypt
   amber: 'border-amber-500', // Caesar Cipher
   yellow: 'border-yellow-400', // Vigenere Cipher
   fuchsia: 'border-fuchsia-600', // RSA Signature
@@ -186,7 +167,9 @@ const HOVER_BORDER_TOOLBAR_CLASSES = {
 
 // --- Port Configuration ---
 const PORT_SIZE = 4; // w-4 h-4
-const PORT_VISUAL_OFFSET_PX = 8; 
+// CORREGIDO: Offset es solo para el elemento DIV que contiene el puerto visual
+// El cálculo de la línea debe ir justo hasta el borde del nodo (donde el puerto está pegado).
+const PORT_VISUAL_OFFSET_PX = 8; // Half port width in pixels + padding offset (approx 2px)
 const INPUT_PORT_COLOR = 'bg-stone-500'; // Standard Input (Mandatory)
 const OPTIONAL_PORT_COLOR = 'bg-gray-400'; // Optional Input 
 const OUTPUT_PORT_COLOR = 'bg-emerald-500'; // Standard Data Output
@@ -216,6 +199,7 @@ const NODE_DEFINITIONS = {
     color: 'red', 
     icon: Zap, 
     inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
+    // ADDED: Output port to send data (converted or raw) downstream
     outputPorts: [{ name: 'Viewer Data Output', type: 'data', keyField: 'dataOutput' }] 
   },
   
@@ -224,14 +208,14 @@ const NODE_DEFINITIONS = {
     inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
     outputPorts: [{ name: 'Hash Output', type: 'data', keyField: 'dataOutput' }] },
 
-  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: XORIcon, 
+  XOR_OP: { label: 'XOR Operation', color: 'lime', icon: XORIcon, // Updated icon
     inputPorts: [
         { name: 'Input A', type: 'data', mandatory: true, id: 'dataA' }, 
         { name: 'Input B', type: 'data', mandatory: true, id: 'dataB' }
     ], 
     outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
     
-  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: BitShiftIcon, 
+  SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: BitShiftIcon, // Updated icon
     inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], 
     outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
     
@@ -239,13 +223,13 @@ const NODE_DEFINITIONS = {
   DATA_SPLIT: { 
     label: 'Data Split', // Removed (Half)
     color: 'green', 
-    icon: Split, 
+    icon: Split, // Lucide icon for splitting
     inputPorts: [
         { name: 'Data Input', type: 'data', mandatory: true, id: 'data' }
     ], 
     outputPorts: [
-        { name: 'Chunk 1', type: 'data', keyField: 'chunk1' }, 
-        { name: 'Chunk 2', type: 'data', keyField: 'chunk2' }  
+        { name: 'Chunk 1', type: 'data', keyField: 'chunk1' }, // Output to store the first half
+        { name: 'Chunk 2', type: 'data', keyField: 'chunk2' }  // Output to store the second half
     ] 
   },
   
@@ -253,7 +237,7 @@ const NODE_DEFINITIONS = {
   DATA_CONCAT: { 
     label: 'Data Concatenate', 
     color: 'teal', 
-    icon: Cpu, 
+    icon: Cpu, // Using CPU for generic logic/tooling
     inputPorts: [
         { name: 'Data A', type: 'data', mandatory: true, id: 'dataA' }, 
         { name: 'Data B', type: 'data', mandatory: true, id: 'dataB' }
@@ -267,7 +251,7 @@ const NODE_DEFINITIONS = {
   CAESAR_CIPHER: {
     label: 'Caesar Cipher',
     color: 'amber',
-    icon: Lock, 
+    icon: Lock, // Using Lock icon as it is a cipher
     inputPorts: [
         { name: 'Plaintext', type: 'data', mandatory: true, id: 'plaintext' },
     ],
@@ -287,26 +271,29 @@ const NODE_DEFINITIONS = {
   // --- Key Generators ---
   KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] }, 
 
-  // RSA Key Generator (Private Key Gen - for modular arithmetic demo)
+  // Simple RSA Key Generator (Private Key Gen - for modular arithmetic demo)
   SIMPLE_RSA_KEY_GEN: { 
-    label: 'RSA PrivKey Gen', 
+    label: 'Simple RSA PrivKey Gen', 
     color: 'purple', 
     icon: Key, 
     inputPorts: [], 
     outputPorts: [
+        // The output stores the D value, but the node itself internally stores N and E for the PubKey Gen node
         { name: 'Private Key (d)', type: 'private', keyField: 'dataOutputPrivate' } 
     ]
   },
     
-  // RSA Public Key Generator
+  // Simple RSA Public Key Generator
   SIMPLE_RSA_PUBKEY_GEN: {
-    label: 'RSA PubKey Gen',
+    label: 'Simple RSA PubKey Gen',
     color: 'lime', 
     icon: Unlock, 
     inputPorts: [
+        // This port is optional. If connected, it sources N and E from the Private Key Gen node
         { name: 'Private Key Source', type: 'private', mandatory: false, id: 'keySource' } 
     ],
     outputPorts: [
+        // This output is the (n, e) combination for downstream encryption/verification
         { name: 'Public Key (n, e)', type: 'public', keyField: 'dataOutputPublic' }
     ]
   },
@@ -323,9 +310,9 @@ const NODE_DEFINITIONS = {
     ]
   },
   
-  // --- RSA Cipher Nodes (Modular Arithmetic Demo) ---
+  // --- Simple RSA Cipher Nodes (Modular Arithmetic Demo) ---
   SIMPLE_RSA_ENC: {
-    label: 'RSA Encrypt',
+    label: 'Simple RSA Encrypt',
     color: 'maroon',
     icon: Lock,
     inputPorts: [
@@ -336,7 +323,7 @@ const NODE_DEFINITIONS = {
   },
 
   SIMPLE_RSA_DEC: {
-    label: 'RSA Decrypt',
+    label: 'Simple RSA Decrypt',
     color: 'rose',
     icon: Unlock,
     inputPorts: [
@@ -346,11 +333,11 @@ const NODE_DEFINITIONS = {
     outputPorts: [{ name: 'Plaintext (m)', type: 'data', keyField: 'dataOutput' }]
   },
 
-  // --- RSA Signature Nodes ---
+  // --- Simple RSA Signature Nodes ---
   SIMPLE_RSA_SIGN: {
-      label: 'RSA Sign',
+      label: 'Simple RSA Sign',
       color: 'fuchsia',
-      icon: Signature, 
+      icon: Signature, // Changed to Signature icon
       inputPorts: [
           { name: 'Message (m)', type: 'data', mandatory: true, id: 'message' },
           { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }
@@ -359,7 +346,7 @@ const NODE_DEFINITIONS = {
   },
 
   SIMPLE_RSA_VERIFY: {
-      label: 'RSA Verify',
+      label: 'Simple RSA Verify',
       color: 'fuchsia',
       icon: CheckCheck,
       inputPorts: [
@@ -414,16 +401,29 @@ const NODE_DEFINITIONS = {
   },
 };
 
+// --- Defines the desired rendering order for the toolbar ---
 const ORDERED_NODE_GROUPS = [
+    // MODIFIED: Added 'DATA_CONCAT' to CORE TOOLS
     { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP', 'DATA_SPLIT', 'DATA_CONCAT'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] }, 
+    // MODIFIED: Changed name from 'SIMPLE RSA (MODULAR)' to 'SIMPLE RSA'
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] }, 
+    // MODIFIED: Changed name from 'SYMMETRIC CRYPTO' to 'SYMMETRIC CRYPTO (AES)'
     { name: 'SYMMETRIC CRYPTO (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] }, 
+    // REMOVED: { name: 'ADVANCED ASYMMETRIC (WEB CRYPTO)', types: ['RSA_KEY_GEN', 'ASYM_ENC', 'ASYM_DEC'] },
+    // Removed old 'BITWISE & HASH' category
 ];
 
-const INITIAL_NODES = []; 
-const INITIAL_CONNECTIONS = []; 
+// Initial nodes on the canvas
+const INITIAL_NODES = []; // Set to empty array to start clean
+
+const INITIAL_CONNECTIONS = []; // No initial connections
+
+// --- Node Dimension Constants (for initial and minimum size) ---
+// Dimensions adjusted to ensure Bit Shift visibility
 const NODE_DIMENSIONS = { initialWidth: 300, initialHeight: 280, minWidth: 250, minHeight: 250 };
+
+// Used for initial placement reference. All components should use NODE_DIMENSIONS now.
 const BOX_SIZE = NODE_DIMENSIONS; 
 
 
@@ -433,6 +433,7 @@ const BOX_SIZE = NODE_DIMENSIONS;
 
 /** Calculates (base^exponent) mod modulus using BigInt for large numbers. */
 const modPow = (base, exponent, modulus) => {
+    // Uses BigInt for large numbers.
     if (modulus === BigInt(1)) return BigInt(0);
     let result = BigInt(1);
     base = base % modulus;
@@ -440,12 +441,13 @@ const modPow = (base, exponent, modulus) => {
         if (exponent % BigInt(2) === BigInt(1)) {
             result = (result * base) % modulus;
         }
-        exponent = exponent >> BigInt(1); 
+        exponent = exponent >> BigInt(1); // exponent = exponent / 2
         base = (base * base) % modulus;
     }
     return result;
 };
 
+/** Finds the greatest common divisor of two numbers using BigInt. */
 const gcd = (a, b) => {
     while (b) {
         [a, b] = [b, a % b];
@@ -453,6 +455,9 @@ const gcd = (a, b) => {
     return a;
 };
 
+/** Calculates the modular multiplicative inverse (d) of 'e' modulo 'phi(n)'.
+ * Uses the Extended Euclidean Algorithm, compatible with BigInt.
+ */
 const modInverse = (a, m) => {
     let m0 = m;
     let x0 = BigInt(0); 
@@ -478,8 +483,12 @@ const modInverse = (a, m) => {
     return x1;
 };
 
+// --- Simple RSA Key Generation Functions ---
+
+// Simple primes for demo purposes to avoid huge BigInts and slow arithmetic
 const DEMO_PRIMES = [167, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283];
 
+/** Finds two random distinct prime numbers from the DEMO_PRIMES array. */
 const generateSmallPrimes = () => {
     let p = 0;
     let q = 0;
@@ -490,40 +499,67 @@ const generateSmallPrimes = () => {
     return { p: BigInt(p), q: BigInt(q) };
 };
 
+/** Generates a random valid public exponent 'e' for the given phi(n). */
 const generateSmallE = (phiN) => {
     let e = BigInt(0); 
     do {
+        // Choose a random number > 1 and < phiN
         e = BigInt(Math.floor(Math.random() * (Number(phiN) - 3)) + 2);
     } while (gcd(e, phiN) !== BigInt(1)); 
     return e;
 };
 
+
+// --- Caesar Cipher Implementation ---
+
+/**
+ * Encrypts plaintext using the Caesar cipher.
+ * ONLY works on Text (UTF-8) input. Returns error otherwise.
+ * @param {string} inputData The data string (or text).
+ * @param {string} inputFormat The format of the inputData.
+ * @param {number} k The shift value (key).
+ * @returns {{output: string, format: string}} The resulting output data and its format.
+ */
 const caesarEncrypt = (inputData, inputFormat, k) => {
     if (inputFormat !== 'Text (UTF-8)') {
           return { output: `ERROR: Caesar Cipher requires Text (UTF-8) input. Received: ${inputFormat}`, format: inputFormat };
     }
     
     let ciphertext = '';
-    const shift = (k % 26 + 26) % 26; 
+    const shift = (k % 26 + 26) % 26; // Ensure shift is positive and within 0-25
     const plaintext = inputData;
     
     for (let i = 0; i < plaintext.length; i++) {
         const char = plaintext[i];
         const charCode = char.charCodeAt(0);
 
-        if (charCode >= 65 && charCode <= 90) { 
+        if (charCode >= 65 && charCode <= 90) { // Uppercase (A=65, Z=90)
+            // (charCode - 65 + shift) mod 26 + 65
             const encryptedCode = ((charCode - 65 + shift) % 26) + 65;
             ciphertext += String.fromCharCode(encryptedCode);
-        } else if (charCode >= 97 && charCode <= 122) { 
+        } else if (charCode >= 97 && charCode <= 122) { // Lowercase (a=97, z=122)
+            // (charCode - 97 + shift) mod 26 + 97
             const encryptedCode = ((charCode - 97 + shift) % 26) + 97;
             ciphertext += String.fromCharCode(encryptedCode);
         } else {
+            // Non-alphabetic characters are left unchanged
             ciphertext += char;
         }
     }
     return { output: ciphertext, format: 'Text (UTF-8)' };
 };
 
+
+// --- Vigenère Cipher Implementation ---
+
+/**
+ * Encrypts/Decrypts plaintext using the Vigenère cipher.
+ * ONLY works on Text (UTF-8) input.
+ * @param {string} inputData The plaintext or ciphertext.
+ * @param {string} keyWord The keyword for the Vigenère cipher.
+ * @param {string} mode 'ENCRYPT' or 'DECRYPT'.
+ * @returns {{output: string, format: string}} The resulting output data and its format.
+ */
 const vigenereEncryptDecrypt = (inputData, keyWord, mode = 'ENCRYPT') => {
     if (!keyWord || keyWord.length === 0) {
         return { output: "ERROR: Keyword cannot be empty.", format: 'Text (UTF-8)' };
@@ -537,34 +573,44 @@ const vigenereEncryptDecrypt = (inputData, keyWord, mode = 'ENCRYPT') => {
     let keyIndex = 0;
     const plaintext = inputData;
     const alphabetSize = 26;
+    const direction = mode === 'ENCRYPT' ? 1 : -1;
 
     for (let i = 0; i < plaintext.length; i++) {
         const char = plaintext[i];
         const charCode = char.charCodeAt(0);
 
         if ((charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)) {
+            // 1. Get the shift value (k_i) from the keyword
             const keyChar = keyWord[keyIndex % keyWord.length];
             let keyShift = keyChar.toUpperCase().charCodeAt(0) - 65;
 
+            // 2. Determine base (A=65 or a=97)
             let base = 0;
             if (charCode >= 65 && charCode <= 90) {
-                base = 65; 
+                base = 65; // Uppercase
             } else {
-                base = 97; 
+                base = 97; // Lowercase
             }
 
+            // 3. Calculate new position: (m_i + k_i) mod 26 or (c_i - k_i) mod 26
             let charOffset = charCode - base;
+            
             let encryptedOffset;
             
             if (mode === 'ENCRYPT') {
                 encryptedOffset = (charOffset + keyShift) % alphabetSize;
             } else {
+                // Decryption: (charOffset - keyShift + 26) mod 26
                 encryptedOffset = (charOffset - keyShift + alphabetSize) % alphabetSize;
             }
 
+            // 4. Convert back to character
             result += String.fromCharCode(encryptedOffset + base);
+            
+            // 5. Advance key index only if an alphabetic character was processed
             keyIndex++;
         } else {
+            // Non-alphabetic characters are left unchanged and do not advance the key
             result += char;
         }
     }
@@ -572,6 +618,10 @@ const vigenereEncryptDecrypt = (inputData, keyWord, mode = 'ENCRYPT') => {
     return { output: result, format: 'Text (UTF-8)' };
 };
 
+
+// --- Standard Data Conversion Functions ---
+
+/** Converts ArrayBuffer to Base64 URL-safe string. */
 const arrayBufferToBase64 = (buffer) => {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -581,6 +631,7 @@ const arrayBufferToBase64 = (buffer) => {
   return btoa(binary);
 };
 
+/** Converts Base64 URL-safe string to ArrayBuffer. */
 const base64ToArrayBuffer = (base64) => {
   const binary_string = atob(base64);
   const len = binary_string.length;
@@ -591,54 +642,75 @@ const base64ToArrayBuffer = (base64) => {
   return bytes.buffer;
 };
 
+// --- Single Big Number Conversion Helpers ---
+
+/** Converts ArrayBuffer to a single BigInt string (Base 10). */
 const arrayBufferToBigIntString = (buffer) => {
     const hex = arrayBufferToHex(buffer);
     if (hex.length === 0) return '0';
+    
     let bigInt = BigInt(0);
+    // Convert hex string to BigInt
+    // Note: This relies on the browser supporting BigInt from hex literal '0x'
     try {
         bigInt = BigInt(`0x${hex}`);
     } catch (e) {
+        // Fallback for extremely large numbers or environments lacking full BigInt support
         return `ERROR: Data too large for BigInt conversion (${buffer.byteLength} bytes).`;
     }
     return bigInt.toString(10);
 };
 
+/** Converts ArrayBuffer to a single hexadecimal string (Big Number representation). */
 const arrayBufferToHexBig = (buffer) => {
     const hex = arrayBufferToHex(buffer);
-    return hex.toUpperCase(); 
+    return hex.toUpperCase(); // Display as one single number
 };
 
+/** Converts ArrayBuffer to a single binary string (Big Number representation). */
 const arrayBufferToBinaryBig = (buffer) => {
     const byteArray = new Uint8Array(buffer);
     let binary = '';
+    // Concatenate all 8-bit binary strings
     for (const byte of byteArray) {
         binary += byte.toString(2).padStart(8, '0');
     }
     return binary;
 };
 
+// --- Other Data Format Conversion Functions ---
+
+/** Converts ArrayBuffer to a hexadecimal string (space separated by byte). */
 const arrayBufferToHex = (buffer) => {
     const byteArray = new Uint8Array(buffer);
     return Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
+/** Converts ArrayBuffer to a binary string (space separated by byte). */
 const arrayBufferToBinary = (buffer) => {
     const byteArray = new Uint8Array(buffer);
     return Array.from(byteArray).map(byte => byte.toString(2).padStart(8, '0')).join(' ');
 };
 
+/** Converts a hexadecimal string to ArrayBuffer. */
 const hexToArrayBuffer = (hex) => {
-    const cleanedHex = hex.replace(/\s/g, ''); 
+    // Clean the hex string from spaces or non-hex characters
+    const cleanedHex = hex.replace(/\s/g, ''); // Remove all spaces
     if (cleanedHex.length === 0) return new ArrayBuffer(0);
+
+    // Ensure it has an even length, padding with 0 if necessary
     const paddedHex = cleanedHex.length % 2 !== 0 ? '0' + cleanedHex : cleanedHex;
+
     const len = paddedHex.length / 2;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
+        // Parse two hex characters as one byte (base 16)
         bytes[i] = parseInt(paddedHex.substring(i * 2, i * 2 + 2), 16);
     }
     return bytes.buffer;
 };
 
+/** * Converts a data string and its format into a Uint8Array. */
 const convertToUint8Array = (dataStr, sourceFormat) => {
     if (!dataStr) return new Uint8Array(0);
 
@@ -648,17 +720,22 @@ const convertToUint8Array = (dataStr, sourceFormat) => {
         } else if (sourceFormat === 'Base64') {
              return new Uint8Array(base64ToArrayBuffer(dataStr));
         } else if (sourceFormat === 'Hexadecimal') {
-             const cleanedHex = dataStr.replace(/\s/g, ''); 
+             // Handle both single big number hex and byte-separated hex if needed.
+             // For consistency in binary operation inputs, we interpret input hex as raw byte data.
+             const cleanedHex = dataStr.replace(/\s/g, ''); // Assume contiguous hex stream
              return new Uint8Array(hexToArrayBuffer(cleanedHex));
         } else if (sourceFormat === 'Binary') {
-             const binaryArray = dataStr.replace(/\s+/g, '').match(/.{1,8}/g) || []; 
+             // Convert space-separated binary string to bytes
+             const binaryArray = dataStr.replace(/\s+/g, '').match(/.{1,8}/g) || []; // Group into 8-bit chunks
              const validBytes = binaryArray.map(s => parseInt(s, 2)).filter(b => !isNaN(b));
              return new Uint8Array(validBytes);
         } else if (sourceFormat === 'Decimal') {
+             // Convert space-separated decimal string to bytes
              const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
              const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b >= 255);
              return new Uint8Array(validBytes);
         } else {
+             // Default to UTF-8 encoding for safety
              return new TextEncoder().encode(dataStr);
         }
     } catch (e) {
@@ -667,36 +744,46 @@ const convertToUint8Array = (dataStr, sourceFormat) => {
     }
 };
 
+/** Converts a data string from a source format to a target format via ArrayBuffer. */
 const convertDataFormat = (dataStr, sourceFormat, targetFormat, toSingleNumber = false) => {
     if (!dataStr) return '';
+    
+    // Skip conversion if formats are the same OR if the source data is an error message
     if (sourceFormat === targetFormat || dataStr.startsWith('ERROR')) return dataStr;
     
     let buffer;
     
+    // 1. Convert from source format to ArrayBuffer
     try {
         if (sourceFormat === 'Text (UTF-8)') {
              buffer = new TextEncoder().encode(dataStr).buffer;
         } else if (sourceFormat === 'Base64') {
              buffer = base64ToArrayBuffer(dataStr);
         } else if (sourceFormat === 'Hexadecimal') {
+             // Handle hex input (assumed to be a stream of bytes, possibly a large number if crypto output)
              const cleanedHex = dataStr.replace(/\s/g, '');
              buffer = hexToArrayBuffer(cleanedHex);
         } else if (sourceFormat === 'Binary') {
+             // Convert binary string (space separated or contiguous) to ArrayBuffer
              const binaryArray = dataStr.replace(/\s+/g, '').match(/.{1,8}/g) || [];
              const validBytes = binaryArray.map(s => parseInt(s, 2)).filter(b => !isNaN(b) && b >= 0 && b <= 255);
              buffer = new Uint8Array(validBytes).buffer;
         } else if (sourceFormat === 'Decimal') {
+             // NOTE: Assuming space-separated bytes for now. True BigInt parsing requires more complex input logic.
              const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
              const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
              buffer = new Uint8Array(validBytes).buffer;
         } else {
+             // Treat other source formats as raw text for simplicity and encode as UTF-8
              buffer = new TextEncoder().encode(dataStr).buffer;
         }
     } catch (e) {
          return `DECODING ERROR: Failed source format (${sourceFormat}).`;
     }
 
+    // 2. Convert from ArrayBuffer to target format
     try {
+        // --- Single Number Representation ---
         if (toSingleNumber) {
             if (targetFormat === 'Decimal') {
                 return arrayBufferToBigIntString(buffer);
@@ -704,20 +791,23 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat, toSingleNumber =
             if (targetFormat === 'Hexadecimal') {
                 return arrayBufferToHexBig(buffer);
             }
+            // If target format is Binary in SLN mode, we output contiguous binary string
             if (targetFormat === 'Binary') {
                 return arrayBufferToBinaryBig(buffer);
             }
         }
 
+        // --- Byte-by-Byte Representation ---
         if (targetFormat === 'Text (UTF-8)') {
             return new TextDecoder().decode(buffer);
         } else if (targetFormat === 'Base64') {
             return arrayBufferToBase64(buffer);
         } else if (targetFormat === 'Hexadecimal') {
-            return arrayBufferToHex(buffer).toUpperCase().match(/.{1,2}/g)?.join(' ') || ''; 
+            return arrayBufferToHex(buffer).toUpperCase().match(/.{1,2}/g)?.join(' ') || ''; // Space-separated Hex bytes
         } else if (targetFormat === 'Binary') {
-            return arrayBufferToBinary(buffer); 
+            return arrayBufferToBinary(buffer); // Space-separated Binary bytes
         } else if (targetFormat === 'Decimal') {
+             // Convert to decimal byte representation (space separated)
              const byteArray = new Uint8Array(buffer);
              return Array.from(byteArray).join(' ');
         } else {
@@ -728,60 +818,80 @@ const convertDataFormat = (dataStr, sourceFormat, targetFormat, toSingleNumber =
     }
 };
 
+/** Determines the output format based on the node type. */
 const getOutputFormat = (nodeType) => {
     switch (nodeType) {
         case 'DATA_INPUT':
-        case 'CAESAR_CIPHER': 
-        case 'VIGENERE_CIPHER': 
+        case 'CAESAR_CIPHER': // Caesar outputs Text
+        case 'VIGENERE_CIPHER': // Vigenere outputs Text
             return 'Text (UTF-8)'; 
         case 'KEY_GEN':
         case 'SYM_ENC':
+        // DATA_SPLIT outputs data chunks in Binary format by default (as it is the most raw representation of bits)
         case 'DATA_SPLIT': 
-        case 'DATA_CONCAT': 
+        case 'DATA_CONCAT': // Concatenate outputs Binary by default for precision
             return 'Binary';
         case 'ASYM_ENC':
         case 'SIMPLE_RSA_KEY_GEN':
         case 'RSA_KEY_GEN':
-        case 'SIMPLE_RSA_PUBKEY_GEN': 
+        case 'SIMPLE_RSA_PUBKEY_GEN': // NEW NODE
             return 'Base64';
         case 'HASH_FN':
             return 'Hexadecimal';
         case 'SYM_DEC':
         case 'ASYM_DEC':
             return 'Text (UTF-8)';
+        // Simple RSA operations output single large decimal numbers
         case 'SIMPLE_RSA_ENC':
         case 'SIMPLE_RSA_DEC':
-        case 'SIMPLE_RSA_SIGN': 
+        case 'SIMPLE_RSA_SIGN': // Signature is a large decimal number
             return 'Decimal'; 
         case 'SIMPLE_RSA_VERIFY':
-            return 'Text (UTF-8)'; 
+            return 'Text (UTF-8)'; // Verification result is always a status message
         default:
             return 'Text (UTF-8)';
     }
 }
 
+/** * Performs XOR operation on two input strings (data) of the same format.
+ * Returns the result maintaining the input format and length.
+ */
 const performBitwiseXor = (dataAStr, formatA, dataBStr, formatB) => {
     
+    // Ensure inputs are present and same numerical format
     if (!dataAStr || !dataBStr || dataAStr.startsWith('ERROR') || dataBStr.startsWith('ERROR')) {
         return { output: "ERROR: Missing one or both inputs or inputs failed conversion.", format: formatA };
     }
     
+    // XOR is only meaningful for Binary and Hexadecimal single numbers or byte streams.
+    // If Text or Base64 is used, we fall back to byte-level XOR (original logic, but less precise for bit length).
     if (formatA !== formatB || !['Binary', 'Hexadecimal'].includes(formatA)) {
+        // Fallback to byte-level XOR for mismatched or non-precise formats (like text/base64)
         const bytesA = convertToUint8Array(dataAStr, formatA);
         const bytesB = convertToUint8Array(dataBStr, formatB);
-        const combinedBytes = performRawXor(bytesA, bytesB); 
+        const combinedBytes = performRawXor(bytesA, bytesB); // Use combinedBytes instead of raw output
+        const base64Result = arrayBufferToBase64(combinedBytes.buffer);
+        // We convert the byte result back to formatA (or Base64 if A is non-standard)
         const finalFormat = formatA === 'N/A' || formatA === 'Decimal' ? 'Base64' : formatA;
         const output = convertDataFormat(arrayBufferToBase64(combinedBytes.buffer), 'Base64', finalFormat);
+        
         return { output: output, format: finalFormat };
     }
 
+    // --- LOGIC FOR BIT/HEX PRECISION (Single Large Number/Contiguous Stream) ---
+    
+    // 1. Clean strings (remove potential spaces added by viewer)
     const cleanA = dataAStr.replace(/\s/g, '');
     const cleanB = dataBStr.replace(/\s/g, '');
     
+    // 2. Determine the target length (always the longer one for XOR)
     const targetLength = Math.max(cleanA.length, cleanB.length);
+    
+    // 3. Pad the shorter string with '0's on the left to match the length
     const paddedA = cleanA.padStart(targetLength, '0');
     const paddedB = cleanB.padStart(targetLength, '0');
     
+    // 4. Convert padded strings to BigInt for XOR operation
     let bigIntA;
     let bigIntB;
     
@@ -793,23 +903,29 @@ const performBitwiseXor = (dataAStr, formatA, dataBStr, formatB) => {
             bigIntA = BigInt(`0x${paddedA}`);
             bigIntB = BigInt(`0x${paddedB}`);
         } else {
+             // Should not happen due to initial check, but safety fallback
              return { output: "ERROR: Unsupported XOR numerical format.", format: formatA };
         }
     } catch (e) {
          return { output: "ERROR: Data too large for BigInt XOR or invalid numerical input.", format: formatA };
     }
 
+    // 5. Perform BigInt XOR
     const resultBigInt = bigIntA ^ bigIntB;
+    
+    // 6. Convert result back to string, maintaining the target length
     let resultStr;
     if (formatA === 'Binary') {
         resultStr = bigIntToString(resultBigInt, 'Binary', targetLength);
-    } else { 
+    } else { // Hexadecimal
+        // Hexadecimal is represented by 4 bits per character
         resultStr = bigIntToString(resultBigInt, 'Hexadecimal', targetLength, true);
     }
     
     return { output: resultStr, format: formatA };
 };
 
+/** Performs XOR on two Uint8Arrays (used for byte-stream fallback). */
 const performRawXor = (bytesA, bytesB) => {
     const len = Math.min(bytesA.length, bytesB.length);
     const result = new Uint8Array(len);
@@ -819,12 +935,20 @@ const performRawXor = (bytesA, bytesB) => {
     return result;
 };
 
+
+/** Converts a large number represented as a string (Decimal, Hex, or Binary) to a BigInt.
+ * Returns BigInt or null if conversion fails.
+ */
 const stringToBigInt = (dataStr, format) => {
     if (!dataStr) return null;
-    if (dataStr.includes(' ') && format !== 'Text (UTF-8)' && format !== 'Base64') { 
+    
+    // ** MODIFICATION: Check for spaces to enforce single number constraint **
+    // If we find any space, it implies byte-stream format, which is not allowed for single number bit shift.
+    if (dataStr.includes(' ') && format !== 'Text (UTF-8)' && format !== 'Base64') { // Allow spaces if it's text/base64, though it will be rejected later by performBitShiftOperation anyway.
+        // For numeric formats (Decimal, Hex, Binary), spaces indicate multiple numbers/bytes, which is not supported for SLN bit shift.
         return null; 
     }
-    const cleanedStr = dataStr.replace(/\s/g, ''); 
+    const cleanedStr = dataStr.replace(/\s/g, ''); // Should be no-op now if check passed.
 
     try {
         if (format === 'Decimal') {
@@ -837,15 +961,18 @@ const stringToBigInt = (dataStr, format) => {
         }
         if (format === 'Binary') {
             if (!/^[01]+$/.test(cleanedStr)) return null;
+            // Pad binary string to be a multiple of 4 bits (a nibble) for safety if not already
             const paddedBinary = cleanedStr.padStart(Math.ceil(cleanedStr.length / 4) * 4, '0');
             return BigInt(`0b${paddedBinary}`);
         }
     } catch (e) {
+        // BigInt parsing failure (e.g., number too large or invalid structure)
         return null;
     }
     return null;
 };
 
+/** Converts a BigInt back to a string in the specified format (Decimal, Hex, Binary). */
 const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = false) => {
     if (bigIntValue === null) return 'N/A';
     
@@ -855,8 +982,10 @@ const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = f
         case 'Hexadecimal':
             let hexString = bigIntValue.toString(16).toUpperCase();
             if (originalLength > 0) {
+                 // originalLength here represents the desired *hex character count* if isHexLength is true
                  const hexLength = isHexLength ? originalLength : Math.ceil(originalLength / 4);
                  hexString = hexString.padStart(hexLength, '0');
+                 // If it's longer, we trim from the left (most significant bits)
                  if (hexString.length > hexLength) {
                      hexString = hexString.substring(hexString.length - hexLength);
                  }
@@ -864,8 +993,10 @@ const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = f
             return hexString;
         case 'Binary':
             let binaryString = bigIntValue.toString(2);
+            // Pad with leading zeros if original length is provided
             if (originalLength > 0) {
                 binaryString = binaryString.padStart(originalLength, '0');
+                // If it's longer, we trim from the left (most significant bits)
                  if (binaryString.length > originalLength) {
                      binaryString = binaryString.substring(binaryString.length - originalLength);
                  }
@@ -876,15 +1007,22 @@ const bigIntToString = (bigIntValue, format, originalLength = 0, isHexLength = f
     }
 };
 
+/** * Performs a bit shift operation on the input number (represented by a string).
+ * If the input is Binary or Hexadecimal, it performs a Rotational Shift (Circular).
+ * For Decimal input, it performs a standard Arithmetic/Logical Shift.
+ * @returns {{output: string, description: string}} The output data and a description of the shift performed.
+ */
 const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) => {
-    let shiftDescription = `Arithmetic/Logical ${shiftType} Shift (${shiftAmount} bits)`; 
+    let shiftDescription = `Arithmetic/Logical ${shiftType} Shift (${shiftAmount} bits)`; // Default
     
     if (!dataStr) return { output: "ERROR: Missing data input.", description: shiftDescription };
     
+    // 1. **REJECT TEXT/BASE64 INPUT**
     if (inputFormat === 'Text (UTF-8)' || inputFormat === 'Base64') {
         return { output: `ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary). Received: ${inputFormat}.`, description: shiftDescription };
     }
     
+    // 2. **VALIDATE AND CONVERT TO BIGINT**
     const cleanedStr = dataStr.replace(/\s/g, ''); 
     const bigIntData = stringToBigInt(cleanedStr, inputFormat);
     
@@ -895,6 +1033,7 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
     const amount = BigInt(Math.max(0, parseInt(shiftAmount) || 0));
     let resultBigInt;
     
+    // 3. **DETERMINE BIT LENGTH & ROTATIONAL FLAG**
     let bitLength = 0;
     const isRotational = inputFormat === 'Binary' || inputFormat === 'Hexadecimal';
     
@@ -902,43 +1041,61 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
         if (inputFormat === 'Binary') {
             bitLength = cleanedStr.length;
         } else if (inputFormat === 'Hexadecimal') {
+            // Each hexadecimal digit is 4 bits
             bitLength = cleanedStr.length * 4;
         } 
     }
     
     const amountMod = amount % BigInt(bitLength || 1); 
     
+    
+    // 4. **PERFORM BIT SHIFT (Rotational or Logical/Arithmetic)**
     try {
         if (isRotational && bitLength > 0) {
+             // --- ROTATIONAL SHIFT (ROL / ROR) ---
              const L = BigInt(bitLength);
              const data = bigIntData;
 
              if (shiftType === 'Left') {
+                 // Rotational Left Shift (ROL). Leftmost bit -> Rightmost bit.
+                 // ROL: (x << a) | (x >> (L - a))
+                 
                  const shiftedLeft = data << amountMod;
                  const shiftedRight = data >> (L - amountMod);
+                 
+                 // Mask to keep the original length
                  const mask = (BigInt(1) << L) - BigInt(1);
                  resultBigInt = (shiftedLeft | shiftedRight) & mask;
+                 
                  shiftDescription = `Rotational Left Shift (ROL) (${shiftAmount} bits)`; 
              } else if (shiftType === 'Right') {
+                 // Rotational Right Shift (ROR). Rightmost bit -> Leftmost bit.
+                 // ROR: (x >> a) | (x << (L - a))
                  const shiftedRight = data >> amountMod;
                  const shiftedLeft = data << (L - amountMod);
+                 
+                 // Mask to keep the original length
                  const mask = (BigInt(1) << L) - BigInt(1);
                  resultBigInt = (shiftedRight | shiftedLeft) & mask;
+                 
                  shiftDescription = `Rotational Right Shift (ROR) (${shiftAmount} bits)`; 
              }
 
         } else {
+            // --- ARITHMETIC/LOGICAL SHIFT (Default for Decimal, or if bitLength=0) ---
             if (shiftType === 'Left') {
                 resultBigInt = bigIntData << amount;
             } else { // Right
                 resultBigInt = bigIntData >> amount;
             }
+            // The default description is already 'Arithmetic/Logical...'
         }
     } catch (error) {
         console.error("Bit Shift operation failed:", error);
         return { output: `ERROR: Bit Shift calculation failed. ${error.message}`, description: shiftDescription };
     }
 
+    // 5. **CONVERT BACK**
     const finalLength = isRotational ? bitLength : 0;
     
     return { 
@@ -947,45 +1104,66 @@ const performBitShiftOperation = (dataStr, shiftType, shiftAmount, inputFormat) 
     };
 };
 
+/** * Splits the input data string into two equal chunks. 
+ * Returns the result in the original format (o a standardized one like Binary)
+ * If data length is odd, the first chunk gets the extra element.
+ * @param {string} dataStr The data string (in its source format).
+ * @param {string} format The source format of the data.
+ * @returns {{chunk1: string, chunk2: string, outputFormat: string}} The two chunks and the resulting format.
+ */
 const splitDataIntoChunks = (dataStr, format) => {
     if (!dataStr || dataStr.startsWith('ERROR')) {
         const error = dataStr || 'Missing data input.';
         return { chunk1: `ERROR: ${error}`, chunk2: `ERROR: ${error}`, outputFormat: format };
     }
 
+    // 1. Convert to the most appropriate intermediary representation for splitting
     let cleanData = dataStr.replace(/\s/g, '');
     let representation;
-    let splitUnit; 
+    let splitUnit; // How we measure length (characters, binary digits, etc.)
+
+    // Use Binary representation for precise splitting if it's a numeric format.
+    // Use raw characters if it's Text/Base64 (less precise, but often what's desired).
 
     if (format === 'Text (UTF-8)' || format === 'Base64') {
         representation = cleanData;
         splitUnit = 'char';
     } else if (format === 'Hexadecimal') {
+        // Hex splitting: 1 hex char = 4 bits. We split by hex characters.
         representation = cleanData;
         splitUnit = 'hex';
     } else if (format === 'Decimal') {
+        // Decimal splitting is problematic as a single decimal string represents one large number. 
+        // We warn and convert to a binary stream of bytes first.
         return { chunk1: `ERROR: Cannot split a single Decimal number. Convert to Base64/Hex/Binary stream first.`, 
                  chunk2: `ERROR: Cannot split a single Decimal number. Convert to Base64/Hex/Binary stream first.`, 
                  outputFormat: 'Text (UTF-8)' };
-    } else { 
+    } else { // Binary, o any other assumed stream
         representation = cleanData;
         splitUnit = 'bin';
     }
     
+    // 2. Perform the split
     const length = representation.length;
-    const midPoint = Math.ceil(length / 2); 
+    const midPoint = Math.ceil(length / 2); // First chunk gets the extra char/bit if length is odd
     
     const chunk1 = representation.substring(0, midPoint);
     const chunk2 = representation.substring(midPoint);
     
+    // 3. Format the chunks back to the original format
     const outputFormat = format; 
     
+    // Re-introduce spacing for Hex/Binary for readability if they were originally spaced
     const formatChunk = (chunk, originalFormat) => {
         if (originalFormat === 'Hexadecimal' && splitUnit === 'hex') {
+             // Re-add byte separation (2 hex chars). This is only valid if the original hex string had an even length
+             // and the split point respects byte boundaries (which it may not if splitting by character).
+             // However, for consistency with the display of input hex stream, we try to format it.
              const spacedChunk = chunk.match(/.{1,2}/g)?.join(' ') || chunk;
-             return spacedChunk.trim(); 
+             return spacedChunk.trim(); // Trim leading/trailing spaces
         }
         if (originalFormat === 'Binary' && splitUnit === 'bin') {
+             // Re-add byte separation (8 binary chars).
              const spacedChunk = chunk.match(/.{1,8}/g)?.join(' ') || chunk;
              return spacedChunk.trim();
         }
@@ -1000,7 +1178,12 @@ const splitDataIntoChunks = (dataStr, format) => {
     };
 };
 
+/** * Concatenates two data inputs (A and B) into a single output (A + B).
+ * Inputs are converted to Uint8Array for concatenation before being returned in a common format.
+ * If formats don't match, it will use the most precise common representation (Binary/Hex) or fallback to byte stream.
+ */
 const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
+    // If input A or B is missing, return the valid input as the output, or an error if both are missing.
     if (!dataAStr || dataAStr.startsWith('ERROR')) {
         return { output: dataBStr || "ERROR: Missing data input A and B.", format: formatB || 'Binary' };
     }
@@ -1010,18 +1193,23 @@ const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
     
     const cleanA = dataAStr.replace(/\s/g, '');
     const cleanB = dataBStr.replace(/\s/g, '');
-    const outputFormat = formatA; 
+    const outputFormat = formatA; // Use format A as primary output format
 
+    // **FIX: Special case 1: Bit/Hex Concatenation (simple string join)**
+    // This is the desired behavior for bit streams where padding to bytes would be incorrect.
     if (formatA === 'Binary' && formatB === 'Binary') {
         return { output: cleanA + cleanB, format: 'Binary' };
     }
     if (formatA === 'Hexadecimal' && formatB === 'Hexadecimal') {
         const concatenatedHex = cleanA + cleanB;
+        // Re-apply byte spacing for readability if it was originally spaced
         const spacedOutput = concatenatedHex.toUpperCase().match(/.{1,2}/g)?.join(' ') || concatenatedHex;
         return { output: spacedOutput, format: 'Hexadecimal' };
     }
     
+    // Default case: Concatenate via Byte Array (for Base64, Text, or mismatched numeric formats)
     try {
+        // Use the raw byte representation (Uint8Array) for byte-level concatenation
         const bytesA = convertToUint8Array(dataAStr, formatA);
         const bytesB = convertToUint8Array(dataBStr, formatB);
 
@@ -1029,6 +1217,7 @@ const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
         combinedBytes.set(bytesA, 0);
         combinedBytes.set(bytesB, bytesA.length);
         
+        // Convert the combined ArrayBuffer back to the chosen string format (Base64 is safest intermediate)
         const output = convertDataFormat(arrayBufferToBase64(combinedBytes.buffer), 'Base64', outputFormat);
         
         return { output, format: outputFormat };
@@ -1040,6 +1229,7 @@ const concatenateData = (dataAStr, formatA, dataBStr, formatB) => {
 };
 
 
+/** Calculates the hash of a given string using the Web Crypto API. */
 const calculateHash = async (str, algorithm) => {
   if (!str) return 'Missing data input.';
   const webCryptoAlgorithm = algorithm.toUpperCase(); 
@@ -1053,6 +1243,7 @@ const calculateHash = async (str, algorithm) => {
     const data = encoder.encode(str);
     const hashBuffer = await crypto.subtle.digest(webCryptoAlgorithm, data);
     
+    // Returns Hexadecimal
     return arrayBufferToHex(hashBuffer);
   } catch (error) {
     console.error(`Error calculating hash with ${algorithm}:`, error);
@@ -1060,14 +1251,17 @@ const calculateHash = async (str, algorithm) => {
   }
 };
 
+/** Generates an AES-GCM Symmetric Key. */
 const generateSymmetricKey = async (algorithm) => {
     try {
+        // We only support AES-256 for simplicity in the UI/demo
         const key = await crypto.subtle.generateKey(
             { name: algorithm, length: 256 },
-            true, 
+            true, // extractable
             ["encrypt", "decrypt"]
         );
         
+        // The key is exported as raw bytes (Base64 encoded for transport/storage)
         const rawKey = await crypto.subtle.exportKey('raw', key);
         const base64Key = arrayBufferToBase64(rawKey);
         
@@ -1078,6 +1272,9 @@ const generateSymmetricKey = async (algorithm) => {
     }
 };
 
+/** Generates an RSA Key Pair.
+ * The standard version (used by both SIMPLE and ADVANCED generator).
+ */
 const generateAsymmetricKeyPair = async (algorithm, modulusLength, publicExponentDecimal) => {
     
     let publicExponentArray;
@@ -1097,16 +1294,19 @@ const generateAsymmetricKeyPair = async (algorithm, modulusLength, publicExponen
                 publicExponent: publicExponentArray,
                 hash: { name: hashAlgorithm },
             },
-            true, 
+            true, // extractable
             ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
         );
         
+        // Export public key to SPKI format (Base64)
         const publicKey = await crypto.subtle.exportKey('spki', keyPair.publicKey);
         const base64PublicKey = arrayBufferToBase64(publicKey);
         
+        // Export private key to PKCS#8 format (Base64)
         const privateKey = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
         const base64PrivateKey = arrayBufferToBase64(privateKey);
         
+        // Export PRIVATE key in JWK format to extract internal parameters (p, q, d, n) for visualization (only used by ADVANCED node)
         const privateKeyJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
         
         const rsaParams = {
@@ -1131,6 +1331,7 @@ const generateAsymmetricKeyPair = async (algorithm, modulusLength, publicExponen
     }
 };
 
+/** Encrypts data using an RSA public key (Asymmetric). */
 const asymmetricEncrypt = async (dataStr, base64PublicKey, algorithm) => {
     if (!dataStr) return 'Missing Data Input.';
     if (!base64PublicKey || typeof base64PublicKey !== 'string' || base64PublicKey.length === 0) {
@@ -1159,6 +1360,7 @@ const asymmetricEncrypt = async (dataStr, base64PublicKey, algorithm) => {
     }
 };
 
+/** Decrypts data using an RSA private key (Asymmetric). */
 const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) => {
     if (!base64Ciphertext) return 'Missing Ciphertext Input.';
     if (!base64PrivateKey || typeof base64PrivateKey !== 'string' || base64PrivateKey.length === 0) {
@@ -1175,7 +1377,7 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
         const cipherBuffer = base64ToArrayBuffer(base64Ciphertext);
 
         const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: algorithm }, 
+            { name: algorithm }, // Corrected for RSA-OAEP
             privateKey, 
             cipherBuffer
         );
@@ -1190,6 +1392,7 @@ const asymmetricDecrypt = async (base64Ciphertext, base64PrivateKey, algorithm) 
 };
 
 
+/** Encrypts data using an AES-GCM key (Symmetric). */
 const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     if (!dataStr) return 'Missing Data Input.';
     if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
@@ -1199,23 +1402,28 @@ const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64Key);
         
+        // Import raw key data into a CryptoKey object
         const key = await crypto.subtle.importKey(
             'raw', keyBuffer, { name: algorithm, length: 256 }, true, ['encrypt', 'decrypt']
         );
         
+        // Generate a random Initialization Vector (IV) for AES-GCM
         const iv = crypto.getRandomValues(new Uint8Array(12)); 
         
         const encoder = new TextEncoder();
         const dataBuffer = encoder.encode(dataStr);
 
+        // Encrypt the data
         const encryptedBuffer = await crypto.subtle.encrypt(
             { name: algorithm, iv: iv }, key, dataBuffer
         );
         
+        // Combine IV and ciphertext into a single ArrayBuffer/Uint8Array for output
         const fullCipher = new Uint8Array(iv.byteLength + encryptedBuffer.byteLength);
-        fullCipher.set(new Uint8Array(iv), 0); 
-        fullCipher.set(new Uint8Array(encryptedBuffer), iv.byteLength); 
+        fullCipher.set(new Uint8Array(iv), 0); // IV first
+        fullCipher.set(new Uint8Array(encryptedBuffer), iv.byteLength); // Ciphertext second
 
+        // Output the result as Base64 string
         return arrayBufferToBase64(fullCipher.buffer);
 
     } catch (error) {
@@ -1224,6 +1432,7 @@ const symmetricEncrypt = async (dataStr, base64Key, algorithm) => {
     }
 };
 
+/** Decrypts data using an AES-GCM key (Symmetric). */
 const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
     if (!base64Ciphertext) return 'Missing Ciphertext Input.';
     if (!base64Key || typeof base64Key !== 'string' || base64Key.length === 0) {
@@ -1233,12 +1442,14 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
     try {
         const keyBuffer = base64ToArrayBuffer(base64Key);
         
+        // Import raw key data into a CryptoKey object
         const key = await crypto.subtle.importKey(
             'raw', keyBuffer, { name: algorithm, length: 256 }, true, ['encrypt', 'decrypt']
         );
         
         const fullCipherBuffer = base64ToArrayBuffer(base64Ciphertext);
         
+        // IV is the first 12 bytes for AES-GCM
         if (fullCipherBuffer.byteLength < 12) {
              throw new Error('Ciphertext is too short to contain IV and tag.');
         }
@@ -1246,6 +1457,7 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
         const iv = fullCipherBuffer.slice(0, 12);
         const ciphertext = fullCipherBuffer.slice(12);
 
+        // Decrypt the data
         const decryptedBuffer = await crypto.subtle.decrypt(
             { name: algorithm, iv: new Uint8Array(iv) }, key, ciphertext
         );
@@ -1255,30 +1467,48 @@ const symmetricDecrypt = async (base64Ciphertext, base64Key, algorithm) => {
 
     } catch (error) {
         console.error("Decryption failed:", error);
+        // This usually fails if the key or IV/tag is incorrect.
         return `ERROR: Decryption failed. ${error.message}. Check key/data integrity.`;
     }
 };
 
 
+// --- Input Validation and Auto-Conversion Helper ---
+
+/**
+ * Checks content compatibility with numeric formats.
+ * @param {string} content The user input string.
+ * @param {string} targetFormat The format to check against ('Binary', 'Decimal', 'Hexadecimal', 'Base64', 'Text (UTF-8)').
+ * @returns {boolean} True if content is compatible with the target format.
+ */
 const isContentCompatible = (content, targetFormat) => {
+    // Remove spaces for robust numeric/hex checking
     const cleanedContent = content.replace(/\s+/g, '');
-    if (!cleanedContent) return true; 
+    if (!cleanedContent) return true; // Empty content is always compatible
 
     if (targetFormat === 'Text (UTF-8)') return true;
     
     if (targetFormat === 'Binary') {
+        // Must only contain 0s and 1s
         return /^[01]*$/.test(cleanedContent);
     }
     if (targetFormat === 'Decimal') {
+        // Must only contain 0-9 digits
         return /^\d*$/.test(cleanedContent);
     }
     if (targetFormat === 'Hexadecimal') {
+        // Must only contain 0-9, a-f, A-F
         return /^[0-9a-fA-F]*$/.test(cleanedContent);
     }
     if (targetFormat === 'Base64') {
+        // Simple heuristic for Base64 (alphanumeric, +, /, =, and potentially URL-safe chars)
+        // Note: A truly strict Base64 check is complex (padding, valid chars).
+        // For simplicity here, we use a basic regex that allows typical Base64 characters, 
+        // but it is still highly permissive. The control flow in onChange will prioritize it
+        // over Text (UTF-8).
         return /^[A-Za-z0-9+/=]*$/.test(cleanedContent); 
     }
-    return true; 
+    return true; // Should be covered by Text (UTF-8) above, but kept for completeness.
 };
 
 
@@ -1286,46 +1516,50 @@ const isContentCompatible = (content, targetFormat) => {
 // 3. UI COMPONENTS & GRAPH LOGIC
 // =================================================================
 
+/**
+ * Calculates the SVG path for the line connecting two specific ports.
+ * The connection is calculated to go from the center of the source port to the center of the target port.
+ */
 const getLinePath = (sourceNode, targetNode, connection) => {
     const sourceDef = NODE_DEFINITIONS[sourceNode.type];
     const targetDef = NODE_DEFINITIONS[targetNode.type];
     
+    // 1. Calculate vertical position based on port index and node height
     const getVerticalPosition = (nodeDef, index, isInput, nodeHeight) => {
         const numPorts = isInput ? nodeDef.inputPorts.length : nodeDef.outputPorts.length;
+        // Use nodeHeight instead of fixed BOX_SIZE.minHeight
         const step = nodeHeight / (numPorts + 1); 
         return (index + 1) * step;
     };
 
+    // Calculate vertical position for Source Output Port
+    // Use sourceNode.height
     const sourceVerticalPos = getVerticalPosition(sourceDef, connection.sourcePortIndex, false, sourceNode.height);
+    
+    // Find the index of the targetPortId in the target node's inputPorts array
     const targetPortIndex = targetDef.inputPorts.findIndex(p => p.id === connection.targetPortId);
+    // Calculate vertical position for Target Input Port
+    // Use targetNode.height
     const targetVerticalPos = getVerticalPosition(targetDef, targetPortIndex, true, targetNode.height);
 
+    // P1: Source connection point 
+    // CORREGIDO: Eliminar PORT_VISUAL_OFFSET_PX del cálculo.
     const p1 = { 
-      x: sourceNode.position.x + sourceNode.width, 
+      x: sourceNode.position.x + sourceNode.width, // Borde derecho del nodo fuente
       y: sourceNode.position.y + sourceVerticalPos 
     }; 
     
+    // P2: Target connection point
     const p2 = { 
-      x: targetNode.position.x, 
+      x: targetNode.position.x, // Borde izquierdo del nodo destino
       y: targetNode.position.y + targetVerticalPos
     }; 
     
+    // Use a smooth Bezier curve that flows horizontally
     const midX = (p1.x + p2.x) / 2;
-    return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
-};
-
-
-// --- Helper function to calculate correct mouse position considering scroll and scale ---
-const getMouseCoordinates = (e, canvasElement, scale) => {
-    const rect = canvasElement.getBoundingClientRect();
-    const scrollLeft = canvasElement.scrollLeft;
-    const scrollTop = canvasElement.scrollTop;
     
-    // Calculate position relative to the container's content area (including scroll)
-    // and apply inverse scaling.
-    const x = (e.clientX - rect.left + scrollLeft) / scale;
-    const y = (e.clientY - rect.top + scrollTop) / scale;
-    return { x, y };
+    // Control points pull horizontally towards the center for a smooth arc
+    return `M${p1.x} ${p1.y} C${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
 };
 
 
@@ -1336,15 +1570,18 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     
     let portColor = OUTPUT_PORT_COLOR;
 
+    // Determine specific color for Key ports
     if (outputType === 'public' || outputType === 'private') {
         portColor = outputType === 'public' ? PUBLIC_KEY_COLOR : PRIVATE_KEY_COLOR;
     } else if (type === 'input') {
         portColor = isMandatory ? INPUT_PORT_COLOR : OPTIONAL_PORT_COLOR;
     }
     
+    // Change Output Port Color for 'key' type (Symmetric)
     if (type === 'output' && outputType === 'key') {
-         portColor = TEXT_ICON_CLASSES['orange'].replace('text', 'bg'); 
+         portColor = TEXT_ICON_CLASSES['orange'].replace('text', 'bg'); // Use orange background for symmetric key output
     }
+    // Change Output Port Color for 'signature' type
     if (type === 'output' && outputType === 'signature') {
          portColor = SIGNATURE_COLOR.replace('border', 'bg'); 
     }
@@ -1352,18 +1589,24 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     if (type === 'output') {
         clickHandler = (e) => { 
             e.stopPropagation(); 
+            // Pass the node ID, port index, and output data type
             onStart(nodeId, portIndex, outputType); 
         };
         interactionClasses = isConnecting?.sourceId === nodeId 
             ? 'ring-4 ring-emerald-300 animate-pulse' 
             : 'hover:ring-4 hover:ring-emerald-300 transition duration-150';
     } else if (type === 'input') {
+        // --- FIX: Ensure validation works for multi-input nodes like XOR ---
+        
+        // Find the full node definition
         const targetNode = nodes.find(n => n.id === nodeId);
         const targetNodeDef = NODE_DEFINITIONS[targetNode?.type];
         
+        // Find the specific port definition by ID to get its type (e.g., 'data', 'key')
         const inputPortDef = targetNodeDef.inputPorts.find(p => p.id === portId);
         const inputPortType = inputPortDef?.type;
         
+        // A port is a target candidate if an output port is active AND port types match
         const isTargetCandidate = isConnecting && 
                                    isConnecting.sourceId !== nodeId && 
                                    isConnecting.outputType === inputPortType; 
@@ -1371,6 +1614,7 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
         if (isTargetCandidate) {
             clickHandler = (e) => { 
                 e.stopPropagation(); 
+                // Pass the node ID and the input port ID
                 onEnd(nodeId, portId); 
             };
             interactionClasses = 'ring-4 ring-yellow-300 cursor-pointer animate-pulse-slow';
@@ -1382,8 +1626,10 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
     
     const stopPropagation = (e) => e.stopPropagation();
 
+    // Port styles rely on absolute positioning determined by the parent DraggableBox
     return (
         <div 
+            // Ajuste: usar -left-2 / -right-2 para empujar el puerto visual fuera del borde
             className={`w-${PORT_SIZE} h-${PORT_SIZE} rounded-full ${portColor} absolute transform -translate-x-1/2 -translate-y-1/2 
                            shadow-md border-2 border-white cursor-pointer ${interactionClasses}`}
             onClick={clickHandler}
@@ -1397,13 +1643,17 @@ const Port = React.memo(({ nodeId, type, isConnecting, onStart, onEnd, title, is
 
 // --- Component for the Draggable Box ---
 
-const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize, isSelected, onNodeDown }) => {
+const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize }) => {
+  // Destructure node props and look up definition
   const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, viewFormat, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, rsaParameters, asymAlgorithm, convertedData, convertedFormat, isConversionExpanded, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, generateKey, shiftDescription, chunk1, chunk2 } = node; 
+  // Get node definition
   const definition = NODE_DEFINITIONS[type];
-  const [isResizing, setIsResizing] = useState(false); 
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false); // Resizing state
   const boxRef = useRef(null);
-  const resizeOffset = useRef({ x: 0, y: 0 }); 
-  const [copyStatus, setCopyStatus] = useState('Copy'); 
+  const offset = useRef({ x: 0, y: 0 });
+  const resizeOffset = useRef({ x: 0, y: 0 }); // Stores the difference between mouse and corner
+  const [copyStatus, setCopyStatus] = useState('Copy'); // English for Copy
 
   // Node specific flags
   const isDataInput = type === 'DATA_INPUT';
@@ -1424,50 +1674,91 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   const isBitShift = type === 'SHIFT_OP'; 
   const isCaesarCipher = type === 'CAESAR_CIPHER'; 
   const isVigenereCipher = type === 'VIGENERE_CIPHER'; 
-  const isDataSplit = type === 'DATA_SPLIT'; 
-  const isDataConcat = type === 'DATA_CONCAT'; 
+  const isDataSplit = type === 'DATA_SPLIT'; // Data Split Flag
+  const isDataConcat = type === 'DATA_CONCAT'; // Data Concatenate Flag
   
   const FORMATS = ALL_FORMATS;
   
   const isPortSource = connectingPort?.sourceId === id;
   
-  // --- Drag Handler Logic Moved to App.jsx ---
-  // We only notify parent on mouse down
-  const handleMouseDown = useCallback((e) => {
-      // Only process left click
-      if (e.button !== 0) return;
+  
+  // --- Drag Handlers (standard) ---
+  const handleDragStart = useCallback((e) => {
+    if (connectingPort || isResizing) return; 
+    const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'BUTTON', 'INPUT']; 
+    // Check if a port was clicked to prevent drag
+    if (e.target.tagName === 'DIV' && e.target.classList.contains('w-4') && e.target.classList.contains('h-4')) {
+        return; 
+    }
+    // Allow interaction inside form elements
+    if (interactiveTags.includes(e.target.tagName)) {
+        return; 
+    }
 
-      // Allow interaction with inputs without triggering drag
-      const interactiveTags = ['TEXTAREA', 'SELECT', 'OPTION', 'BUTTON', 'INPUT']; 
-      // Check if a port was clicked to prevent drag (handled in port, but just in case)
-      if (e.target.tagName === 'DIV' && e.target.classList.contains('w-4') && e.target.classList.contains('h-4')) {
-          return; 
-      }
-      if (interactiveTags.includes(e.target.tagName)) {
-          return; 
-      }
-      e.stopPropagation(); // Stop propagation to prevent selection box
-      onNodeDown(e, id);
-  }, [onNodeDown, id]);
+    const clientX = e.clientX || (e.touches?.[0]?.clientX ?? 0);
+    const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
+    const canvas = canvasRef.current;
+    
+    if (boxRef.current && canvas) {
+      const canvasRect = canvas.getBoundingClientRect();
 
+      // Calculate mouse position relative to the unscaled coordinate system
+      const unscaledMouseX = (clientX - canvasRect.left) / scale;
+      const unscaledMouseY = (clientY - canvasRect.y) / scale;
+
+      offset.current = {
+        x: unscaledMouseX - position.x,
+        y: unscaledMouseY - position.y,
+      };
+      
+      setIsDragging(true);
+      e.preventDefault(); 
+    }
+  }, [canvasRef, position.x, position.y, connectingPort, isResizing, scale]);
+
+  const handleDragMove = useCallback((e) => {
+    if (!isDragging) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const clientX = e.clientX || (e.touches?.[0]?.clientX ?? 0);
+    const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
+
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    // Mouse coordinates relative to the unscaled coordinate system (scaled back up)
+    const unscaledMouseX = (clientX - canvasRect.left) / scale;
+    const unscaledMouseY = (clientY - canvasRect.y) / scale;
+    
+    let newX = unscaledMouseX - offset.current.x;
+    let newY = unscaledMouseY - offset.current.y;
+    
+    // BOUNDS CHECKING (Unscaled dimensions)
+    newX = Math.max(0, newX);
+    newY = Math.max(0, newY);
+
+    setPosition(id, { x: newX, y: newY });
+  }, [isDragging, id, setPosition, canvasRef, scale]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
   
   // --- Resizing Handlers ---
   const handleResizeStart = useCallback((e) => {
-    if (e.button !== 0) return; // Only left click for resizing
     e.stopPropagation(); 
     setIsResizing(true);
     
     const clientX = e.clientX || (e.touches?.[0]?.clientX ?? 0);
     const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
     
-    // Use getMouseCoordinates logic for resizing too, although here we need relative movement
+    // Store the difference between current mouse pos (relative to document/viewport) and node's current size position
     const canvas = canvasRef.current.getBoundingClientRect();
-    const scrollLeft = canvasRef.current.scrollLeft;
-    const scrollTop = canvasRef.current.scrollTop;
+    const unscaledMouseX = (clientX - canvas.left) / scale;
+    const unscaledMouseY = (clientY - canvas.y) / scale;
 
-    const unscaledMouseX = (clientX - canvas.left + scrollLeft) / scale;
-    const unscaledMouseY = (clientY - canvas.top + scrollTop) / scale;
-
+    // Calculate current width/height in unscaled coords relative to canvas top/left,
+    // and store the difference to maintain offset while resizing.
     resizeOffset.current = {
         x: unscaledMouseX - (node.position.x + node.width),
         y: unscaledMouseY - (node.position.y + node.height),
@@ -1484,12 +1775,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     const clientY = e.clientY || (e.touches?.[0]?.clientY ?? 0);
 
     const canvasRect = canvas.getBoundingClientRect();
-    const scrollLeft = canvas.scrollLeft;
-    const scrollTop = canvas.scrollTop;
     
-    const unscaledMouseX = (clientX - canvasRect.left + scrollLeft) / scale;
-    const unscaledMouseY = (clientY - canvasRect.top + scrollTop) / scale;
+    // Mouse coordinates relative to the unscaled coordinate system
+    const unscaledMouseX = (clientX - canvasRect.left) / scale;
+    const unscaledMouseY = (clientY - canvasRect.y) / scale;
     
+    // Calculate new dimensions based on mouse position relative to node's origin
     let newWidth = unscaledMouseX - node.position.x - resizeOffset.current.x;
     let newHeight = unscaledMouseY - node.position.y - resizeOffset.current.y;
     
@@ -1505,19 +1796,24 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   
   // --- Combined Global Event Listeners ---
   useEffect(() => {
+    // Determine the correct move/up handlers based on which operation is active
     const globalHandleMove = (e) => {
-        if (isResizing) {
+        if (isDragging) {
+            handleDragMove(e);
+        } else if (isResizing) {
             handleResizeMove(e);
         }
     };
     
     const globalHandleUp = (e) => {
-        if (isResizing) {
+        if (isDragging) {
+            handleDragEnd(e);
+        } else if (isResizing) {
             handleResizeEnd(e);
         }
     };
 
-    if (isResizing) {
+    if (isDragging || isResizing) {
       document.addEventListener('mousemove', globalHandleMove);
       document.addEventListener('mouseup', globalHandleUp);
       document.addEventListener('touchmove', globalHandleMove, { passive: false });
@@ -1530,18 +1826,17 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       document.removeEventListener('touchmove', globalHandleMove);
       document.removeEventListener('touchend', globalHandleUp);
     };
-  }, [isResizing, handleResizeMove, handleResizeEnd]);
+  }, [isDragging, isResizing, handleDragMove, handleDragEnd, handleResizeMove, handleResizeEnd]);
   
   const handleBoxClick = useCallback((e) => {
-    if (isResizing) return; 
+    if (isDragging || isResizing) return; 
     if (connectingPort) {
-      handleConnectEnd(null); 
+      handleConnectEnd(null); // Cancel connection if canvas clicked
     }
-    // Don't stop prop here if we want node click to select, but mousedown usually handles select
-    // e.stopPropagation(); 
-  }, [connectingPort, handleConnectEnd, isResizing]);
+    e.stopPropagation();
+  }, [connectingPort, handleConnectEnd, isDragging, isResizing]);
 
-  // Handle Copy to Clipboard
+  // Handle Copy to Clipboard for Output Viewer
   const handleCopyToClipboard = useCallback((e, textToCopy) => {
     e.stopPropagation();
     
@@ -1550,16 +1845,22 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     try {
         const tempTextArea = document.createElement('textarea');
         tempTextArea.value = textToCopy;
+        
         tempTextArea.style.position = 'fixed';
         tempTextArea.style.left = '-9999px';
         tempTextArea.style.top = '0';
         tempTextArea.style.opacity = '0'; 
+
         document.body.appendChild(tempTextArea);
+        
+        // Use document.execCommand('copy') for iframe compatibility
         tempTextArea.select();
         document.execCommand('copy');
+        
         document.body.removeChild(tempTextArea);
-        setCopyStatus('Copied!'); 
-        setTimeout(() => setCopyStatus('Copy'), 1500); 
+        setCopyStatus('Copied!'); // Changed to English for consistency with other internal strings
+        setTimeout(() => setCopyStatus('Copy'), 1500); // Changed to English for consistency with other internal strings
+        
     } catch (err) {
         console.error('Failed to copy text:', err);
         setCopyStatus('Error');
@@ -1574,19 +1875,22 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     if (!definition.inputPorts || definition.inputPorts.length === 0) return null;
     
     const numPorts = definition.inputPorts.length;
-    const nodeHeight = height; 
+    const nodeHeight = height; // Use dynamic height
+    // Calculate vertical offset for even distribution
     const step = nodeHeight / (numPorts + 1); 
 
     return definition.inputPorts.map((portDef, index) => {
         const topPosition = (index + 1) * step;
         const portId = portDef.id;
+        
         const isInputConnected = connections.some(c => c.target === id && c.targetPortId === portId);
 
         return (
             <div 
                 key={portId}
+                // Ajuste: usar -left-2 para empujar el puerto visual fuera del borde
                 className="absolute -left-2 transform -translate-y-1/2 z-20"
-                style={{ top: `${topPosition}px` }} 
+                style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
                 <Port 
                     nodeId={id} 
@@ -1598,7 +1902,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     title={`${portDef.name} (${portDef.mandatory ? 'Mandatory' : 'Optional'}) - Type: ${portDef.type}`}
                     isMandatory={portDef.mandatory}
                     isInputConnected={isInputConnected}
-                    nodes={nodes} 
+                    nodes={nodes} // PASSING NODES PROP TO PORT FOR VALIDATION
                 />
             </div>
         );
@@ -1609,7 +1913,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     if (!definition.outputPorts || definition.outputPorts.length === 0) return null;
     
     const numPorts = definition.outputPorts.length;
-    const nodeHeight = height; 
+    const nodeHeight = height; // Use dynamic height
+    // Calculate vertical offset for even distribution
     const step = nodeHeight / (numPorts + 1); 
 
     return definition.outputPorts.map((portDef, index) => {
@@ -1618,8 +1923,9 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         return (
             <div 
                 key={portDef.name}
+                // Ajuste: usar -right-2 para empujar el puerto visual fuera del borde
                 className="absolute -right-2 transform -translate-y-1/2 z-20"
-                style={{ top: `${topPosition}px` }} 
+                style={{ top: `${topPosition}px` }} // Use pixels based on calculated step
             >
                 <Port 
                     nodeId={id} 
@@ -1632,7 +1938,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     onEnd={handleConnectEnd}
                     title={`${portDef.name} - Type: ${portDef.type}`}
                     isMandatory={true} 
-                    nodes={nodes} 
+                    nodes={nodes} // PASSING NODES PROP TO PORT FOR VALIDATION
                 />
             </div>
         );
@@ -1647,20 +1953,21 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
   if (isPortSource) {
     specificClasses = `border-emerald-500 ring-4 ring-emerald-300 cursor-pointer animate-pulse transition duration-200`; 
   } else {
-    // Add specific styles for selected state (blue border/ring)
-    specificClasses = `${BORDER_CLASSES[color]} ${HOVER_BORDER_CLASSES[color]} ${isSelected ? 'node-selected' : 'cursor-pointer hover:border-blue-500'}`;
+    specificClasses = `${BORDER_CLASSES[color]} ${HOVER_BORDER_CLASSES[color]} ${isDragging ? 'cursor-grabbing' : 'cursor-pointer hover:border-blue-500'}`;
   }
   
   if (isProcessing) {
       specificClasses = `border-yellow-500 ring-4 ring-yellow-300 animate-pulse transition duration-200`; 
   }
   
+  // Apply height adjustment here
   let requiredMinHeight = NODE_DIMENSIONS.minHeight;
   
   if (isOutputViewer) {
       requiredMinHeight = isConversionExpanded ? 280 : 250;
   }
   
+  // Specific height adjustment for Bit Shift, XOR, Data Split, and Data Concatenate (similar structure)
   if (isBitShift || type === 'XOR_OP' || isDataSplit || isDataConcat) {
       requiredMinHeight = 300; 
   }
@@ -1672,35 +1979,37 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     bg-white shadow-xl rounded-xl border-4 transition duration-150 ease-in-out 
     hover:shadow-2xl absolute select-none z-10`;
     
+  // --- Dynamic Style Object ---
   const boxStyle = {
       left: `${position.x}px`,
       top: `${position.y}px`,
       width: `${width}px`,
+      // Use initialBoxHeight for the box initial height
       minHeight: `${effectiveMinHeight}px`, 
       height: `${height}px`, 
   };
   
-  const contentHeightExcludingHeader = height - 50; 
+  // Calculate remaining space inside the box for growing components
+  const contentHeightExcludingHeader = height - 50; // Estimate header/padding height
 
   // --- Render ---
   return (
     <div
       ref={boxRef}
       id={id}
-      // Add draggable-box class for easier hit testing
-      className={`${baseClasses} ${specificClasses} draggable-box`}
+      className={`${baseClasses} ${specificClasses}`}
       style={boxStyle} 
-      onMouseDown={handleMouseDown} 
-      onTouchStart={handleMouseDown} // Map touch to same logic if needed, but multitouch selection is tricky
+      onMouseDown={handleDragStart} 
+      onTouchStart={handleDragStart} 
       onClick={handleBoxClick} 
     >
       
-      {/* Resizing Handle */}
+      {/* Resizing Handle (Bottom Right Corner) */}
       <div 
           className="absolute bottom-0 right-0 w-4 h-4 rounded-tl-lg bg-gray-200 opacity-60 hover:opacity-100 transition duration-150 cursor-nwse-resize z-30"
           onMouseDown={handleResizeStart}
           onTouchStart={handleResizeStart}
-          onClick={(e) => e.stopPropagation()} 
+          onClick={(e) => e.stopPropagation()} // Prevent click propagation during resize
           title="Resize"
       >
         <div className="w-1 h-1 bg-gray-600 absolute bottom-1 right-1"></div>
@@ -1726,21 +2035,26 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
       {renderOutputPorts()} 
 
       {/* -------------------- CONTENT -------------------- */}
+      {/* Use style to dynamically set height based on node's height - accounting for padding/header */}
       <div 
           className="flex flex-col w-full justify-start items-center overflow-hidden" 
           style={{ height: `${contentHeightExcludingHeader}px` }}
       >
         {/* Top Section: Icon and Main Label */}
         <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
+          {/* Icon Component (Simplified logic to prevent React type errors) */}
           {definition.icon && (
               <definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />
           )}
           <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
+          {/* Show algorithm name for functional nodes */}
           
           {isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>k = {node.shiftKey || 0}</span>}
           {isVigenereCipher && <span className={`text-xs text-gray-500 mt-1`}>Keyword: {node.keyword || 'None'}</span>}
           {isSimpleRSASign && <span className={`text-xs text-gray-500 mt-1`}>Signing (m^d mod n)</span>}
           {isSimpleRSAVerify && <span className={`text-xs text-gray-500 mt-1`}>Verifying (s^e mod n)</span>}
+
+          {/* Simple RSA Encrypt/Decrypt Subtitle (Updated as requested) */}
           {isSimpleRSAEnc && <span className={`text-xs text-gray-500 mt-1`}>Encryption: (c = m^e mod n)</span>}
           {isSimpleRSADec && <span className={`text-xs text-gray-500 mt-1`}>Decryption: (m = c^d mod n)</span>}
 
@@ -1748,6 +2062,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           {isHashFn && (
               <div className="text-xs w-full text-center flex flex-col items-center">
                 <span className={`text-[10px] font-semibold text-gray-600 mb-1`}>ALGORITHM</span>
+                {/* Hash Algorithm Selector */}
                 <select
                     className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2
                                      bg-white appearance-none cursor-pointer text-gray-700 
@@ -1766,10 +2081,13 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
           )}
           {isKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({keyAlgorithm})</span>}
           
+          {/* Simple RSA Key Gen */}
           {isSimpleRSAKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({modulusLength} bits)</span>}
           
+          {/* Advanced RSA Key Gen */}
           {isRSAKeyGen && <span className={`text-xs text-gray-500 mt-1`}>({node.keyAlgorithm} {modulusLength} bits, e={publicExponent})</span>}
           
+          {/* Show status/algorithm for XOR and Bit Shift */}
           {type === 'XOR_OP' && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : 'Bitwise XOR'})</span>}
           {isBitShift && <span className={`text-xs text-gray-500 mt-1`}>({isProcessing ? 'Processing' : (shiftDescription || 'Bit Shift')})</span>}
           {isSimpleRSAPubKeyGen && <span className={`text-xs text-gray-500 mt-1`}>Public Key Output</span>} 
@@ -1781,6 +2099,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
         </div>
         
         {isDataInput && (
+          /* Data Input Specific Controls */
           <div className="w-full flex flex-col items-center flex-grow">
             <textarea
               className="w-full text-xs p-2 border border-gray-200 rounded-lg shadow-md resize-y flex-grow mb-2 
@@ -1788,15 +2107,20 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                            outline-none transition duration-200"
               placeholder="Enter data here..."
               value={content || ''}
+              // Handle content change with format detection
               onChange={(e) => {
                   const newContent = e.target.value;
                   const currentFormat = node.format;
                   let newFormat = currentFormat;
                   
+                  // Define the priority order (most restrictive first)
                   const formatsByRestrictiveness = ['Binary', 'Decimal', 'Hexadecimal', 'Base64', 'Text (UTF-8)'];
                   
+                  // 1. Check if new content is compatible with the CURRENT format. 
+                  // If it is, we keep the current format to avoid annoying auto-reversions (e.g., from Hex to Dec).
                   if (!isContentCompatible(newContent, currentFormat)) {
-                      let detectedFormat = 'Text (UTF-8)'; 
+                      // 2. If incompatible with the current format, find the MOST restrictive compatible format.
+                      let detectedFormat = 'Text (UTF-8)'; // Safest fallback
                       for (const formatCheck of formatsByRestrictiveness) {
                           if (isContentCompatible(newContent, formatCheck)) {
                               detectedFormat = formatCheck;
@@ -1806,10 +2130,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                       newFormat = detectedFormat;
                   }
                   
+                  // Only update if the determined new format is DIFFERENT from the old format
                   if (newFormat !== currentFormat) {
                       updateNodeContent(id, 'format', newFormat);
                   }
                   
+                  // Always update content
                   updateNodeContent(id, 'content', newContent);
               }}
               onMouseDown={(e) => e.stopPropagation()} 
@@ -1821,6 +2147,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                            bg-white appearance-none cursor-pointer text-gray-700 
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-200"
               value={format || 'Text (UTF-8)'}
+              // Add auto-correction logic when user manually selects an incompatible format
               onChange={(e) => {
                 e.stopPropagation();
                 const selectedFormat = e.target.value;
@@ -1828,9 +2155,12 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 let finalFormat = selectedFormat;
 
                 if (!isContentCompatible(currentContent, selectedFormat)) {
+                    // If the selected format is NOT compatible with the current content,
+                    // calculate the safest compatible format based on the content.
                     
                     const formatsByRestrictiveness = ['Binary', 'Decimal', 'Hexadecimal', 'Base64', 'Text (UTF-8)'];
                     
+                    // Find the most restrictive format that fits the current content
                     for (const formatCheck of formatsByRestrictiveness) {
                         if (isContentCompatible(currentContent, formatCheck)) {
                             finalFormat = formatCheck;
@@ -1838,6 +2168,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         }
                     }
 
+                    // Inform user that original choice was incompatible, reverting to safe fallback
                     if (finalFormat !== selectedFormat) {
                         console.warn(`Content incompatible with ${selectedFormat}. Reverted to compatible format: ${finalFormat}`);
                     }
@@ -1861,13 +2192,14 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             <div className="w-full mt-1 flex flex-col items-center flex-grow text-xs text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded-lg shadow-inner overflow-y-auto">
                 <span className="text-center font-bold text-red-600 mb-1 flex-shrink-0">RAW INPUT DATA</span>
                 
+                {/* Source Data Type Selector (Read-only representation of input data type) */}
                 <div className="w-full mb-1 flex-shrink-0">
                     <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">Source Data Type</label>
                     <select
                         className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
                                      bg-gray-100 cursor-default text-gray-700 appearance-none pointer-events-none"
                         value={sourceFormat || 'N/A'}
-                        onChange={() => {}} 
+                        onChange={() => {}} // Disabled but functional selector
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                         disabled
@@ -1876,14 +2208,17 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     </select>
                 </div>
 
+                {/* Primary Output Box (RAW UNCONVERTED Input Data - uses relative height) */}
                 <div 
                     className={`relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200`}
+                    // Dynamic height adjustment for output
                     style={{ flexGrow: isConversionExpanded ? 0.5 : 1.2, minHeight: '40px' }} 
                 >
                     <p>{rawInputData || 'Not connected or no data.'}</p>
                     
+                    {/* Copy Button for Primary Output */}
                     <button
-                        onClick={(e) => handleCopyToClipboard(e, rawInputData)} 
+                        onClick={(e) => handleCopyToClipboard(e, rawInputData)} // Copying raw input data
                         disabled={!rawInputData || rawInputData.startsWith('ERROR')}
                         className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm 
                                      ${rawInputData && !rawInputData.startsWith('ERROR')
@@ -1895,6 +2230,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     </button>
                 </div>
 
+                {/* Conversion Button */}
                 <button
                     onClick={(e) => { 
                         e.stopPropagation();
@@ -1906,16 +2242,19 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 </button>
 
 
+                {/* Secondary Output/Conversion Section (Conditionally rendered) */}
                 {isConversionExpanded && (
                     <div className="w-full mt-2 pt-2 border-t border-gray-200 flex flex-col space-y-2 flex-grow">
                         <span className="text-center font-bold text-red-600 text-[10px] flex-shrink-0">CONVERTED VIEW</span>
 
+                        {/* Converted Output Box */}
                         <div 
                             className="relative w-full break-all text-[10px] leading-tight text-gray-800 bg-white p-1 rounded-md mb-2 overflow-y-auto border border-gray-200"
-                            style={{ flexGrow: 1, minHeight: '40px' }} 
+                            style={{ flexGrow: 1, minHeight: '40px' }} // Takes remaining space
                         >
                             <p>{convertedData || 'Select conversion type...'}</p>
 
+                            {/* Copy Button for Converted Output */}
                             <button
                                 onClick={(e) => handleCopyToClipboard(e, convertedData)}
                                 disabled={!convertedData || convertedData.startsWith('ERROR')}
@@ -1929,6 +2268,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                             </button>
                         </div>
 
+                        {/* Converted Format Selector */}
                         <select
                             className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm flex-shrink-0
                                              bg-white appearance-none cursor-pointer text-gray-700 
@@ -1948,8 +2288,662 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             </div>
         )}
 
-        {/* ... (Other Node Types Rendering Logic - Kept same as original, just ensuring e.stopPropagation is correct) ... */}
+        {isCaesarCipher && (
+            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>SHIFT KEY (k)</span>
+                {/* Input for k, must be 0-25 */}
+                <input
+                    type="number"
+                    min="0"
+                    max="25"
+                    step="1"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 
+                                 outline-none transition duration-200"
+                    value={node.shiftKey || 0}
+                    // Only update shiftKey. Recalc is triggered by updateNodeContent.
+                    onChange={(e) => updateNodeContent(id, 'shiftKey', parseInt(e.target.value) || 0)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+                
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-amber-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Encrypting...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    {/* Increased padding and removed substring for full error visibility */}
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext...'}
+                    </p>
+                    {/* Copy Button for Caesar Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR') && node.outputFormat === 'Text (UTF-8)' 
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Vigenere Cipher */}
+        {isVigenereCipher && (
+             <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>KEYWORD (A-Z only)</span>
+                {/* Keyword Input */}
+                <input
+                    type="text"
+                    placeholder="Keyword"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-1 flex-shrink-0
+                                 text-gray-700 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition duration-200"
+                    value={keyword || ''}
+                    // Only update keyword. Recalc is triggered by updateNodeContent.
+                    onChange={(e) => updateNodeContent(id, 'keyword', e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} // Force uppercase letters only
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+
+                {/* Mode Selector */}
+                <div className="w-full mb-2 flex-shrink-0">
+                    <label className="block text-left text-[10px] font-semibold text-gray-600 mb-0.5">OPERATION MODE</label>
+                    <select
+                        className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm 
+                                     bg-white appearance-none cursor-pointer text-gray-700 
+                                     focus:ring-2 focus:ring-yellow-500 outline-none transition duration-200"
+                        value={vigenereMode || 'ENCRYPT'}
+                        onChange={(e) => updateNodeContent(id, 'vigenereMode', e.target.value)}
+                        onMouseDown={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <option value="ENCRYPT">Encrypt (C = P + K)</option>
+                        <option value="DECRYPT">Decrypt (P = C - K)</option>
+                    </select>
+                </div>
+                
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-yellow-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Processing...' : `Active (${vigenereMode})`}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data and Keyword...'}
+                    </p>
+                    {/* Copy Button */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR') && node.outputFormat === 'Text (UTF-8)' 
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Simple RSA Private Key Generator (Modular Arithmetic Demo) */}
+        {isSimpleRSAKeyGen && (
+             <div className="text-xs w-full flex flex-col items-center flex-grow space-y-2">
+                <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
+                    {/* P Input/Display */}
+                    <label className="block">
+                        <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">P (Prime 1)</span>
+                        <input
+                            type="text"
+                            placeholder="Auto-generated"
+                            className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition"
+                            value={p || ''}
+                            onChange={(e) => updateNodeContent(id, 'p', e.target.value.replace(/[^0-9]/g, ''))}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </label>
+                    {/* Q Input/Display */}
+                    <label className="block">
+                        <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Q (Prime 2)</span>
+                        <input
+                            type="text"
+                            placeholder="Auto-generated"
+                            className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition"
+                            value={q || ''}
+                            onChange={(e) => updateNodeContent(id, 'q', e.target.value.replace(/[^0-9]/g, ''))}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </label>
+                </div>
+
+                {/* N and Phi(N) Display */}
+                <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
+                    <label className="block">
+                        <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">N (Modulus)</span>
+                        <div className="text-[10px] p-1.5 border border-gray-200 rounded-lg bg-gray-100 overflow-hidden break-all h-6">{n || 'N/A'}</div>
+                    </label>
+                    <label className="block">
+                        <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Phi(N)</span>
+                        <div className="text-[10px] p-1.5 border border-gray-200 rounded-lg bg-gray-100 overflow-hidden break-all h-6">{phiN || 'N/A'}</div>
+                    </label>
+                </div>
+
+                {/* E and D Inputs/Displays */}
+                <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
+                    <label className="block">
+                        <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">E (Public Exponent)</span>
+                        <input
+                            type="text"
+                            placeholder="Auto-generated"
+                            className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition"
+                            value={e || ''}
+                            onChange={(e) => updateNodeContent(id, 'e', e.target.value.replace(/[^0-9]/g, ''))}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </label>
+                    <label className="block">
+                        <span className="block text-[10px] font-semibold text-red-800 mb-0.5">D (Private Key)</span>
+                        {/* User can input D for validation/testing, but only the calculated D is outputted */}
+                        <input
+                            type="text"
+                            placeholder="Calculated D"
+                            className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-red-800 outline-none transition"
+                            value={d || ''}
+                            onChange={(e) => updateNodeContent(id, 'd', e.target.value.replace(/[^0-9]/g, ''))}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </label>
+                </div>
+
+                {/* Generate/Recalculate Button */}
+                <button
+                    onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
+                    className={`w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md 
+                                 ${isProcessing ? 'bg-yellow-500 animate-pulse' : 'bg-purple-600 hover:bg-purple-700'} flex-shrink-0`}
+                    disabled={isProcessing}
+                >
+                    <Key className="w-4 h-4" />
+                    <span>{isProcessing ? 'Generating Key...' : 'Generate/Recalculate Keys'}</span>
+                </button>
+
+                {/* Status/Output Display */}
+                <div className="relative w-full text-left flex-grow">
+                    <span className={`block text-[10px] font-semibold text-red-800 mb-0.5`}>PRIVATE KEY D OUTPUT (d)</span>
+                    <div className={`text-[10px] p-1 bg-gray-100 rounded border h-full overflow-y-auto break-all 
+                                     ${dStatus?.startsWith('INCORRECT') || dStatus?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        <p>D: {dataOutputPrivate || 'N/A'}</p>
+                        <p className="mt-1 font-bold italic text-gray-700">Status: {dStatus || 'Idle'}</p>
+                    </div>
+                </div>
+            </div>
+        )}
         
+        {/* Simple RSA Public Key Generator (N, E output) */}
+        {isSimpleRSAPubKeyGen && (
+             <div className="text-xs w-full flex flex-col items-center flex-grow space-y-2">
+                <div className="w-full grid grid-cols-1 gap-2 flex-shrink-0">
+                    <p className="text-[10px] text-gray-500 text-center italic">
+                        This node extracts the Public Key (N, E) from the connected Private Key source (d) or uses the manually entered values.
+                    </p>
+                </div>
+
+                {/* N Input/Display */}
+                <label className="block w-full flex-shrink-0">
+                    <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">N (Modulus)</span>
+                    <input
+                        type="text"
+                        placeholder="N"
+                        className={`w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 outline-none transition
+                                     ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-lime-500'}`}
+                        value={n_pub || ''}
+                        onChange={(e) => updateNodeContent(id, 'n_pub', e.target.value.replace(/[^0-9]/g, ''))}
+                        readOnly={isReadOnly}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    {isReadOnly && <span className="block text-[8px] text-lime-600 italic mt-0.5">Value derived from input key.</span>}
+                </label>
+
+                {/* E Input/Display */}
+                <label className="block w-full flex-shrink-0">
+                    <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">E (Public Exponent)</span>
+                    <input
+                        type="text"
+                        placeholder="E"
+                        className={`w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 outline-none transition
+                                     ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-lime-500'}`}
+                        value={e_pub || ''}
+                        onChange={(e) => updateNodeContent(id, 'e_pub', e.target.value.replace(/[^0-9]/g, ''))}
+                        readOnly={isReadOnly}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    {isReadOnly && <span className="block text-[8px] text-lime-600 italic mt-0.5">Value derived from input key.</span>}
+                </label>
+
+                {/* Output Display */}
+                <div className="relative w-full text-left flex-grow">
+                    <span className={`block text-[10px] font-semibold text-lime-600 mb-0.5`}>PUBLIC KEY (N, E) OUTPUT</span>
+                    <div className={`text-[10px] p-1 bg-gray-100 rounded border h-full overflow-y-auto break-all text-gray-800`}>
+                        <p>{dataOutputPublic || 'N/A'}</p>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Hash Function Implementation */}
+        {isHashFn && (
+            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                {/* Algorithm Selector is now inside the title block */}
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Calculating Hash...' : 'Active'}
+                </span>
+                
+                {/* Output Display Box */}
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Hash (${node.outputFormat}): ${dataOutput}` : 'Waiting for Data Input...'}
+                    </p>
+                    {/* Copy Button for Hash Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Symmetric Key Generator */}
+        {isKeyGen && (
+            <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-2 flex-shrink-0`}>ALGORITHM ({keyAlgorithm} 256-bit)</span>
+                
+                {/* Generate Button */}
+                <button
+                    onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'generateKey', true); }}
+                    className={`w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md 
+                                 ${isProcessing ? 'bg-yellow-500 animate-pulse' : 'bg-orange-500 hover:bg-orange-600'} flex-shrink-0`}
+                    disabled={isProcessing}
+                >
+                    <Key className="w-4 h-4" />
+                    <span>{isProcessing ? 'Generating Key...' : 'Generate New Key'}</span>
+                </button>
+                
+                <span className={`font-semibold mt-4 ${dataOutput && !dataOutput.startsWith('ERROR') ? 'text-orange-600' : 'text-gray-500'} flex-shrink-0`}>
+                    {dataOutput && !dataOutput.startsWith('ERROR') ? 'Key Ready' : 'Key Not Generated'}
+                </span>
+
+                {/* Key Output Display */}
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {keyBase64 ? `Key (Base64): ${keyBase64}` : 'Waiting for generation...'}
+                    </p>
+                    {/* Copy Button for Key Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, keyBase64)}
+                        disabled={!keyBase64 || keyBase64.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${keyBase64 && !keyBase64.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+        
+        {/* Symmetric Encrypt (AES-GCM) */}
+        {isSymEnc && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>ALGORITHM</span>
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition duration-200"
+                    value={symAlgorithm || 'AES-GCM'}
+                    onChange={(e) => updateNodeContent(id, 'symAlgorithm', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {SYM_ALGORITHMS.map(alg => (
+                        <option key={alg} value={alg}>{alg} (256-bit)</option>
+                    ))}
+                </select>
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-red-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Encrypting...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Ciphertext (Base64): ${dataOutput}` : 'Waiting for Data and Key...'}
+                    </p>
+                    {/* Copy Button for Ciphertext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Symmetric Decrypt (AES-GCM) */}
+        {isSymDec && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>ALGORITHM</span>
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition duration-200"
+                    value={symAlgorithm || 'AES-GCM'}
+                    onChange={(e) => updateNodeContent(id, 'symAlgorithm', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {SYM_ALGORITHMS.map(alg => (
+                        <option key={alg} value={alg}>{alg} (256-bit)</option>
+                    ))}
+                </select>
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-pink-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Decrypting...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {dataOutput ? `Plaintext (UTF-8): ${dataOutput}` : 'Waiting for Cipher and Key...'}
+                    </p>
+                    {/* Copy Button for Plaintext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Simple RSA Encrypt/Decrypt/Sign/Verify nodes (Skipped for brevity) */}
+        {isSimpleRSAEnc && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Encrypting (m^e mod n)...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
+                        {dataOutput ? `Ciphertext (c): ${dataOutput}` : 'Waiting for m and Public Key...'}
+                    </p>
+                    {/* Copy Button for Ciphertext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">Input/Output are Decimal Numbers.</span>
+            </div>
+        )}
+
+        {/* Simple RSA Decrypt */}
+        {isSimpleRSADec && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Decrypting (c^d mod n)...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
+                        {dataOutput ? `Plaintext (m): ${dataOutput}` : 'Waiting for c and Private Key...'}
+                    </p>
+                    {/* Copy Button for Plaintext Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">Input/Output are Decimal Numbers.</span>
+            </div>
+        )}
+
+        {/* Simple RSA Sign */}
+        {isSimpleRSASign && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Signing...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className="text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full">
+                        {dataOutput ? `Signature (s): ${dataOutput}` : 'Waiting for m and Private Key...'}
+                    </p>
+                    {/* Copy Button for Signature Output */}
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+                <span className="text-[10px] text-gray-500 mt-2 flex-shrink-0">Input/Output are Decimal Numbers.</span>
+            </div>
+        )}
+
+        {/* Simple RSA Verify */}
+        {isSimpleRSAVerify && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-fuchsia-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Verifying...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 rounded overflow-auto h-full 
+                                     ${dataOutput?.includes('SUCCESS') ? 'bg-green-100 text-green-700 font-bold' : dataOutput?.includes('FAILURE') || dataOutput?.startsWith('ERROR') ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-800'}`}>
+                        {dataOutput || 'Waiting for m, s, and Public Key...'}
+                    </p>
+                </div>
+            </div>
+        )}
+        
+        {/* XOR Operation */}
+        {type === 'XOR_OP' && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-lime-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Calculating XOR...' : 'Active'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {/* Display the complete XOR output */}
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for two data inputs...'}
+                    </p>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Bit Shift (Single Large Number) */}
+        {isBitShift && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>SHIFT AMOUNT (BITS)</span>
+                <input
+                    type="number"
+                    min="0"
+                    className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
+                    value={node.shiftAmount || 0}
+                    onChange={(e) => updateNodeContent(id, 'shiftAmount', parseInt(e.target.value) || 0)}
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+                
+                <span className={`text-[10px] font-semibold text-gray-600 mb-1 flex-shrink-0`}>SHIFT DIRECTION</span>
+                <select
+                    className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0
+                                 bg-white appearance-none cursor-pointer text-gray-700 
+                                 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition duration-200"
+                    value={node.shiftType || 'Left'}
+                    onChange={(e) => updateNodeContent(id, 'shiftType', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <option value="Left">Left Shift (ROL)</option>
+                    <option value="Right">Right Shift (ROR)</option>
+                </select>
+
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-indigo-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Shifting...' : (shiftDescription || 'Active (Rotational)')}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow"
+                     // Minimum guaranteed height for the output (60px)
+                     style={{ minHeight: '60px' }} 
+                >
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'} overflow-y-auto h-full`}>
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for single numeric input...'}
+                    </p>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+        
+        {/* Data Split */}
+        {isDataSplit && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow space-y-2">
+                <span className={`font-semibold ${isProcessing ? 'text-yellow-600' : 'text-green-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Splitting...' : 'Active (Splitting by Character/Hex/Bit)'}
+                </span>
+                
+                {/* Chunk 1 Output Display - Fixed Height for Stable Layout */}
+                <div className="relative w-full text-left flex-shrink-0">
+                    <span className={`block text-[10px] font-semibold text-green-700 mb-0.5`}>CHUNK 1 ({node.outputFormat || 'N/A'})</span>
+                    <div className={`text-[10px] p-1 bg-gray-100 rounded border overflow-y-auto break-all h-20 
+                                     ${chunk1?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        <p>{chunk1 || 'Awaiting Input...'}</p>
+                    </div>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, chunk1)}
+                        disabled={!chunk1 || chunk1.startsWith('ERROR')}
+                        className={`absolute top-6 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${chunk1 && !chunk1.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+
+                {/* Chunk 2 Output Display - Fixed Height for Stable Layout */}
+                <div className="relative w-full text-left flex-shrink-0">
+                    <span className={`block text-[10px] font-semibold text-green-700 mb-0.5`}>CHUNK 2 ({node.outputFormat || 'N/A'})</span>
+                    <div className={`text-[10px] p-1 bg-gray-100 rounded border overflow-y-auto break-all h-20 
+                                     ${chunk2?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        <p>{chunk2 || 'Awaiting Input...'}</p>
+                    </div>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, chunk2)}
+                        disabled={!chunk2 || chunk2.startsWith('ERROR')}
+                        className={`absolute top-6 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${chunk2 && !chunk2.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+        
+        {/* Data Concatenate */}
+        {isDataConcat && (
+             <div className="text-xs w-full text-center flex flex-col flex-grow">
+                <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-teal-600'} flex-shrink-0`}>
+                    {isProcessing ? 'Concatenating...' : 'Active (A + B)'}
+                </span>
+                <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
+                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-y-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                        {/* Display the complete Concatenated output */}
+                        {dataOutput ? `Result (${node.outputFormat || 'N/A'}): ${dataOutput}` : 'Waiting for two data inputs...'}
+                    </p>
+                    <button
+                        onClick={(e) => handleCopyToClipboard(e, dataOutput)}
+                        disabled={!dataOutput || dataOutput.startsWith('ERROR')}
+                        className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm
+                                     ${dataOutput && !dataOutput.startsWith('ERROR')
+                                         ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'
+                                         : 'bg-gray-300 cursor-not-allowed'}`}
+                        title={copyStatus === 'Copied!' ? 'Copied!' : 'Copy to Clipboard'}
+                    >
+                        <Clipboard className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        )}
+
         {/* Generic Output Preview (Fallback for unimplemented nodes) */}
         {!isDataInput && !isOutputViewer && !isHashFn && !isKeyGen && !isSymEnc && !isSymDec && !isRSAKeyGen && !isAsymEnc && !isAsymDec && type !== 'XOR_OP' && !isBitShift && !isSimpleRSAKeyGen && !isSimpleRSAPubKeyGen && !isSimpleRSAEnc && !isSimpleRSADec && !isCaesarCipher && !isVigenereCipher && !isSimpleRSASign && !isSimpleRSAVerify && !isDataSplit && !isDataConcat && (
             <div className="text-xs text-gray-500 mt-2">
@@ -1963,32 +2957,49 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
 
 // --- Main Application Component ---
 
+// Function to handle the migration of old project structures
 const migrateProjectData = (projectData) => {
+    // Current application schema version (hardcoded at the top of the file)
     const currentVersion = PROJECT_SCHEMA_VERSION;
-    const importedVersion = projectData.schemaVersion || '1.0'; 
+    // Version of the imported file
+    const importedVersion = projectData.schemaVersion || '1.0'; // Default old version if missing
 
+    // Check if migration is necessary
     if (importedVersion === currentVersion) {
         return { migratedData: projectData, wasMigrated: false };
     }
     
+    // Create a working copy of the project data
     let migratedData = { ...projectData };
     let wasMigrated = false;
+
+    // --- Migration Logic ---
+    
+    // Migration from pre-1.1 (V1.0) to V1.1
+    // V1.0 issues:
+    // 1. DATA_INPUT nodes often had outputFormat: "Text (UTF-8)" even if input was binary/hex, breaking math nodes.
+    // 2. Nodes might lack required dimensions (width, height) which are now crucial for responsive layout.
+    // 3. XOR_OP and SHIFT_OP sizes might be too small (250px)
 
     if (importedVersion < '1.1') {
         wasMigrated = true;
         migratedData.nodes = migratedData.nodes.map(node => {
             const newNode = { ...node };
 
+            // 1. Fix DATA_INPUT outputFormat mismatch (Crucial for V1.0 files like the one provided)
             if (newNode.type === 'DATA_INPUT' && newNode.format && newNode.outputFormat === 'Text (UTF-8)') {
+                // If content type is numeric (Binary/Hex/Decimal), we force outputFormat to match the input format.
                 if (['Binary', 'Hexadecimal', 'Decimal'].includes(newNode.format)) {
                     newNode.outputFormat = newNode.format;
                 }
             }
 
+            // 2. Add default dimensions if missing or too small for V1.1 UI standards
             if (!newNode.width || newNode.width < NODE_DIMENSIONS.minWidth) {
                 newNode.width = NODE_DIMENSIONS.initialWidth;
             }
             if (!newNode.height || newNode.height < NODE_DIMENSIONS.minHeight) {
+                // Use the larger initial height for functional nodes that need it
                 if (newNode.type === 'XOR_OP' || newNode.type === 'SHIFT_OP' || newNode.type === 'DATA_SPLIT' || newNode.type === 'DATA_CONCAT') {
                     newNode.height = 300;
                 } else {
@@ -1996,6 +3007,7 @@ const migrateProjectData = (projectData) => {
                 }
             }
             
+            // 3. Clear unnecessary fields from XOR_OP nodes that might be relics
             if (newNode.type === 'XOR_OP') {
                  delete newNode.shiftType;
                  delete newNode.shiftAmount;
@@ -2007,15 +3019,23 @@ const migrateProjectData = (projectData) => {
         });
     }
     
+    // --- Migration V1.1 to V1.2 ---
+    // V1.2 added DATA_CONCAT. No breaking changes requiring node modification, 
+    // but the default height is covered by V1.1 check above.
+
+    // Set the new version stamp
     migratedData.schemaVersion = currentVersion;
     console.log(`Project migrated from version ${importedVersion} to ${currentVersion}.`);
     
+    // Return migrated data and a flag indicating if migration occurred
     return { migratedData, wasMigrated };
 };
 
 
+// Helper component for displaying floating notifications
 const StatusNotification = ({ status, message, onClose }) => {
     let bgColor;
+    /** @type {React.FC} */
     let IconComponent;
     
     switch (status) {
@@ -2057,27 +3077,16 @@ const App = () => {
   const [nodes, setNodes] = useState(INITIAL_NODES);
   const [connections, setConnections] = useState(INITIAL_CONNECTIONS); 
   const [connectingPort, setConnectingPort] = useState(null); 
-  const [scale, setScale] = useState(1.0); 
-  const [statusMessage, setStatusMessage] = useState(null); 
-  
-  // --- New Selection State ---
-  const [selectedNodeIds, setSelectedNodeIds] = useState(new Set()); // IDs of selected nodes
-  const [selectionBox, setSelectionBox] = useState(null); // { x, y, width, height, startX, startY }
-  
-  // --- Refs for Dragging/Selecting to avoid re-renders and stale closures ---
-  const interactionState = useRef({
-      mode: 'IDLE', // 'IDLE', 'SELECTING', 'DRAGGING'
-      startMouse: { x: 0, y: 0 }, // Unscaled coordinates at start
-      initialNodePositions: new Map(), // Map<id, {x, y}>
-      selectionBoxStart: { x: 0, y: 0 }, // For marquee drawing
-  });
-
-  const canvasRef = useRef(null);
+  const [scale, setScale] = useState(1.0); // New state for zoom level
+    
+  // --- NEW: State for handling status messages (success, warning, error) ---
+  const [statusMessage, setStatusMessage] = useState(null); // { type: 'success' | 'warning' | 'error', message: string }
   
   const MAX_SCALE = 2.0;
   const MIN_SCALE = 0.5;
   const ZOOM_STEP = 0.2;
 
+  // Zoom handlers
   const handleZoomIn = useCallback(() => {
       setScale(prevScale => Math.min(MAX_SCALE, prevScale + ZOOM_STEP));
   }, []);
@@ -2086,180 +3095,14 @@ const App = () => {
       setScale(prevScale => Math.max(MIN_SCALE, prevScale - ZOOM_STEP));
   }, []);
 
+  // Handler to clear the status notification
   const clearStatusMessage = useCallback(() => setStatusMessage(null), []);
     
-  // --- Mouse Interaction Handlers ---
-
-  // 1. Canvas Mouse Down (Start Selection)
-  const handleCanvasMouseDown = useCallback((e) => {
-      if (connectingPort) return;
-      
-      // Ensure only left click triggers selection
-      if (e.button !== 0) return; 
-
-      if (e.target.closest('.draggable-box')) return; // Ignore if clicking on a node
-      
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const { x, y } = getMouseCoordinates(e, canvas, scale);
-
-      // Clear selection if not holding Shift/Ctrl
-      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-          setSelectedNodeIds(new Set());
-      }
-
-      interactionState.current.mode = 'SELECTING';
-      interactionState.current.selectionBoxStart = { x, y };
-      
-      setSelectionBox({
-          x, y, width: 0, height: 0
-      });
-  }, [connectingPort, scale]);
-
-  // 2. Node Mouse Down (Start Dragging or Toggle Selection)
-  const handleNodeMouseDown = useCallback((e, nodeId) => {
-      // Ensure only left click triggers selection/drag
-      if (e.button !== 0) return; 
-
-      e.stopPropagation(); 
-      if (connectingPort) return;
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const { x, y } = getMouseCoordinates(e, canvas, scale);
-
-      // Handle Selection Logic
-      let newSelectedIds = new Set(selectedNodeIds);
-      
-      if (e.shiftKey || e.ctrlKey || e.metaKey) {
-          if (newSelectedIds.has(nodeId)) {
-              newSelectedIds.delete(nodeId);
-          } else {
-              newSelectedIds.add(nodeId);
-          }
-          setSelectedNodeIds(newSelectedIds);
-      } else {
-          // If clicking a node that is NOT in the current selection, verify selection.
-          // If it IS in the current selection, keep the group selection to allow dragging the group.
-          if (!newSelectedIds.has(nodeId)) {
-              newSelectedIds = new Set([nodeId]);
-              setSelectedNodeIds(newSelectedIds);
-          }
-      }
-
-      // Prepare Dragging State
-      interactionState.current.mode = 'DRAGGING';
-      interactionState.current.startMouse = { x, y };
-      interactionState.current.initialNodePositions.clear();
-
-      // Snapshot initial positions of ALL selected nodes (using the calculated new set)
-      nodes.forEach(n => {
-          if (newSelectedIds.has(n.id)) {
-              interactionState.current.initialNodePositions.set(n.id, { ...n.position });
-          }
-      });
-
-  }, [connectingPort, scale, nodes, selectedNodeIds]);
-
-  // 3. Global Mouse Move (Handle both operations)
-  useEffect(() => {
-      const handleGlobalMouseMove = (e) => {
-          const mode = interactionState.current.mode;
-          if (mode === 'IDLE') return;
-
-          const canvas = canvasRef.current;
-          if (!canvas) return;
-
-          const { x: currentX, y: currentY } = getMouseCoordinates(e, canvas, scale);
-
-          if (mode === 'SELECTING') {
-              const startX = interactionState.current.selectionBoxStart.x;
-              const startY = interactionState.current.selectionBoxStart.y;
-
-              const newX = Math.min(currentX, startX);
-              const newY = Math.min(currentY, startY);
-              const newWidth = Math.abs(currentX - startX);
-              const newHeight = Math.abs(currentY - startY);
-
-              setSelectionBox({ x: newX, y: newY, width: newWidth, height: newHeight });
-          } 
-          else if (mode === 'DRAGGING') {
-              const startMouse = interactionState.current.startMouse;
-              const dx = currentX - startMouse.x;
-              const dy = currentY - startMouse.y;
-
-              setNodes(prevNodes => prevNodes.map(node => {
-                  const initialPos = interactionState.current.initialNodePositions.get(node.id);
-                  if (initialPos) {
-                      return {
-                          ...node,
-                          position: {
-                              x: Math.max(0, initialPos.x + dx),
-                              y: Math.max(0, initialPos.y + dy)
-                          }
-                      };
-                  }
-                  return node;
-              }));
-          }
-      };
-
-      const handleGlobalMouseUp = (e) => {
-          const mode = interactionState.current.mode;
-          if (mode === 'IDLE') return;
-
-          const canvas = canvasRef.current;
-          if (canvas && mode === 'SELECTING') {
-              // Finalize Selection
-              const { x: currentX, y: currentY } = getMouseCoordinates(e, canvas, scale);
-              const startX = interactionState.current.selectionBoxStart.x;
-              const startY = interactionState.current.selectionBoxStart.y;
-              
-              const boxLeft = Math.min(currentX, startX);
-              const boxTop = Math.min(currentY, startY);
-              const boxRight = Math.max(currentX, startX);
-              const boxBottom = Math.max(currentY, startY);
-
-              setSelectionBox(null); // Clear visual box
-
-              setSelectedNodeIds(prevSelected => {
-                  const newSelected = new Set(e.shiftKey || e.ctrlKey ? prevSelected : []);
-                  
-                  nodes.forEach(node => {
-                      const nodeRight = node.position.x + node.width;
-                      const nodeBottom = node.position.y + node.height;
-                      
-                      // Check overlap
-                      if (node.position.x < boxRight && 
-                          nodeRight > boxLeft && 
-                          node.position.y < boxBottom && 
-                          nodeBottom > boxTop) {
-                          newSelected.add(node.id);
-                      }
-                  });
-                  return newSelected;
-              });
-          }
-
-          // Reset Mode
-          interactionState.current.mode = 'IDLE';
-          interactionState.current.initialNodePositions.clear();
-      };
-
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-
-      return () => {
-          document.removeEventListener('mousemove', handleGlobalMouseMove);
-          document.removeEventListener('mouseup', handleGlobalMouseUp);
-      };
-  }, [nodes, scale]); // Minimal dependencies to avoid thrashing
-
-
+  const canvasRef = useRef(null);
+  
   // --- Project Management Handlers ---
   
+  /** Helper function to trigger file download. */
   const downloadFile = (data, filename, type) => {
     const blob = new Blob([data], { type: type });
     const url = URL.createObjectURL(blob);
@@ -2272,9 +3115,10 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
+  /** Exports the current project state (nodes, connections) to a JSON file. */
   const handleDownloadProject = useCallback(() => {
     const projectData = {
-        schemaVersion: PROJECT_SCHEMA_VERSION, 
+        schemaVersion: PROJECT_SCHEMA_VERSION, // Mandatory version field
         nodes: nodes,
         connections: connections
     };
@@ -2284,10 +3128,11 @@ const App = () => {
     setTimeout(clearStatusMessage, 5000);
   }, [nodes, connections, clearStatusMessage]);
 
+  /** Imports a project state from a JSON file, handling version compatibility. */
   const handleUploadProject = useCallback((fileInput) => {
       clearStatusMessage();
       
-      const file = fileInput.files?.[0]; 
+      const file = fileInput.files?.[0]; // Use files[0] for input type="file"
       if (!file) return;
 
       const reader = new FileReader();
@@ -2296,6 +3141,7 @@ const App = () => {
           let importStatus = { type: 'error', message: 'Import failed due to an unknown error.' };
           
           try {
+              // 1. Validate: Attempt to parse JSON
               try {
                   projectData = JSON.parse(e.target.result);
               } catch (error) {
@@ -2303,11 +3149,13 @@ const App = () => {
                   throw new Error("Invalid JSON");
               }
 
+              // 2. Validate: Check for essential structure
               if (!projectData || !Array.isArray(projectData.nodes) || !Array.isArray(projectData.connections)) {
                   importStatus = { type: 'error', message: "Import failed: JSON file is missing the required 'nodes' or 'connections' structure." };
                   throw new Error("Invalid schema structure");
               }
               
+              // 3. Validate and Migrate: Handle version field and migration
               const importedVersion = projectData.schemaVersion || '1.0';
               const currentVersion = PROJECT_SCHEMA_VERSION;
               
@@ -2316,12 +3164,14 @@ const App = () => {
               setNodes(migratedData.nodes);
               setConnections(migratedData.connections);
               
+              // 5. Set appropriate success/warning status message
               if (wasMigrated) {
                   importStatus = { 
                       type: 'warning', 
                       message: `Project loaded successfully, but imported version (${importedVersion}) required migration to ${currentVersion}. Minor feature differences may exist.` 
                   };
               } else if (importedVersion !== currentVersion) {
+                   // This covers forward compatibility (newer file loaded by current app)
                    importStatus = { 
                       type: 'warning', 
                       message: `Project loaded successfully. Version mismatch (Imported: ${importedVersion}, Current: ${currentVersion}).` 
@@ -2331,6 +3181,7 @@ const App = () => {
               }
 
           } catch (error) {
+              // Log error and use the most specific error message set in importStatus
               console.error("Import process failed:", error);
           }
           
@@ -2345,37 +3196,85 @@ const App = () => {
       };
       
       reader.readAsText(file);
+      // Clear file input value after reading
       fileInput.value = ''; 
   }, [clearStatusMessage, setNodes, setConnections]);
 
+  const handleDownloadImage = useCallback(() => {
+      // NOTE: This feature requires the 'html2canvas' library to be loaded externally (e.g., via a <script> tag).
+      // This function will now rely on external configuration in index.html to load html2canvas.
+      
+      if (typeof window.html2canvas !== 'function') {
+          console.error("Image download failed: html2canvas library is required for canvas capture. Please ensure the <script> tag for html2canvas is loaded globally in your index.html file.");
+          setStatusMessage({ type: 'error', message: 'Image export failed: Missing required external library (html2canvas).' });
+          setTimeout(clearStatusMessage, 5000);
+          return;
+      }
+      
+      const element = canvasRef.current;
+      if (element) {
+          window.html2canvas(element, { 
+              useCORS: true, 
+              allowTaint: true, 
+              backgroundColor: '#ffffff'
+          }).then(canvas => {
+              const imageURL = canvas.toDataURL('image/jpeg', 0.9);
+              
+              const a = document.createElement('a');
+              a.href = imageURL;
+              a.download = 'visual_crypto_diagram.jpg';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(imageURL);
+              setStatusMessage({ type: 'success', message: 'Diagram exported as JPG successfully!' });
+              setTimeout(clearStatusMessage, 5000);
+          }).catch(err => {
+              console.error("Error capturing canvas image:", err);
+              setStatusMessage({ type: 'error', message: `Image export failed: ${err.message}` });
+              setTimeout(clearStatusMessage, 5000);
+          });
+      }
+  }, [clearStatusMessage]);
+  
   // --- Core Logic: Graph Recalculation (Data Flow Engine) ---
   
   const recalculateGraph = useCallback((currentNodes, currentConnections, changedNodeId = null) => {
+    // Re-initialize newNodesMap correctly to ensure integrity and reset calculation fields.
     const newNodesMap = new Map(currentNodes.map(n => {
         const newNode = { ...n };
+        // Reset fields relevant to calculation output/status
         newNode.isProcessing = false;
         if (newNode.type === 'OUTPUT_VIEWER') {
+             // Keep state of conversion feature
              newNode.convertedData = newNode.convertedData || ''; 
              newNode.convertedFormat = newNode.convertedFormat || 'Base64';
              newNode.isConversionExpanded = newNode.isConversionExpanded || false;
-             newNode.sourceFormat = newNode.sourceFormat || ''; 
-             newNode.rawInputData = newNode.rawInputData || ''; 
-        } else if (newNode.type === 'DATA_SPLIT') { 
+             newNode.sourceFormat = newNode.sourceFormat || ''; // New field for source format
+             newNode.rawInputData = newNode.rawInputData || ''; // New field to store UNCONVERTED input
+        } else if (newNode.type === 'DATA_SPLIT') { // Reset split chunks
              newNode.chunk1 = '';
              newNode.chunk2 = '';
         }
         return [n.id, newNode];
     })); 
     
+    // --- Step 0: Identify nodes to process based on inputs/triggers ---
+    
+    // Start with nodes that have no inputs (Data Input, Key Generators)
     let initialQueue = new Set(currentNodes.filter(n => {
         const def = NODE_DEFINITIONS[n.type];
         return def && def.inputPorts && def.inputPorts.length === 0;
     }).map(n => n.id));
     
+    // If a node was explicitly changed (e.g., via a button click or input field change),
+    // we must recalculate it and its downstream dependents.
     if (changedNodeId) {
         initialQueue.add(changedNodeId);
+        // The recalculation loop handles adding dependencies dynamically.
     }
     
+    // Convert initialQueue to an array for deterministic processing order
     let nodesToProcess = Array.from(initialQueue);
     const processed = new Set();
     
@@ -2386,6 +3285,7 @@ const App = () => {
             .filter(targetId => !processed.has(targetId));
     };
 
+    // --- Step 1: Process nodes synchronously (Key generation, Data input, Crypto operations) ---
     while (nodesToProcess.length > 0) {
         const sourceId = nodesToProcess.shift();
         if (processed.has(sourceId) || !newNodesMap.has(sourceId)) continue; 
@@ -2396,16 +3296,23 @@ const App = () => {
         let outputData = sourceNode.dataOutput || '';
         let isProcessing = false;
         
+        // --- 1.1 Source Nodes (No input ports) ---
         if (sourceNodeDef.inputPorts.length === 0) {
             
             if (sourceNode.type === 'DATA_INPUT') {
                 outputData = sourceNode.content || ''; 
             } else if (sourceNode.type === 'KEY_GEN') {
+                
+                // Symmetric Key Generator Logic
                 const algorithm = sourceNode.keyAlgorithm || 'AES-GCM';
 
+                // Check if key generation has been triggered OR the key is missing
                 if (sourceNode.generateKey || !sourceNode.keyBase64) {
                     isProcessing = true;
+                    // --- Asynchronous operation starts here ---
+                    // The main loop stops for this node, but the promise resolves later
                     generateSymmetricKey(algorithm).then(({ keyBase64 }) => {
+                        // Use functional update to ensure atomicity and avoid stale state
                         setNodes(prevNodes => prevNodes.map(n => 
                             n.id === sourceId 
                                 ? { 
@@ -2425,16 +3332,19 @@ const App = () => {
                            ));
                     });
                     
+                    // Immediately set status and output in the current synchronous state for display/queue processing
                     outputData = sourceNode.dataOutput || 'Generating Key...';
                     sourceNode.isProcessing = isProcessing;
                     sourceNode.generateKey = false;
                     newNodesMap.set(sourceId, sourceNode);
                     
+                    // Break early, but still add targets to the queue in case of fast resolution
                     processed.add(sourceId);
                     nodesToProcess.push(...findAllTargets(sourceId));
-                    continue; 
+                    continue; // Skip remaining synchronous processing for this node
 
                 } else if (sourceNode.keyBase64) {
+                    // Key already generated, use stored key
                     outputData = sourceNode.keyBase64; 
                     isProcessing = false;
                 }
@@ -2443,9 +3353,11 @@ const App = () => {
                 
                  const publicExponentToUse = sourceNode.type === 'SIMPLE_RSA_KEY_GEN' ? 65537 : (sourceNode.publicExponent || 65537);
                    
+                 // --- Simple RSA Key Gen Logic (Synchronous Calculation) ---
                  if (sourceNode.type === 'SIMPLE_RSA_KEY_GEN' && sourceNode.generateKey) {
                      isProcessing = true;
                      
+                     // Read P, Q, E from input fields
                      const rawP = sourceNode.p;
                      const rawQ = sourceNode.q;
                      const rawE = sourceNode.e;
@@ -2456,7 +3368,10 @@ const App = () => {
                      let error = null;
                      let d_status = ''; 
 
+                     
                      try {
+                         
+                         // 1. Determine P and Q (Generate if missing or invalid)
                          const userP = rawP && !isNaN(Number(rawP)) ? BigInt(rawP) : null;
                          const userQ = rawQ && !isNaN(Number(rawQ)) ? BigInt(rawQ) : null;
                          
@@ -2464,26 +3379,32 @@ const App = () => {
                              p_val = userP;
                              q_val = userQ;
                          } else {
+                             // Autogenerate if P or Q are missing/invalid
                              ({ p: p_val, q: q_val } = generateSmallPrimes());
                          }
 
+                         // 2. Calculate n and phi(n)
                          n_val = p_val * q_val;
                          phiN_val = (p_val - BigInt(1)) * (q_val - BigInt(1)); 
 
+                         // 3. Determine E (Generate if missing, validate if provided)
                          const userE = rawE && !isNaN(Number(rawE)) ? BigInt(rawE) : null;
                          
                          if (userE && userE > BigInt(1) && userE < phiN_val && gcd(userE, phiN_val) === BigInt(1)) {
                              e_val = userE;
                          } else if (!userE || userE <= BigInt(0)) {
+                             // Autogenerate if E is missing/invalid or 0
                              e_val = generateSmallE(phiN_val);
                          } else {
                              error = `ERROR: Invalid E (${userE.toString()}). Must be 1 < E < phi(n) and gcd(E, phi(n)) = 1.`;
                              throw new Error(error);
                          }
                          
+                         // 4. Determine D (Always calculate the correct D)
                          const calculatedD = modInverse(e_val, phiN_val);
                          d_val = calculatedD; 
                          
+                         // 5. Provide feedback on the user's D input
                          if (userD && userD > BigInt(0)) {
                             if ((userD * e_val) % phiN_val === BigInt(1) && userD < phiN_val) {
                                 d_status = `CORRECT (User input D: ${userD.toString()}). Using calculated value for consistency.`;
@@ -2495,45 +3416,54 @@ const App = () => {
                          }
                          
                      } catch (err) {
+                          // Catches validation errors and modular inverse errors
                           error = err.message.startsWith("ERROR") ? err.message : `ERROR: Calculation failed. ${err.message}`;
                      }
                      
+                     // 6. Update Node State
                      if (!error) {
+                          // Key data output for downstream nodes
                           sourceNode.dataOutputPublic = `${n_val.toString()},${e_val.toString()}`; 
                           sourceNode.dataOutputPrivate = d_val.toString();
                           
+                          // Internal display parameters (P, Q, E are now saved back to fill empty fields)
                           sourceNode.n = n_val.toString();
                           sourceNode.phiN = phiN_val.toString();
-                          sourceNode.d = d_val.toString(); 
+                          sourceNode.d = d_val.toString(); // OVERWRITE: Ensure D field shows the correct calculated key
                           sourceNode.p = p_val.toString();
                           sourceNode.q = q_val.toString();
                           sourceNode.e = e_val.toString();
                           sourceNode.dStatus = d_status; 
                           
-                          outputData = sourceNode.dataOutputPrivate; 
+                          outputData = sourceNode.dataOutputPrivate; // Only outputting Private Key
                           isProcessing = false;
                      } else {
+                          // Handle error: reset output fields and display the error
                           outputData = error;
                           sourceNode.dataOutputPublic = outputData;
                           sourceNode.dataOutputPrivate = outputData;
                           sourceNode.n = ''; sourceNode.phiN = ''; 
                           
+                          // Keep user-entered P, Q, E but set calculated fields to error state
                           sourceNode.p = rawP; 
                           sourceNode.q = rawQ;
                           sourceNode.e = rawE;
-                          sourceNode.d = ''; 
+                          sourceNode.d = ''; // CLEAR D FIELD ON ERROR
                           sourceNode.dStatus = error;
                      }
 
+                     // Since Simple RSA calculation is synchronous, we update the map directly
                      sourceNode.isProcessing = isProcessing;
-                     sourceNode.generateKey = false; 
+                     sourceNode.generateKey = false; // Reset trigger
                      newNodesMap.set(sourceId, sourceNode);
                      
+                     // Jump to next loop iteration
                      processed.add(sourceId);
                      nodesToProcess.push(...findAllTargets(sourceId));
                      continue;
 
                  } else if (sourceNode.keyPairObject || sourceNode.generateKey) {
+                      // --- Web Crypto RSA Key Gen Logic (Advanced - ASYNC) ---
                       isProcessing = true;
                       
                       if (!sourceNode.keyPairObject || sourceNode.generateKey) {
@@ -2571,10 +3501,13 @@ const App = () => {
                  }
             }
         
+        // --- 1.2 Processing/Sink Nodes (Have input ports) ---
         } else {
+            // Collect all incoming connections to this target node
             const incomingConns = currentConnections.filter(c => c.target === sourceId);
             let inputs = {};
             
+            // Step 1: Gather inputs and their formats from all upstream nodes
             incomingConns.forEach(conn => {
                 const inputSourceNode = newNodesMap.get(conn.source);
                 if (!inputSourceNode) return;
@@ -2582,22 +3515,27 @@ const App = () => {
                 let dataToUse;
                 const sourceDef = NODE_DEFINITIONS[inputSourceNode.type];
                 
+                // Determine which data field to use from the source node
                 if (sourceDef && sourceDef.outputPorts.length > conn.sourcePortIndex) {
                     const keyField = sourceDef.outputPorts[conn.sourcePortIndex].keyField;
                     
+                    // --- CORRECCIÓN CLAVE PARA DATA_SPLIT ---
                     if (inputSourceNode.type === 'DATA_SPLIT' && (keyField === 'chunk1' || keyField === 'chunk2')) {
+                        // Leer el valor específico del chunk
                         dataToUse = inputSourceNode[keyField];
                     } else {
-                        dataToUse = inputSourceNode[keyField]; 
+                        dataToUse = inputSourceNode[keyField]; // Usa dataOutput, dataOutputPrivate, etc.
                     }
                 } else {
-                    dataToUse = inputSourceNode.dataOutput; 
+                    dataToUse = inputSourceNode.dataOutput; // Fallback for simple nodes
                 }
 
+                // Determine the format of the output data
                 const sourceFormat = inputSourceNode.type === 'DATA_INPUT' 
                     ? inputSourceNode.format 
-                    : (inputSourceNode.outputFormat || getOutputFormat(inputSourceNode.type)); 
+                    : (inputSourceNode.outputFormat || getOutputFormat(inputSourceNode.type)); // Use node.outputFormat if set
 
+                // Store the data and format using the input port ID
                 if (!inputs[conn.targetPortId]) { 
                     inputs[conn.targetPortId] = { 
                         data: dataToUse, 
@@ -2607,6 +3545,7 @@ const App = () => {
                 }
             });
             
+            // Step 2: Execute node logic (using direct inputs lookup)
             switch (sourceNode.type) {
                 case 'OUTPUT_VIEWER':
                     const inputObj = inputs['data'];
@@ -2615,21 +3554,34 @@ const App = () => {
                     let calculatedSourceFormat = inputObj?.format || 'N/A';
                     
                     if (rawInput !== undefined && rawInput !== null && rawInput !== '' && !rawInput?.startsWith('ERROR')) {
+                        
+                        // Check if the source format suggests binary data (i.e., not a simple text node)
+                        // A simpler heuristic: if it's not text/base64, assume byte stream that might be large number
                         const isSourceBinary = ['Hexadecimal', 'Binary', 'Decimal', 'Base64'].includes(calculatedSourceFormat);
+                        
+                        // Decide if we should treat the data as a single large number (SLN)
                         const isSLNTarget = ['Decimal', 'Hexadecimal', 'Binary'].includes(sourceNode.convertedFormat);
+                        // Heuristic: If source is binary-based AND target is SLN, we attempt SLN conversion.
                         const shouldBeSingleNumber = isSLNTarget && isSourceBinary;
 
+                        // 1. Calculate Secondary (Converted) Output if Expanded
                         if (sourceNode.isConversionExpanded) {
+                            // Pass the flag to the converter
                             convertedDataOutput = convertDataFormat(rawInput, calculatedSourceFormat, sourceNode.convertedFormat || 'Base64', shouldBeSingleNumber);
                         } else {
                             convertedDataOutput = '';
                         }
                         
+                        // 2. Set the data for the OUTPUT PORT (dataOutput)
                         if (sourceNode.isConversionExpanded && convertedDataOutput && !convertedDataOutput.startsWith('ERROR')) {
+                            // Output converted data if expansion is active AND conversion was successful
                             outputData = convertedDataOutput;
+                            // Set the advertised output format to the converted format
                             sourceNode.outputFormat = sourceNode.convertedFormat; 
                         } else {
+                            // Otherwise, output the raw input (as raw input format)
                             outputData = rawInput;
+                            // Set the advertised output format to the raw input format
                             sourceNode.outputFormat = calculatedSourceFormat === 'N/A' ? 'Text (UTF-8)' : calculatedSourceFormat; 
                         }
 
@@ -2637,22 +3589,27 @@ const App = () => {
                         outputData = 'Not connected or no data.';
                         convertedDataOutput = '';
                         calculatedSourceFormat = 'N/A';
-                        sourceNode.outputFormat = 'Text (UTF-8)'; 
+                        sourceNode.outputFormat = 'Text (UTF-8)'; // Default fallback format
                     }
                     
+                    // 3. Update the node's state fields for UI display
                     sourceNode.convertedData = convertedDataOutput;
                     sourceNode.sourceFormat = calculatedSourceFormat; 
-                    sourceNode.rawInputData = rawInput || outputData; 
+                    sourceNode.rawInputData = rawInput || outputData; // Raw input for internal viewer display
                     break;
                 
                 case 'CAESAR_CIPHER':
+                    // Key input is taken from node's internal state (shiftKey)
                     const plaintextInput = inputs['plaintext']?.data;
                     const plainFormat = inputs['plaintext']?.format;
-                    const shiftKey = sourceNode.shiftKey; 
+                    const shiftKey = sourceNode.shiftKey; // Read key from internal state
                     
                     if (plaintextInput !== undefined && plaintextInput !== null) {
                         isProcessing = true;
+                        
+                        // Handle Text (Latin alphabet shift)
                         const k = parseInt(shiftKey) || 0;
+
                         const { output, format } = caesarEncrypt(plaintextInput, plainFormat, k);
                         outputData = output;
                         sourceNode.outputFormat = format;
@@ -2673,6 +3630,7 @@ const App = () => {
                     if (vigenereInput !== undefined && vigenereInput !== null) {
                         isProcessing = true;
                         
+                        // Vigenere only operates on Text (UTF-8)
                         if (vigenereFormat !== 'Text (UTF-8)') {
                             outputData = `ERROR: Vigenère Cipher requires Text (UTF-8) input. Received: ${vigenereFormat}`;
                             sourceNode.outputFormat = vigenereFormat;
@@ -2691,6 +3649,7 @@ const App = () => {
                     break;
                     
                 case 'SIMPLE_RSA_KEY_GEN':
+                    // Handled in the initial (no input ports) block. Skip here.
                     outputData = sourceNode.dataOutputPrivate;
                     break;
                 
@@ -2703,19 +3662,23 @@ const App = () => {
                     let isReadOnly = false;
 
                     if (sourceKeyGenNode && sourceKeyGenNode.n && sourceKeyGenNode.e) {
+                        // Connected to Simple RSA PrivKey Gen: pull values and set read-only
                         n_val = sourceKeyGenNode.n;
                         e_val = sourceKeyGenNode.e;
                         isReadOnly = true;
                     } 
                     
+                    // Update node state immediately (will be used in the UI)
                     sourceNode.isReadOnly = isReadOnly;
                     sourceNode.n_pub = n_val;
                     sourceNode.e_pub = e_val;
 
                     if (n_val && e_val) {
                         try {
+                            // Simple validation that values are convertible to BigInt (numbers)
                             BigInt(n_val);
                             BigInt(e_val);
+                            // Output is the concatenated string (n,e)
                             sourceNode.dataOutputPublic = `${n_val},${e_val}`;
                         } catch (err) {
                             sourceNode.dataOutputPublic = `ERROR: Invalid N or E format. Must be numeric.`;
@@ -2724,12 +3687,14 @@ const App = () => {
                         sourceNode.dataOutputPublic = 'N/A (Missing N or E input)';
                     }
 
+                    // Set the main output field (dataOutputPublic is already set above)
                     outputData = sourceNode.dataOutputPublic;
                     break;
                     
                 case 'SIMPLE_RSA_ENC':
                     try {
                         const mStr = inputs['message']?.data; 
+                        // Use 'publicKey' port to find the source node and extract N and E.
                         const pkInputObj = inputs['publicKey'];
                         const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
                         const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
@@ -2740,6 +3705,7 @@ const App = () => {
                             n = BigInt(sourceNodeKeyGen.n_pub);
                             e = BigInt(sourceNodeKeyGen.e_pub);
                         } else if (pkInputObj?.data) {
+                            // Fallback: if data came from a public type port, try to parse it
                             const [nStr, eStr] = pkInputObj.data.split(',');
                             if (nStr && eStr) {
                                 n = BigInt(nStr);
@@ -2753,6 +3719,7 @@ const App = () => {
                             break;
                         }
                         
+                        // Ensure m is a number (if not, attempt to parse as decimal string)
                         let mValue = mStr.replace(/\s+/g, '');
                         if (isNaN(Number(mValue))) {
                             outputData = `ERROR: Message must be a valid DECIMAL number. Received: ${mStr}`;
@@ -2765,6 +3732,7 @@ const App = () => {
                             outputData = `ERROR: Message (m=${mStr}) must be less than Modulus (n=${n.toString()}).`;
                         } else {
                             isProcessing = true;
+                            // c = m^e mod n
                             const c = modPow(m, e, n);
                             outputData = c.toString();
                             isProcessing = false;
@@ -2779,11 +3747,13 @@ const App = () => {
                         const cStr = inputs['cipher']?.data;
                         const dStr = inputs['privateKey']?.data;
                         
+                        // Ensure c is a number
                         if (isNaN(Number(cStr))) {
                             outputData = `ERROR: Ciphertext must be a valid number. Received: ${cStr}`;
                             break;
                         }
                         
+                        // We need to look up the source of the private key to get 'n'.
                         const sourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'privateKey');
                         const sourceNodeKeyGen = newNodesMap.get(sourceConn?.source);
                         
@@ -2794,9 +3764,11 @@ const App = () => {
                         
                         const c = BigInt(cStr);
                         const d = BigInt(dStr);
+                        // Get N from the original private key generator node
                         const n = BigInt(sourceNodeKeyGen.n);
 
                         isProcessing = true;
+                        // m = c^d mod n
                         const m = modPow(c, d, n);
                         outputData = m.toString();
                         isProcessing = false;
@@ -2822,6 +3794,7 @@ const App = () => {
                             break;
                         }
                         
+                        // We need n from the key generator node (source of dStr)
                         const sourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'privateKey');
                         const sourceNodeKeyGen = newNodesMap.get(sourceConn?.source);
 
@@ -2834,6 +3807,7 @@ const App = () => {
                         const d = BigInt(dStr);
                         const n = BigInt(sourceNodeKeyGen.n);
 
+                        // Signature: s = m^d mod n
                         isProcessing = true;
                         const s = modPow(m, d, n);
                         outputData = s.toString();
@@ -2848,6 +3822,7 @@ const App = () => {
                     try {
                         const mStr = inputs['message']?.data;
                         const sStr = inputs['signature']?.data;
+                        // Use 'publicKey' port to find the source node and extract N and E.
                         const pkInputObj = inputs['publicKey'];
                         const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
                         const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
@@ -2858,6 +3833,7 @@ const App = () => {
                             n = BigInt(sourceNodeKeyGen.n_pub);
                             e = BigInt(sourceNodeKeyGen.e_pub);
                         } else if (pkInputObj?.data) {
+                            // Fallback: if data came from a public type port, try to parse it
                             const [nStr, eStr] = pkInputObj.data.split(',');
                             if (nStr && eStr) {
                                 n = BigInt(nStr);
@@ -2878,10 +3854,12 @@ const App = () => {
                             break;
                         }
 
+                        // Get n and e from the key generator node properties
                         const m = BigInt(mValue);
                         const s = BigInt(sValue);
                         
                         isProcessing = true;
+                        // Verification: m' = s^e mod n
                         const decryptedM = modPow(s, e, n);
                         isProcessing = false;
 
@@ -2902,6 +3880,8 @@ const App = () => {
                         isProcessing = true; 
                         const algorithm = sourceNode.hashAlgorithm || 'SHA-256';
 
+                        // --- Asynchronous operation starts here ---
+                        // Update node to processing state and defer output setting to promise resolution
                         calculateHash(hashInput, algorithm).then(hashResult => {
                             setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: hashResult, isProcessing: false } : n));
                         }).catch(err => {
@@ -2912,13 +3892,14 @@ const App = () => {
                              ));
                         });
                         
+                        // Output placeholder while processing
                         outputData = sourceNode.dataOutput || 'Calculating...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                         sourceNode.isProcessing = isProcessing;
                         newNodesMap.set(sourceId, sourceNode);
                         processed.add(sourceId);
                         nodesToProcess.push(...findAllTargets(sourceId));
-                        continue; 
+                        continue; // Skip remaining synchronous processing for this node
 
                     } else if (hashInput && hashInput.startsWith('ERROR')) {
                         outputData = hashInput;
@@ -2930,15 +3911,18 @@ const App = () => {
                 case 'XOR_OP':
                     const xorInputA = inputs['dataA']?.data; 
                     const xorInputB = inputs['dataB']?.data; 
-                    const xorFormatA = inputs['dataA']?.format; 
+                    const xorFormatA = inputs['dataA']?.format; // Primary input format
                     const xorFormatB = inputs['dataB']?.format;
 
+                    // --- XOR LOGIC ---
                     if (xorInputA && xorInputB) { 
+                        // Corregido: Verificar si alguno de los inputs es un error
                         if (xorInputA.startsWith('ERROR')) {
                             outputData = xorInputA;
                         } else if (xorInputB.startsWith('ERROR')) {
                             outputData = xorInputB;
                         } else {
+                            // Ambos inputs están presentes y no son errores, proceder al cálculo
                             isProcessing = true;
                             
                             const result = performBitwiseXor(xorInputA, xorFormatA, xorInputB, xorFormatB);
@@ -2960,26 +3944,29 @@ const App = () => {
                         outputData = 'Waiting for two data inputs.'; 
                         sourceNode.outputFormat = '';
                     }
+                    // --- END XOR LOGIC ---
 
                     break;
                 
                 case 'SHIFT_OP':
                     const shiftDataInput = inputs['data']?.data;
-                    const shiftFormat = inputs['data']?.format; 
+                    const shiftFormat = inputs['data']?.format; // Primary input format
                     const shiftType = sourceNode.shiftType || 'Left';
                     const shiftAmount = sourceNode.shiftAmount || 0;
                     
                     if (shiftDataInput && !shiftDataInput.startsWith('ERROR')) {
                         isProcessing = true;
                         
+                        // Data formats considered single numbers: Decimal, Hexadecimal, Binary
                         if (shiftFormat === 'Decimal' || shiftFormat === 'Hexadecimal' || shiftFormat === 'Binary') {
                             
                             const result = performBitShiftOperation(shiftDataInput, shiftType, shiftAmount, shiftFormat);
                             outputData = result.output;
-                            sourceNode.shiftDescription = result.description; 
+                            sourceNode.shiftDescription = result.description; // Update description safely
                             sourceNode.outputFormat = shiftFormat;
                             
                         } else {
+                             // This covers Text (UTF-8) and Base64 (which is byte stream)
                             outputData = `ERROR: Bit Shift requires input data to be a single number (Decimal, Hexadecimal, or Binary). Received: ${shiftFormat}.`;
                             sourceNode.outputFormat = shiftFormat;
                         }
@@ -2994,7 +3981,7 @@ const App = () => {
                     }
                     break;
                     
-                case 'DATA_SPLIT': 
+                case 'DATA_SPLIT': // DATA SPLIT LOGIC
                     const splitDataInput = inputs['data']?.data;
                     const splitFormat = inputs['data']?.format;
 
@@ -3005,7 +3992,7 @@ const App = () => {
                         
                         sourceNode.chunk1 = chunk1;
                         sourceNode.chunk2 = chunk2;
-                        sourceNode.outputFormat = outputFormat; 
+                        sourceNode.outputFormat = outputFormat; // Update output format to match chunk output
                         
                         isProcessing = false;
                         
@@ -3019,10 +4006,13 @@ const App = () => {
                         sourceNode.outputFormat = splitFormat;
                     }
                     
+                    // Al ser un nodo con múltiples salidas de datos (chunk1, chunk2), no tiene un "dataOutput" principal
+                    // pero necesitamos asegurarnos de que la información se propague por las salidas correctas.
+                    // Los campos chunk1/chunk2 se usan como campos de salida directamente.
                     outputData = '';
                     break;
                     
-                case 'DATA_CONCAT': 
+                case 'DATA_CONCAT': // DATA CONCATENATE LOGIC (NEW)
                     const concatInputA = inputs['dataA']?.data; 
                     const concatInputB = inputs['dataB']?.data; 
                     const concatFormatA = inputs['dataA']?.format;
@@ -3043,7 +4033,9 @@ const App = () => {
                     break;
 
 
+                // --- Web Crypto API Cipher Nodes (Symmetric/Asymmetric - ASYNC) ---
                 case 'SYM_ENC':
+                    // Symmetric Encrypt Logic
                     if (inputs['data']?.data && inputs['key']?.data && !inputs['data'].data.startsWith('ERROR') && !inputs['key'].data.startsWith('ERROR')) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM';
@@ -3056,6 +4048,7 @@ const App = () => {
                         outputData = sourceNode.dataOutput || 'Encrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                         
+                        // Break early (async)
                         sourceNode.isProcessing = isProcessing;
                         newNodesMap.set(sourceId, sourceNode);
                         processed.add(sourceId);
@@ -3073,6 +4066,7 @@ const App = () => {
                     break;
                 
                 case 'SYM_DEC':
+                    // Symmetric Decrypt Logic
                     if (inputs['cipher']?.data && inputs['key']?.data && !inputs['cipher'].data.startsWith('ERROR') && !inputs['key'].data.startsWith('ERROR')) {
                         isProcessing = true;
                         const algorithm = sourceNode.symAlgorithm || 'AES-GCM'; 
@@ -3085,6 +4079,7 @@ const App = () => {
                         outputData = sourceNode.dataOutput || 'Decrypting...';
                         sourceNode.outputFormat = getOutputFormat(sourceNode.type);
                         
+                        // Break early (async)
                         sourceNode.isProcessing = isProcessing;
                         newNodesMap.set(sourceId, sourceNode);
                         processed.add(sourceId);
@@ -3102,6 +4097,7 @@ const App = () => {
                     break;
 
                 case 'ASYM_ENC':
+                    // Asymmetric Encrypt Logic (Web Crypto API - RSA-OAEP)
                     if (inputs['data']?.data && inputs['publicKey']?.data) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
@@ -3119,6 +4115,7 @@ const App = () => {
                     break;
                 
                 case 'ASYM_DEC':
+                    // Asymmetric Decrypt Logic (Web Crypto API - RSA-OAEP)
                     if (inputs['cipher']?.data && inputs['privateKey']?.data) {
                         isProcessing = true;
                         const algorithm = sourceNode.asymAlgorithm || 'RSA-OAEP';
@@ -3141,12 +4138,19 @@ const App = () => {
 
         }
         
+        // Update the node's output field(s) and processing status
+        
+        // El nodo Data Split usa campos específicos (chunk1/chunk2) en lugar de dataOutput
         if (sourceNode.type === 'DATA_SPLIT') {
+             // Asegurarse de que los outputs específicos (chunk1/chunk2) se persistan en el mapa
+             // Ya se actualizaron en el switch/case, solo nos aseguramos de que el mapa las tenga
+             // para que los nodos downstream las puedan leer.
         } else {
              const primaryOutputPort = sourceNodeDef.outputPorts?.[0];
              if (primaryOutputPort && primaryOutputPort.keyField === 'dataOutput') {
                  sourceNode.dataOutput = outputData; 
              } else if (!primaryOutputPort) {
+                 // Manually set dataOutput for SINK nodes (viewers)
                  if (sourceNode.type !== 'OUTPUT_VIEWER') {
                      sourceNode.dataOutput = outputData;
                  }
@@ -3165,7 +4169,11 @@ const App = () => {
     return Array.from(newNodesMap.values());
   }, [setNodes]);
   
+  // --- Effects for Recalculation ---
+  
   useEffect(() => {
+    // Initial calculation or on connection change
+    // Trigger recalculation on component mount and whenever connections change.
     setNodes(prevNodes => recalculateGraph(prevNodes, connections));
   }, [connections, recalculateGraph]); 
 
@@ -3181,33 +4189,39 @@ const App = () => {
                     publicExponent: (field === 'publicExponent' ? value : node.publicExponent),
                     shiftType: (field === 'shiftType' ? value : node.shiftType),
                     shiftAmount: (field === 'shiftAmount' ? value : node.shiftAmount),
-                    shiftKey: (field === 'shiftKey' ? value : node.shiftKey), 
-                    keyword: (field === 'keyword' ? value : node.keyword), 
-                    vigenereMode: (field === 'vigenereMode' ? value : node.vigenereMode), 
+                    shiftKey: (field === 'shiftKey' ? value : node.shiftKey), // Caesar Key
+                    keyword: (field === 'keyword' ? value : node.keyword), // Vigenere Keyword
+                    vigenereMode: (field === 'vigenereMode' ? value : node.vigenereMode), // Vigenere Mode
+                    // Symmetric/Asymmetric Crypto Fields
                     symAlgorithm: (field === 'symAlgorithm' ? value : node.symAlgorithm),
                     asymAlgorithm: (field === 'asymAlgorithm' ? value : node.asymAlgorithm),
+                    // Simple RSA specific
                     p: (field === 'p' ? value : node.p),
                     q: (field === 'q' ? value : node.q),
                     e: (field === 'e' ? value : node.e),
-                    d: (field === 'd' ? value : node.d), 
-                    n_pub: (field === 'n_pub' ? value : node.n_pub), 
-                    e_pub: (field === 'e_pub' ? value : node.e_pub), 
-                    isReadOnly: node.isReadOnly, 
+                    d: (field === 'd' ? value : node.d), // PRESERVE D BEFORE RECALC
+                    n_pub: (field === 'n_pub' ? value : node.n_pub), // PUBKEY FIELD
+                    e_pub: (field === 'e_pub' ? value : node.e_pub), // PUBKEY FIELD
+                    isReadOnly: node.isReadOnly, // PUBKEY FIELD
+                    // Conversion Feature State:
                     isConversionExpanded: (field === 'isConversionExpanded' ? value : node.isConversionExpanded),
                     convertedFormat: (field === 'convertedFormat' ? value : node.convertedFormat),
                     viewFormat: (field === 'viewFormat' ? value : node.viewFormat),
                     isProcessing: node.isProcessing,
                     dStatus: node.dStatus,
-                    hashAlgorithm: (field === 'hashAlgorithm' ? value : node.hashAlgorithm), 
+                    hashAlgorithm: (field === 'hashAlgorithm' ? value : node.hashAlgorithm), // Added hashAlgorithm update
                 };
                 return updatedNode;
             }
             return node;
         });
+        // Recalculate immediately after content update
         return recalculateGraph(nextNodes, connections, id);
     });
   }, [connections, recalculateGraph]);
   
+  // --- Standard App Handlers ---
+
   const setPosition = useCallback((id, newPos) => {
     setNodes(prevNodes => prevNodes.map(node =>
       node.id === id ? { ...node, position: newPos } : node
@@ -3220,6 +4234,7 @@ const App = () => {
               const finalWidth = Math.max(NODE_DIMENSIONS.minWidth, newWidth);
               const finalHeight = Math.max(NODE_DIMENSIONS.minHeight, newHeight);
               
+              // Only update if dimension changed significantly
               if (finalWidth !== node.width || finalHeight !== node.height) {
                   return { ...node, width: finalWidth, height: finalHeight };
               }
@@ -3232,9 +4247,11 @@ const App = () => {
     const newId = `${type}_${Date.now()}`;
     const definition = NODE_DEFINITIONS[type];
     
+    // Use adjusted height for nodes like Bit Shift and Data Split
     let initialNodeHeight = NODE_DIMENSIONS.initialHeight;
     let initialNodeWidth = NODE_DIMENSIONS.initialWidth;
     
+    // Adjusted height for Data Split and other complex nodes
     if (type === 'SHIFT_OP' || type === 'XOR_OP' || type === 'DATA_SPLIT' || type === 'DATA_CONCAT') {
         initialNodeHeight = 300; 
         initialNodeWidth = 300;
@@ -3244,51 +4261,59 @@ const App = () => {
         dataOutput: '', 
         isProcessing: false, 
         outputFormat: getOutputFormat(type),
-        width: initialNodeWidth, 
-        height: initialNodeHeight, 
+        width: initialNodeWidth, // Initial width
+        height: initialNodeHeight, // Initial height
     };
     
+    // --- Determine a sensible starting position near the center/previous nodes ---
+    // Calculate canvas size (approximate center, assuming CanvasRef exists later)
     const canvas = canvasRef.current;
     
+    // Use fallback dimensions if ref is not yet active, or bounds are zero
     const canvasWidth = canvas?.clientWidth > 100 ? canvas.clientWidth : 800;
     const canvasHeight = canvas?.clientHeight > 100 ? canvas.clientHeight : 600;
     
+    // Base position near the center
     let x = (canvasWidth / 2) - (initialNodeWidth / 2);
     let y = (canvasHeight / 2) - (initialNodeHeight / 2);
     
+    // Add small random offset (max 100px) to prevent direct overlap
+    // Range is -100 to 100
     const randomOffset = () => Math.floor(Math.random() * 200) - 100;
     x += randomOffset();
     y += randomOffset();
 
+    // Ensure bounds are not violated by the random offset
     x = Math.max(20, Math.min(x, canvasWidth - initialNodeWidth - 20));
     y = Math.max(20, Math.min(y, canvasHeight - initialNodeHeight - 20));
     
     const position = { x, y };
+    // --------------------------------------------------------------------------
 
     if (type === 'DATA_INPUT') {
       initialContent.content = '';
-      initialContent.format = 'Binary'; 
+      initialContent.format = 'Binary'; // Default to Binary (most restrictive)
     } else if (type === 'OUTPUT_VIEWER') { 
-      initialContent.dataOutput = ''; 
-      initialContent.rawInputData = ''; 
+      initialContent.dataOutput = ''; // Will hold the final data (raw or converted)
+      initialContent.rawInputData = ''; // Field to hold the raw input string
       initialContent.viewFormat = 'Text (UTF-8)'; 
       initialContent.isConversionExpanded = false; 
       initialContent.convertedData = ''; 
       initialContent.convertedFormat = 'Base64'; 
       initialContent.sourceFormat = '';
     } else if (type === 'CAESAR_CIPHER') {
-      initialContent.shiftKey = 3; 
+      initialContent.shiftKey = 3; // Default shift key
       initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'VIGENERE_CIPHER') {
-      initialContent.keyword = 'HELLO'; 
+      initialContent.keyword = 'HELLO'; // Default keyword
       initialContent.vigenereMode = 'ENCRYPT';
       initialContent.outputFormat = 'Text (UTF-8)';
     } else if (type === 'HASH_FN') { 
-      initialContent.hashAlgorithm = 'SHA-256'; 
+      initialContent.hashAlgorithm = 'SHA-256'; // Default value
     } else if (type === 'KEY_GEN') {
       initialContent.keyAlgorithm = 'AES-GCM';
-      initialContent.keyBase64 = ''; 
-      initialContent.generateKey = false; 
+      initialContent.keyBase64 = ''; // Store the raw key (Base64)
+      initialContent.generateKey = false; // Trigger flag
     } else if (type === 'RSA_KEY_GEN') { 
       initialContent.keyAlgorithm = 'RSA-OAEP';
       initialContent.modulusLength = 2048;
@@ -3297,20 +4322,20 @@ const App = () => {
       initialContent.dataOutputPrivate = '';
       initialContent.keyPairObject = null;
       initialContent.rsaParameters = { n: '', d: '', p: '', q: '', e: 65537 }; 
-    } else if (type === 'SIMPLE_RSA_KEY_GEN') { 
+    } else if (type === 'SIMPLE_RSA_KEY_GEN') { // Private Key Gen initialization
       initialContent.keyAlgorithm = 'RSA-OAEP';
       initialContent.modulusLength = 0;
       initialContent.p = '';
       initialContent.q = '';
       initialContent.e = '';
-      initialContent.d = ''; 
+      initialContent.d = ''; // Initialize d as empty string to allow input
       initialContent.n = '';
       initialContent.phiN = '';
       initialContent.dataOutputPublic = '';
       initialContent.dataOutputPrivate = '';
-      initialContent.dStatus = ''; 
-      initialContent.generateKey = true; 
-    } else if (type === 'SIMPLE_RSA_PUBKEY_GEN') { 
+      initialContent.dStatus = ''; // New status field
+      initialContent.generateKey = true; // Trigger immediate initial calculation
+    } else if (type === 'SIMPLE_RSA_PUBKEY_GEN') { // Public Key Gen initialization (NEW)
       initialContent.outputFormat = 'Decimal';
       initialContent.n_pub = '';
       initialContent.e_pub = '';
@@ -3318,25 +4343,25 @@ const App = () => {
       initialContent.isReadOnly = false;
     } else if (type === 'SIMPLE_RSA_ENC' || type === 'SIMPLE_RSA_DEC') {
       initialContent.outputFormat = 'Decimal';
-    } else if (type === 'SIMPLE_RSA_SIGN' || type === 'SIMPLE_RSA_VERIFY') { 
+    } else if (type === 'SIMPLE_RSA_SIGN' || type === 'SIMPLE_RSA_VERIFY') { // New Signature nodes
       initialContent.outputFormat = type === 'SIMPLE_RSA_SIGN' ? 'Decimal' : 'Text (UTF-8)';
     } else if (type === 'SYM_ENC' || type === 'SYM_DEC') {
-      initialContent.symAlgorithm = 'AES-GCM'; 
+      initialContent.symAlgorithm = 'AES-GCM'; // Default AES mode
     } else if (type === 'ASYM_ENC' || type === 'ASYM_DEC') {
       initialContent.asymAlgorithm = 'RSA-OAEP';
     } else if (type === 'SHIFT_OP') {
       initialContent.shiftType = 'Left';
       initialContent.shiftAmount = 1;
-      initialContent.outputFormat = 'Binary'; 
+      initialContent.outputFormat = 'Binary'; // Dynamic output format, default to Binary
       initialContent.shiftDescription = 'Active (Rotational)';
     } else if (type === 'XOR_OP') {
-      initialContent.outputFormat = 'Binary'; 
-    } else if (type === 'DATA_SPLIT') { 
-      initialContent.outputFormat = 'Binary'; 
+      initialContent.outputFormat = 'Binary'; // Default output for precise operation
+    } else if (type === 'DATA_SPLIT') { // Data Split Initialization
+      initialContent.outputFormat = 'Binary'; // Default output format for consistency/precision
       initialContent.chunk1 = ''; 
       initialContent.chunk2 = ''; 
-    } else if (type === 'DATA_CONCAT') { 
-      initialContent.outputFormat = 'Binary'; 
+    } else if (type === 'DATA_CONCAT') { // Data Concatenate Initialization
+      initialContent.outputFormat = 'Binary'; // Default output format
     }
 
     setNodes(prevNodes => [
@@ -3354,29 +4379,11 @@ const App = () => {
 
   
   const handleDeleteNode = useCallback((nodeIdToDelete) => {
-      let idsToDelete = new Set();
-
-      // Check if the node to delete is part of the current selection
-      if (selectedNodeIds.has(nodeIdToDelete)) {
-          // If so, we intend to delete the entire selection group
-          idsToDelete = new Set(selectedNodeIds);
-      } else {
-          // Otherwise, just delete the specific node (single delete)
-          idsToDelete.add(nodeIdToDelete);
-      }
-
-      setNodes(prevNodes => prevNodes.filter(n => !idsToDelete.has(n.id)));
+      setNodes(prevNodes => prevNodes.filter(n => n.id !== nodeIdToDelete));
       setConnections(prevConnections => 
-          prevConnections.filter(c => !idsToDelete.has(c.source) && !idsToDelete.has(c.target))
+          prevConnections.filter(c => c.source !== nodeIdToDelete && c.target !== nodeIdToDelete)
       );
-      
-      // Update selection state to remove deleted nodes
-      setSelectedNodeIds(prev => {
-          const newSet = new Set(prev);
-          idsToDelete.forEach(id => newSet.delete(id));
-          return newSet;
-      });
-  }, [selectedNodeIds]);
+  }, []);
 
   const handleConnectStart = useCallback((nodeId, portIndex, outputType) => {
     setConnectingPort({ sourceId: nodeId, sourcePortIndex: portIndex, outputType: outputType });
@@ -3437,11 +4444,13 @@ const App = () => {
   }, []);
   
   const connectionPaths = useMemo(() => {
+    // Calcular el tamaño virtual del lienzo para el SVG
     let maxX = 0;
     let maxY = 0;
-    const padding = 50; 
+    const padding = 50; // Margen de seguridad
 
     nodes.forEach(node => {
+        // La posición del nodo es la esquina superior izquierda
         maxX = Math.max(maxX, node.position.x + node.width);
         maxY = Math.max(maxY, node.position.y + node.height);
     });
@@ -3457,7 +4466,7 @@ const App = () => {
             
             if (sourceNode && targetNode) {
                 return {
-                    path: getLinePath(sourceNode, targetNode, conn), 
+                    path: getLinePath(sourceNode, targetNode, conn), // Passes connection object for precise path calculation
                     source: conn.source,
                     target: conn.target,
                     sourcePortIndex: conn.sourcePortIndex,
@@ -3467,7 +4476,7 @@ const App = () => {
             return null;
         }).filter(p => p !== null)
     };
-  }, [connections, nodes, scale]); 
+  }, [connections, nodes, scale]); // Añadir scale como dependencia
 
 
   
@@ -3480,52 +4489,43 @@ const App = () => {
   return (
     <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
         
+      {/* Styles injected here, including Tailwind base/components/utilities and custom CSS */}
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
 
       <Toolbar 
         addNode={addNode} 
         onDownloadProject={handleDownloadProject}
         onUploadProject={handleUploadProject}
-        onZoomIn={handleZoomIn} 
-        onZoomOut={handleZoomOut} 
+        onZoomIn={handleZoomIn} // Passed new zoom handler
+        onZoomOut={handleZoomOut} // Passed new zoom handler
       />
 
       <div className="flex-grow flex flex-col p-4">
         
         <div 
           ref={canvasRef}
-          className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner overflow-auto select-none"
+          className="canvas-container relative w-full flex-grow border-4 border-dashed border-gray-300 rounded-2xl bg-white shadow-inner overflow-auto" // Added overflow-auto here to allow panning/scrolling
           onClick={handleCanvasClick}
-          onMouseDown={handleCanvasMouseDown}
         >
           
+          {/* New wrapper for scaling nodes and lines */}
           <div 
               style={{ 
                   transform: `scale(${scale})`, 
                   transformOrigin: 'top left',
+                  // EXPANDED VIRTUAL SIZE: Usar el tamaño calculado + un margen para la corrección
                   width: `${connectionPaths.size.width}px`,
                   height: `${connectionPaths.size.height}px`,
+                  // Fijar un mínimo basado en el contenedor visible
                   minWidth: `100%`,
                   minHeight: `100%`,
               }} 
               className="absolute top-0 left-0"
           >
-              {/* Selection Box Render */}
-              {selectionBox && (
-                  <div 
-                      className="selection-marquee"
-                      style={{
-                          left: `${selectionBox.x}px`,
-                          top: `${selectionBox.y}px`,
-                          width: `${selectionBox.width}px`,
-                          height: `${selectionBox.height}px`
-                      }}
-                  />
-              )}
-
               <svg 
                   className="absolute top-0 left-0 pointer-events-auto z-0" 
                   style={{ 
+                      // Establecer el tamaño del SVG al tamaño virtual calculado
                       width: `${connectionPaths.size.width}px`, 
                       height: `${connectionPaths.size.height}px`,
                   }} 
@@ -3537,17 +4537,19 @@ const App = () => {
                         e.stopPropagation(); 
                         handleRemoveConnection(conn.source, conn.target, conn.sourcePortIndex, conn.targetPortId);
                     }}
-                    className="cursor-pointer" 
+                    className="cursor-pointer" // Add cursor style to the group
                   >
+                    {/* Invisible Hitbox (Ajustar stroke-width por la escala) */}
                     <path
                         d={conn.path}
                         className="connection-hitbox"
-                        style={{ strokeWidth: `${15 / scale}px` }} 
+                        style={{ strokeWidth: `${15 / scale}px` }} // Re-escalar el área de clic
                     />
+                    {/* Visible Line (Ajustar stroke-width por la escala) */}
                     <path
                         d={conn.path}
                         className="connection-line-visible"
-                        style={{ strokeWidth: `${4 / scale}px` }} 
+                        style={{ strokeWidth: `${4 / scale}px` }} // Re-escalar el grosor de la línea
                     />
                   </g>
                 ))}
@@ -3566,16 +4568,15 @@ const App = () => {
                   connections={connections}
                   handleDeleteNode={handleDeleteNode}
                   nodes={nodes} 
-                  scale={scale} 
-                  handleResize={handleNodeResize} 
-                  isSelected={selectedNodeIds.has(node.id)}
-                  onNodeDown={handleNodeMouseDown}
+                  scale={scale} // Passed scale for accurate drag calculation
+                  handleResize={handleNodeResize} // Passed resize handler
                 />
               ))}
           </div>
           
         </div>
         
+        {/* --- STATUS Notification Overlay --- */}
         {statusMessage && (
             <StatusNotification 
                 status={statusMessage.type} 
@@ -3596,6 +4597,7 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
 
     const handleClick = () => {
         if (isFileInput) {
+            // Trigger the file input click
             inputRef.current.click();
         } else if (onClick) {
             onClick();
@@ -3606,10 +4608,10 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
         <div className="relative flex-shrink">
             <button 
                 onClick={handleClick}
-                className={`w-full p-2 flex items-center justify-center 
+                className={`w-full p-2 flex items-center justify-center // Simplified size and layout
                             bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
                             transition duration-150 text-gray-700 rounded-lg shadow-sm`}
-                title={label} 
+                title={label} // Use label as tooltip
             >
                 {Icon && <Icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />}
             </button>
@@ -3619,9 +4621,11 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
                     type="file" 
                     ref={inputRef} 
                     onChange={(e) => {
+                        // Pass the event object containing the file list to the handler
                         if (e.target.files.length > 0) {
                             onChange(e.target); 
                         }
+                        // Reset input value to allow the same file to be loaded again
                         e.target.value = null;
                     }} 
                     accept=".json"
@@ -3636,6 +4640,7 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
 
 const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoomOut }) => {
     const [collapsedGroups, setCollapsedGroups] = useState(() => {
+        // Initialize all groups to open (false)
         return ORDERED_NODE_GROUPS.reduce((acc, group) => {
             acc[group.name] = false;
             return acc;
@@ -3649,17 +4654,23 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
         }));
     }, []);
     
+    // Function to handle the Info button click
     const handleInfoClick = (url) => {
+        // Open the specified URL in a new browser tab
         window.open(url, '_blank');
     };
 
     return (
         <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col">
+            {/* Title/Logo Container */}
             <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
                 <img 
+          // NOTE: The original path was 'VCL - Horizonal logo + name.png'.
+          // Assuming the Canvas environment handles path resolution for the uploaded files in 'public/'.
           src="VCL - Horizonal logo + name.png"
           alt="VisualCryptoLab Logo and Name" 
           className="w-full h-auto max-w-[180px]"
+          // Fallback if image fails to load
           onError={(e) => {
               e.target.onerror = null; 
               e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; 
@@ -3672,6 +4683,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                 
                 {ORDERED_NODE_GROUPS.map((group, groupIndex) => (
                     <React.Fragment key={group.name}>
+                        {/* Group Header (Clickable) */}
                         <div 
                             className="flex justify-between items-center text-xs font-bold uppercase text-gray-500 pt-2 pb-1 border-b border-gray-200 cursor-pointer hover:text-gray-700 transition"
                             onClick={() => toggleGroup(group.name)}
@@ -3679,10 +4691,11 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                             <span className="flex items-center space-x-1">
                                 <span>{group.name}</span>
                                 
+                                {/* Info Button for Simple RSA Group */}
                                 {group.name === 'SIMPLE RSA' && (
                                     <button
                                         onClick={(e) => {
-                                            e.stopPropagation(); 
+                                            e.stopPropagation(); // Prevent toggling the group
                                             handleInfoClick('https://github.com/visualcryptolab/vcryptolab/blob/main/docs/SimpleRSA.md');
                                         }}
                                         className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
@@ -3692,10 +4705,11 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                                     </button>
                                 )}
                                 
+                                {/* Info Button for SYMMETRIC CRYPTO Group */}
                                 {group.name === 'SYMMETRIC CRYPTO (AES)' && (
                                     <button
                                         onClick={(e) => {
-                                            e.stopPropagation(); 
+                                            e.stopPropagation(); // Prevent toggling the group
                                             handleInfoClick('https://www.youtube.com/watch?v=mlzxpkdXP58');
                                         }}
                                         className="p-0.5 rounded-full text-gray-400 hover:text-blue-500 transition duration-150 focus:outline-none"
@@ -3708,11 +4722,12 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                             <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsedGroups[group.name] ? 'rotate-180' : ''}`} />
                         </div>
                         
+                        {/* Group Content (Conditionally Rendered/Collapsed) */}
                         {!collapsedGroups[group.name] && (
                             <div className="space-y-1">
                                 {group.types.map((type) => {
                                     const def = NODE_DEFINITIONS[type];
-                                    if (!def) return null; 
+                                    if (!def) return null; // Safety check
                                     
                                     const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[def.color] || 'hover:border-gray-400';
                                     const iconTextColorClass = TEXT_ICON_CLASSES[def.color] || 'text-gray-600';
@@ -3725,6 +4740,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                                                          bg-white hover:bg-gray-100 border-2 border-transparent ${hoverBorderClass}
                                                          transition duration-150 text-gray-700 rounded-lg shadow-sm`}
                                         >
+                                            {/* Render the custom icon component or the default Lucide icon */}
                                             {def.icon && (
                                                 <def.icon className={`w-5 h-5 ${iconTextColorClass} flex-shrink-0`} />
                                             )}
@@ -3739,8 +4755,10 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                 
             </div>
             
+            {/* Action Buttons Section at the bottom */}
             <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
                 
+                {/* Export JSON Button */}
                 <ToolbarButton 
                     icon={Download} 
                     label="Export JSON" 
@@ -3748,6 +4766,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                     onClick={onDownloadProject}
                 />
                 
+                {/* Import JSON Button */}
                 <ToolbarButton 
                     icon={Upload} 
                     label="Import JSON" 
@@ -3756,6 +4775,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                     isFileInput={true} 
                 />
                 
+                {/* Zoom Out Button */}
                 <ToolbarButton 
                     icon={ZoomOut} 
                     label="Zoom Out" 
@@ -3763,6 +4783,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
                     onClick={onZoomOut}
                 />
 
+                {/* Zoom In Button */}
                 <ToolbarButton 
                     icon={ZoomIn} 
                     label="Zoom In" 
