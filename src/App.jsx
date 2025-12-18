@@ -126,9 +126,9 @@ const BORDER_CLASSES = {
   blue: 'border-blue-600', red: 'border-red-600', orange: 'border-orange-600', cyan: 'border-cyan-600', pink: 'border-pink-500', 
   teal: 'border-teal-600', // Used by ASYM_DEC and DATA_CONCAT
   gray: 'border-gray-600', lime: 'border-lime-600', indigo: 'border-indigo-600',
-  purple: 'border-purple-600', // Simple RSA PrivKey Gen
-  maroon: 'border-red-800', // Simple RSA Encrypt
-  rose: 'border-pink-700', // Simple RSA Decrypt
+  purple: 'border-purple-600', // RSA PrivKey Gen
+  maroon: 'border-red-800', // RSA Encrypt
+  rose: 'border-pink-700', // RSA Decrypt
   amber: 'border-amber-500', // Caesar Cipher
   yellow: 'border-yellow-400', // Vigenere Cipher
   fuchsia: 'border-fuchsia-600', // RSA Signature
@@ -287,9 +287,9 @@ const NODE_DEFINITIONS = {
   // --- Key Generators ---
   KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] }, 
 
-  // Simple RSA Key Generator (Private Key Gen - for modular arithmetic demo)
+  // RSA Key Generator (Private Key Gen - for modular arithmetic demo)
   SIMPLE_RSA_KEY_GEN: { 
-    label: 'Simple RSA PrivKey Gen', 
+    label: 'RSA PrivKey Gen', 
     color: 'purple', 
     icon: Key, 
     inputPorts: [], 
@@ -298,9 +298,9 @@ const NODE_DEFINITIONS = {
     ]
   },
     
-  // Simple RSA Public Key Generator
+  // RSA Public Key Generator
   SIMPLE_RSA_PUBKEY_GEN: {
-    label: 'Simple RSA PubKey Gen',
+    label: 'RSA PubKey Gen',
     color: 'lime', 
     icon: Unlock, 
     inputPorts: [
@@ -323,9 +323,9 @@ const NODE_DEFINITIONS = {
     ]
   },
   
-  // --- Simple RSA Cipher Nodes (Modular Arithmetic Demo) ---
+  // --- RSA Cipher Nodes (Modular Arithmetic Demo) ---
   SIMPLE_RSA_ENC: {
-    label: 'Simple RSA Encrypt',
+    label: 'RSA Encrypt',
     color: 'maroon',
     icon: Lock,
     inputPorts: [
@@ -336,7 +336,7 @@ const NODE_DEFINITIONS = {
   },
 
   SIMPLE_RSA_DEC: {
-    label: 'Simple RSA Decrypt',
+    label: 'RSA Decrypt',
     color: 'rose',
     icon: Unlock,
     inputPorts: [
@@ -346,9 +346,9 @@ const NODE_DEFINITIONS = {
     outputPorts: [{ name: 'Plaintext (m)', type: 'data', keyField: 'dataOutput' }]
   },
 
-  // --- Simple RSA Signature Nodes ---
+  // --- RSA Signature Nodes ---
   SIMPLE_RSA_SIGN: {
-      label: 'Simple RSA Sign',
+      label: 'RSA Sign',
       color: 'fuchsia',
       icon: Signature, 
       inputPorts: [
@@ -359,7 +359,7 @@ const NODE_DEFINITIONS = {
   },
 
   SIMPLE_RSA_VERIFY: {
-      label: 'Simple RSA Verify',
+      label: 'RSA Verify',
       color: 'fuchsia',
       icon: CheckCheck,
       inputPorts: [
@@ -430,8 +430,6 @@ const BOX_SIZE = NODE_DIMENSIONS;
 // =================================================================
 // 2. CRYPTO & UTILITY FUNCTIONS
 // =================================================================
-
-// ... (Functions modPow, gcd, modInverse, DEMO_PRIMES, generateSmallPrimes, generateSmallE, caesarEncrypt, vigenereEncryptDecrypt, arrayBufferToBase64, base64ToArrayBuffer, arrayBufferToBigIntString, arrayBufferToHexBig, arrayBufferToBinaryBig, arrayBufferToHex, arrayBufferToBinary, hexToArrayBuffer, convertToUint8Array, convertDataFormat, getOutputFormat, performBitwiseXor, performRawXor, stringToBigInt, bigIntToString, performBitShiftOperation, splitDataIntoChunks, concatenateData, calculateHash, generateSymmetricKey, generateAsymmetricKeyPair, asymmetricEncrypt, asymmetricDecrypt, symmetricEncrypt, symmetricDecrypt, isContentCompatible remain unchanged)
 
 /** Calculates (base^exponent) mod modulus using BigInt for large numbers. */
 const modPow = (base, exponent, modulus) => {
@@ -3590,7 +3588,7 @@ const App = () => {
   );
 };
 
-// ... (ToolbarButton and Toolbar components - No changes needed) ...
+// --- Helper Component for Toolbar Actions ---
 const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInput }) => {
     const hoverBorderClass = HOVER_BORDER_TOOLBAR_CLASSES[color] || 'hover:border-gray-400';
     const iconTextColorClass = TEXT_ICON_CLASSES[color] || 'text-gray-600';
@@ -3633,6 +3631,8 @@ const ToolbarButton = ({ icon: Icon, label, color, onClick, onChange, isFileInpu
         </div>
     );
 };
+
+// --- Toolbar Component ---
 
 const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoomOut }) => {
     const [collapsedGroups, setCollapsedGroups] = useState(() => {
