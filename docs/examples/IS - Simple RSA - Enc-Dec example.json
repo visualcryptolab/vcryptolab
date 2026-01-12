@@ -1,0 +1,184 @@
+{
+  "schemaVersion": "1.2",
+  "nodes": [
+    {
+      "id": "SIMPLE_RSA_KEY_GEN_1761307374419",
+      "label": "Simple RSA PrivKey Gen",
+      "position": {
+        "x": 820.75,
+        "y": 24.25
+      },
+      "type": "SIMPLE_RSA_KEY_GEN",
+      "color": "purple",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Base64",
+      "keyAlgorithm": "RSA-OAEP",
+      "modulusLength": 0,
+      "p": "281",
+      "q": "167",
+      "e": "39423",
+      "d": "26767",
+      "n": "46927",
+      "phiN": "46480",
+      "dataOutputPublic": "46927,39423",
+      "dataOutputPrivate": "26767",
+      "dStatus": "CORRECT (Calculated).",
+      "generateKey": false,
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "SIMPLE_RSA_PUBKEY_GEN_1761307398988",
+      "label": "Simple RSA PubKey Gen",
+      "position": {
+        "x": 325.3333333333333,
+        "y": 19.666666666666686
+      },
+      "type": "SIMPLE_RSA_PUBKEY_GEN",
+      "color": "lime",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "n_pub": "46927",
+      "e_pub": "39423",
+      "dataOutputPublic": "46927,39423",
+      "isReadOnly": true,
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "DATA_INPUT_1761307419284",
+      "label": "Data Input",
+      "position": {
+        "x": 23.5,
+        "y": 444.5
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "16346",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "content": "16346",
+      "format": "Decimal",
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "SIMPLE_RSA_ENC_1761307453957",
+      "label": "Simple RSA Encrypt",
+      "position": {
+        "x": 494.5,
+        "y": 460.5
+      },
+      "type": "SIMPLE_RSA_ENC",
+      "color": "maroon",
+      "dataOutput": "21166",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "OUTPUT_VIEWER_1761307469358",
+      "label": "Output Viewer",
+      "position": {
+        "x": 499.75,
+        "y": 796
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "21166",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "rawInputData": "21166",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Decimal",
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "SIMPLE_RSA_DEC_1761307483017",
+      "label": "Simple RSA Decrypt",
+      "position": {
+        "x": 961.5,
+        "y": 437.25
+      },
+      "type": "SIMPLE_RSA_DEC",
+      "color": "rose",
+      "dataOutput": "16346",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "OUTPUT_VIEWER_1761307493176",
+      "label": "Output Viewer",
+      "position": {
+        "x": 1477.75,
+        "y": 440.75
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "16346",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "rawInputData": "16346",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Decimal",
+      "width": 300,
+      "height": 280
+    }
+  ],
+  "connections": [
+    {
+      "source": "SIMPLE_RSA_KEY_GEN_1761307374419",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_PUBKEY_GEN_1761307398988",
+      "targetPortId": "keySource"
+    },
+    {
+      "source": "DATA_INPUT_1761307419284",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_ENC_1761307453957",
+      "targetPortId": "message"
+    },
+    {
+      "source": "SIMPLE_RSA_PUBKEY_GEN_1761307398988",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_ENC_1761307453957",
+      "targetPortId": "publicKey"
+    },
+    {
+      "source": "SIMPLE_RSA_ENC_1761307453957",
+      "sourcePortIndex": 0,
+      "target": "OUTPUT_VIEWER_1761307469358",
+      "targetPortId": "data"
+    },
+    {
+      "source": "OUTPUT_VIEWER_1761307469358",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_DEC_1761307483017",
+      "targetPortId": "cipher"
+    },
+    {
+      "source": "SIMPLE_RSA_KEY_GEN_1761307374419",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_DEC_1761307483017",
+      "targetPortId": "privateKey"
+    },
+    {
+      "source": "SIMPLE_RSA_DEC_1761307483017",
+      "sourcePortIndex": 0,
+      "target": "OUTPUT_VIEWER_1761307493176",
+      "targetPortId": "data"
+    }
+  ]
+}

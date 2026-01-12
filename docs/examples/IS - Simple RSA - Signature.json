@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "1.2",
+  "nodes": [
+    {
+      "id": "SIMPLE_RSA_KEY_GEN_1761307374419",
+      "label": "Simple RSA PrivKey Gen",
+      "position": {
+        "x": 152.83333333333326,
+        "y": 696.3333333333333
+      },
+      "type": "SIMPLE_RSA_KEY_GEN",
+      "color": "purple",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Base64",
+      "keyAlgorithm": "RSA-OAEP",
+      "modulusLength": 0,
+      "p": "281",
+      "q": "167",
+      "e": "39423",
+      "d": "26767",
+      "n": "46927",
+      "phiN": "46480",
+      "dataOutputPublic": "46927,39423",
+      "dataOutputPrivate": "26767",
+      "dStatus": "CORRECT (Calculated).",
+      "generateKey": false,
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "SIMPLE_RSA_PUBKEY_GEN_1761307398988",
+      "label": "Simple RSA PubKey Gen",
+      "position": {
+        "x": 747,
+        "y": 705.0833333333333
+      },
+      "type": "SIMPLE_RSA_PUBKEY_GEN",
+      "color": "lime",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "n_pub": "46927",
+      "e_pub": "39423",
+      "dataOutputPublic": "46927,39423",
+      "isReadOnly": true,
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "DATA_INPUT_1761307419284",
+      "label": "Data Input",
+      "position": {
+        "x": 213.08333333333303,
+        "y": 59.50000000000006
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "16346",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "content": "16346",
+      "format": "Decimal",
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "SIMPLE_RSA_SIGN_1766135732853",
+      "label": "Simple RSA Sign",
+      "position": {
+        "x": 536.7499999999999,
+        "y": 370.33333333333326
+      },
+      "type": "SIMPLE_RSA_SIGN",
+      "color": "fuchsia",
+      "dataOutput": "997",
+      "isProcessing": false,
+      "outputFormat": "Decimal",
+      "width": 300,
+      "height": 280
+    },
+    {
+      "id": "SIMPLE_RSA_VERIFY_1766135828142",
+      "label": "Simple RSA Verify",
+      "position": {
+        "x": 1088.6666666666663,
+        "y": 379.58333333333337
+      },
+      "type": "SIMPLE_RSA_VERIFY",
+      "color": "fuchsia",
+      "dataOutput": "SUCCESS: Signature verified. Decrypted message m'=16346 equals original message m=16346.",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280
+    }
+  ],
+  "connections": [
+    {
+      "source": "SIMPLE_RSA_KEY_GEN_1761307374419",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_PUBKEY_GEN_1761307398988",
+      "targetPortId": "keySource"
+    },
+    {
+      "source": "DATA_INPUT_1761307419284",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_SIGN_1766135732853",
+      "targetPortId": "message"
+    },
+    {
+      "source": "SIMPLE_RSA_KEY_GEN_1761307374419",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_SIGN_1766135732853",
+      "targetPortId": "privateKey"
+    },
+    {
+      "source": "SIMPLE_RSA_SIGN_1766135732853",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_VERIFY_1766135828142",
+      "targetPortId": "signature"
+    },
+    {
+      "source": "DATA_INPUT_1761307419284",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_VERIFY_1766135828142",
+      "targetPortId": "message"
+    },
+    {
+      "source": "SIMPLE_RSA_PUBKEY_GEN_1761307398988",
+      "sourcePortIndex": 0,
+      "target": "SIMPLE_RSA_VERIFY_1766135828142",
+      "targetPortId": "publicKey"
+    }
+  ]
+}

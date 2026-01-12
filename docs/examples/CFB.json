@@ -1,0 +1,466 @@
+{
+  "schemaVersion": "1.2",
+  "nodes": [
+    {
+      "id": "DATA_INPUT_1766133629731",
+      "label": "Data Input",
+      "position": {
+        "x": 296.1666666666667,
+        "y": 52.25
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "01100010",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280,
+      "content": "01100010",
+      "format": "Binary"
+    },
+    {
+      "id": "SHIFT_OP_1766133754100",
+      "label": "Bit Shift",
+      "position": {
+        "x": 287,
+        "y": 397
+      },
+      "type": "SHIFT_OP",
+      "color": "indigo",
+      "dataOutput": "10001001",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300,
+      "shiftType": "Right",
+      "shiftAmount": 6,
+      "shiftDescription": "Rotational Right Shift (ROR) (6 bits)"
+    },
+    {
+      "id": "DATA_SPLIT_1766133797682",
+      "label": "Data Split",
+      "position": {
+        "x": 84.00000000000003,
+        "y": 745.3333333333333
+      },
+      "type": "DATA_SPLIT",
+      "color": "green",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300,
+      "chunk1": "1000",
+      "chunk2": "1001"
+    },
+    {
+      "id": "DATA_INPUT_1766133823242",
+      "label": "Data Input",
+      "position": {
+        "x": 64.5,
+        "y": 1113.1666666666665
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "1100",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280,
+      "content": "1100",
+      "format": "Binary"
+    },
+    {
+      "id": "XOR_OP_1766133832287",
+      "label": "XOR Operation",
+      "position": {
+        "x": 430.83333333333337,
+        "y": 1098.6666666666665
+      },
+      "type": "XOR_OP",
+      "color": "lime",
+      "dataOutput": "0101",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "OUTPUT_VIEWER_1766133986998",
+      "label": "Output Viewer",
+      "position": {
+        "x": 431.91666666666674,
+        "y": 767.9166666666666
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "1001",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 280,
+      "rawInputData": "1001",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Binary"
+    },
+    {
+      "id": "DATA_CONCAT_1766134032368",
+      "label": "Data Concatenate",
+      "position": {
+        "x": 1213.8333333333333,
+        "y": 44.99999999999997
+      },
+      "type": "DATA_CONCAT",
+      "color": "teal",
+      "dataOutput": "00100101",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "DATA_INPUT_1766134110556",
+      "label": "Data Input",
+      "position": {
+        "x": 838.3333333333333,
+        "y": 42.66666666666667
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "0010",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280,
+      "content": "0010",
+      "format": "Binary"
+    },
+    {
+      "id": "SHIFT_OP_1766134162429",
+      "label": "Bit Shift",
+      "position": {
+        "x": 1212.9166666666665,
+        "y": 382.6666666666667
+      },
+      "type": "SHIFT_OP",
+      "color": "indigo",
+      "dataOutput": "10010100",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300,
+      "shiftType": "Right",
+      "shiftAmount": 6,
+      "shiftDescription": "Rotational Right Shift (ROR) (6 bits)"
+    },
+    {
+      "id": "DATA_SPLIT_1766134223629",
+      "label": "Data Split",
+      "position": {
+        "x": 1207.6666666666665,
+        "y": 748.9999999999999
+      },
+      "type": "DATA_SPLIT",
+      "color": "green",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300,
+      "chunk1": "1001",
+      "chunk2": "0100"
+    },
+    {
+      "id": "OUTPUT_VIEWER_1766134231189",
+      "label": "Output Viewer",
+      "position": {
+        "x": 1618.333333333333,
+        "y": 777.3333333333333
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "0100",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 280,
+      "rawInputData": "0100",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Binary"
+    },
+    {
+      "id": "DATA_INPUT_1766134243205",
+      "label": "Data Input",
+      "position": {
+        "x": 1211,
+        "y": 1105.333333333333
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "1100",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280,
+      "content": "1100",
+      "format": "Binary"
+    },
+    {
+      "id": "XOR_OP_1766134253779",
+      "label": "XOR Operation",
+      "position": {
+        "x": 1637.6666666666665,
+        "y": 1087.333333333333
+      },
+      "type": "XOR_OP",
+      "color": "lime",
+      "dataOutput": "1000",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "DATA_INPUT_1766134334060",
+      "label": "Data Input",
+      "position": {
+        "x": 1821.9999999999998,
+        "y": 38.00000000000003
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "0101",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280,
+      "content": "0101",
+      "format": "Binary"
+    },
+    {
+      "id": "DATA_CONCAT_1766134347176",
+      "label": "Data Concatenate",
+      "position": {
+        "x": 2191.666666666666,
+        "y": 48.00000000000006
+      },
+      "type": "DATA_CONCAT",
+      "color": "teal",
+      "dataOutput": "01011000",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "SHIFT_OP_1766134365627",
+      "label": "Bit Shift",
+      "position": {
+        "x": 2202.666666666667,
+        "y": 404.99999999999994
+      },
+      "type": "SHIFT_OP",
+      "color": "indigo",
+      "dataOutput": "01100001",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300,
+      "shiftType": "Right",
+      "shiftAmount": 6,
+      "shiftDescription": "Rotational Right Shift (ROR) (6 bits)"
+    },
+    {
+      "id": "DATA_SPLIT_1766134376752",
+      "label": "Data Split",
+      "position": {
+        "x": 2196.666666666666,
+        "y": 758.6666666666666
+      },
+      "type": "DATA_SPLIT",
+      "color": "green",
+      "dataOutput": "",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300,
+      "chunk1": "0110",
+      "chunk2": "0001"
+    },
+    {
+      "id": "OUTPUT_VIEWER_1766134399445",
+      "label": "Output Viewer",
+      "position": {
+        "x": 2567,
+        "y": 770
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "0001",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 280,
+      "rawInputData": "0001",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Binary"
+    },
+    {
+      "id": "XOR_OP_1766134408142",
+      "label": "XOR Operation",
+      "position": {
+        "x": 2569.9999999999995,
+        "y": 1071
+      },
+      "type": "XOR_OP",
+      "color": "lime",
+      "dataOutput": "0110",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "DATA_INPUT_1766134418862",
+      "label": "Data Input",
+      "position": {
+        "x": 2196.6666666666665,
+        "y": 1093.6666666666665
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "0111",
+      "isProcessing": false,
+      "outputFormat": "Text (UTF-8)",
+      "width": 300,
+      "height": 280,
+      "content": "0111",
+      "format": "Binary"
+    }
+  ],
+  "connections": [
+    {
+      "source": "DATA_INPUT_1766133629731",
+      "sourcePortIndex": 0,
+      "target": "SHIFT_OP_1766133754100",
+      "targetPortId": "data"
+    },
+    {
+      "source": "SHIFT_OP_1766133754100",
+      "sourcePortIndex": 0,
+      "target": "DATA_SPLIT_1766133797682",
+      "targetPortId": "data"
+    },
+    {
+      "source": "DATA_INPUT_1766133823242",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1766133832287",
+      "targetPortId": "dataB"
+    },
+    {
+      "source": "DATA_SPLIT_1766133797682",
+      "sourcePortIndex": 1,
+      "target": "OUTPUT_VIEWER_1766133986998",
+      "targetPortId": "data"
+    },
+    {
+      "source": "OUTPUT_VIEWER_1766133986998",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1766133832287",
+      "targetPortId": "dataA"
+    },
+    {
+      "source": "DATA_INPUT_1766134110556",
+      "sourcePortIndex": 0,
+      "target": "DATA_CONCAT_1766134032368",
+      "targetPortId": "dataA"
+    },
+    {
+      "source": "XOR_OP_1766133832287",
+      "sourcePortIndex": 0,
+      "target": "DATA_CONCAT_1766134032368",
+      "targetPortId": "dataB"
+    },
+    {
+      "source": "DATA_CONCAT_1766134032368",
+      "sourcePortIndex": 0,
+      "target": "SHIFT_OP_1766134162429",
+      "targetPortId": "data"
+    },
+    {
+      "source": "SHIFT_OP_1766134162429",
+      "sourcePortIndex": 0,
+      "target": "DATA_SPLIT_1766134223629",
+      "targetPortId": "data"
+    },
+    {
+      "source": "DATA_SPLIT_1766134223629",
+      "sourcePortIndex": 1,
+      "target": "OUTPUT_VIEWER_1766134231189",
+      "targetPortId": "data"
+    },
+    {
+      "source": "OUTPUT_VIEWER_1766134231189",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1766134253779",
+      "targetPortId": "dataA"
+    },
+    {
+      "source": "DATA_INPUT_1766134243205",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1766134253779",
+      "targetPortId": "dataB"
+    },
+    {
+      "source": "DATA_INPUT_1766134334060",
+      "sourcePortIndex": 0,
+      "target": "DATA_CONCAT_1766134347176",
+      "targetPortId": "dataA"
+    },
+    {
+      "source": "XOR_OP_1766134253779",
+      "sourcePortIndex": 0,
+      "target": "DATA_CONCAT_1766134347176",
+      "targetPortId": "dataB"
+    },
+    {
+      "source": "DATA_CONCAT_1766134347176",
+      "sourcePortIndex": 0,
+      "target": "SHIFT_OP_1766134365627",
+      "targetPortId": "data"
+    },
+    {
+      "source": "SHIFT_OP_1766134365627",
+      "sourcePortIndex": 0,
+      "target": "DATA_SPLIT_1766134376752",
+      "targetPortId": "data"
+    },
+    {
+      "source": "DATA_SPLIT_1766134376752",
+      "sourcePortIndex": 1,
+      "target": "OUTPUT_VIEWER_1766134399445",
+      "targetPortId": "data"
+    },
+    {
+      "source": "OUTPUT_VIEWER_1766134399445",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1766134408142",
+      "targetPortId": "dataA"
+    },
+    {
+      "source": "DATA_INPUT_1766134418862",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1766134408142",
+      "targetPortId": "dataB"
+    }
+  ]
+}
