@@ -1210,7 +1210,7 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
         <div className="w-64 bg-gray-50 flex-shrink-0 border-r border-gray-200 shadow-lg flex flex-col h-full">
             <div className="p-4 pt-6 pb-4 border-b border-gray-200 flex flex-col justify-center items-center bg-white">
                 <img 
-                  src="public/VCL - Horizonal logo + name.png"
+                  src="VCL - Horizonal logo + name.png"
                   alt="VisualCryptoLab" 
                   className="w-full h-auto max-w-[180px]"
                   onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/180x40/999/fff?text=VCL'; }}
