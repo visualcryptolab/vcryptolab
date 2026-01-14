@@ -27,6 +27,8 @@ jobs:
 
       - name: Run Tests
         run: npm test -- --run
+        env:
+          VITE_GA_ID: ${{ secrets.VITE_GA_ID }}
 
       - name: Build
         run: npm run build
