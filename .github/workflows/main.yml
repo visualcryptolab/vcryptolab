@@ -30,6 +30,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_GA_ID: ${{ secrets.VITE_GA_ID }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
