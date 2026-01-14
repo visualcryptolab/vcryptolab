@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["refactor-antigravity"] # O el nombre de la rama donde estés trabajando
+    branches: ["main"] # Branch to deploy from
 
 permissions:
   contents: read
