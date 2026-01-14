@@ -14,6 +14,8 @@ import { getOutputFormat } from './utils/cryptoUtils';
 import Toolbar from './components/Toolbar';
 import DraggableBox from './components/DraggableBox';
 import StatusNotification from './components/ui/StatusNotification';
+import ReactGA from 'react-ga4';
+import CookieConsent from 'react-cookie-consent';
 
 const App = () => {
     const [nodes, setNodes] = useState(INITIAL_NODES);
@@ -122,6 +124,10 @@ const App = () => {
 
     const handleCanvasClick = useCallback(() => { if (connectingPort) handleConnectEnd(null); }, [connectingPort, handleConnectEnd]);
 
+    const handleAcceptCookie = () => {
+        ReactGA.initialize(import.meta.env.VITE_GA_ID);
+    };
+
     return (
         <div className="h-screen w-screen flex bg-gray-100 font-inter overflow-hidden">
             <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
@@ -144,6 +150,17 @@ const App = () => {
                 </div>
                 {statusMessage && <StatusNotification status={statusMessage.type} message={statusMessage.message} onClose={clearStatusMessage} />}
             </div>
+            <CookieConsent
+                location="bottom"
+                buttonText="I Accept"
+                cookieName="VCL_GA_CONSENT"
+                style={{ background: "#2B373B" }}
+                buttonStyle={{ color: "#4e503b", fontSize: "13px" }}
+                expires={150}
+                onAccept={handleAcceptCookie}
+            >
+                This website uses cookies to enhance the user experience. By clicking "I Accept", you consent to the use of cookies for analytics purposes.
+            </CookieConsent>
         </div>
     );
 };
