@@ -267,7 +267,15 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                             <p>{rawInputData || 'Not connected or no data.'}</p>
                             <button onClick={(e) => handleCopyToClipboard(e, rawInputData)} disabled={!rawInputData || rawInputData.startsWith('ERROR')} className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm ${rawInputData && !rawInputData.startsWith('ERROR') ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500' : 'bg-gray-300 cursor-not-allowed'}`} title="Copy to Clipboard"><Clipboard className="w-3 h-3" /></button>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'isConversionExpanded', !isConversionExpanded); }} className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-red-500 hover:bg-red-600 flex-shrink-0`}><span>{isConversionExpanded ? 'Hide Conversion' : 'Convert Type'}</span></button>
+                        <button onClick={(e) => {
+                            e.stopPropagation();
+                            const newExpandedState = !isConversionExpanded;
+                            updateNodeContent(id, 'isConversionExpanded', newExpandedState);
+
+                            // Auto-resize logic
+                            const newHeight = newExpandedState ? 550 : NODE_DIMENSIONS.initialHeight;
+                            handleResize(id, width, newHeight);
+                        }} className={`mt-1 w-full flex items-center justify-center space-x-2 py-1.5 px-3 rounded-lg text-white font-semibold transition duration-150 text-xs shadow-md bg-red-500 hover:bg-red-600 flex-shrink-0`}><span>{isConversionExpanded ? 'Hide Conversion' : 'Convert Type'}</span></button>
                         {isConversionExpanded && (
                             <div className="w-full mt-2 pt-2 border-t border-gray-200 flex flex-col space-y-2 flex-grow">
                                 <span className="text-center font-bold text-red-600 text-[10px] flex-shrink-0">CONVERTED VIEW</span>
