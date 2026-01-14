@@ -6,7 +6,7 @@ This directory contains example projects that demonstrate various cryptographic 
 
 ### Block Cipher Modes
 - **CBC.json (Cipher Block Chaining):** TODO
-- **CBC-prep.json:** TODO
+- **PCBC.json:** TODO
 - **CFB.json (Cipher Feedback):** TODO
 
 ### Asymmetric Cryptography (RSA)
