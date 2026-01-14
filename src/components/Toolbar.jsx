@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Download, Upload, ZoomIn, ZoomOut, Info, ChevronDown } from 'lucide-react';
+import { Download, Upload, ZoomIn, ZoomOut, Info, ChevronDown, BookOpen } from 'lucide-react';
 import {
     ORDERED_NODE_GROUPS,
     NODE_DEFINITIONS,
@@ -55,11 +55,12 @@ const Toolbar = ({ addNode, onDownloadProject, onUploadProject, onZoomIn, onZoom
             <div className="flex justify-around space-x-1 p-3 pt-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-inner">
                 <ToolbarButton icon={Download} label="Export JSON" color="blue" onClick={onDownloadProject} />
                 <ToolbarButton icon={Upload} label="Import JSON" color="orange" onChange={onUploadProject} isFileInput={true} />
+                <ToolbarButton icon={BookOpen} label="Examples" color="indigo" onClick={() => window.open('https://github.com/visualcryptolab/vcryptolab/tree/main/docs/examples', '_blank')} />
                 <ToolbarButton icon={ZoomOut} label="Zoom Out" color="teal" onClick={onZoomOut} />
                 <ToolbarButton icon={ZoomIn} label="Zoom In" color="teal" onClick={onZoomIn} />
             </div>
         </div>
     );
-}
+};
 
 export default Toolbar;
