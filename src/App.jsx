@@ -48,7 +48,26 @@ const App = () => {
     const addNode = useCallback((type, label, color) => {
         const newId = `${type}_${Date.now()}`;
         const def = NODE_DEFINITIONS[type];
-        const initialContent = { dataOutput: '', isProcessing: false, outputFormat: getOutputFormat(type), width: (['SHIFT_OP', 'XOR_OP', 'DATA_SPLIT', 'DATA_CONCAT'].includes(type) ? 300 : NODE_DIMENSIONS.initialWidth), height: (['SHIFT_OP', 'XOR_OP', 'DATA_SPLIT', 'DATA_CONCAT'].includes(type) ? 300 : NODE_DIMENSIONS.initialHeight) };
+
+        // Define custom dimensions based on node type
+        let initialWidth = NODE_DIMENSIONS.initialWidth;
+        let initialHeight = NODE_DIMENSIONS.initialHeight;
+
+        if (['SHIFT_OP', 'XOR_OP', 'DATA_SPLIT', 'DATA_CONCAT'].includes(type)) {
+            initialWidth = 300;
+            initialHeight = 300;
+        } else if (['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN'].includes(type)) {
+            initialWidth = 350;
+            initialHeight = 450;
+        }
+
+        const initialContent = {
+            dataOutput: '',
+            isProcessing: false,
+            outputFormat: getOutputFormat(type),
+            width: initialWidth,
+            height: initialHeight
+        };
         const cv = canvasRef.current;
         let x = ((cv?.clientWidth || 800) / 2) - 150 + (Math.random() * 200 - 100);
         let y = ((cv?.clientHeight || 600) / 2) - 140 + (Math.random() * 200 - 100);
