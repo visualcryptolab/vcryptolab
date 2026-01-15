@@ -15,7 +15,7 @@ import Toolbar from './components/Toolbar';
 import DraggableBox from './components/DraggableBox';
 import StatusNotification from './components/ui/StatusNotification';
 import ReactGA from 'react-ga4';
-import CookieConsent from 'react-cookie-consent';
+import CookieConsent, { getCookieConsentValue } from 'react-cookie-consent';
 
 const App = () => {
     const [nodes, setNodes] = useState(INITIAL_NODES);
@@ -28,6 +28,12 @@ const App = () => {
     const clearStatusMessage = useCallback(() => setStatusMessage(null), []);
 
     useEffect(() => { setNodes(prevNodes => recalculateGraph(prevNodes, connections, null, setNodes)); }, [connections]);
+
+    useEffect(() => {
+        if (getCookieConsentValue("VCL_GA_CONSENT") === "true") {
+            ReactGA.initialize(import.meta.env.VITE_GA_ID);
+        }
+    }, []);
 
     const updateNodeContent = useCallback((id, field, value) => {
         setNodes(prevNodes => {
