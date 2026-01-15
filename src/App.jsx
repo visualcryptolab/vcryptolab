@@ -54,6 +54,13 @@ const App = () => {
         else if (type === 'SIMPLE_RSA_KEY_GEN') { initialContent.generateKey = true; initialContent.modulusLength = 0; }
         else if (type === 'SHIFT_OP') { initialContent.shiftType = 'Left'; initialContent.shiftAmount = 1; }
 
+        // Track event in GA
+        ReactGA.event({
+            category: "Tools",
+            action: "Add Node",
+            label: label
+        });
+
         setNodes(prev => [...prev, { id: newId, label: def.label, position: { x: Math.max(20, x), y: Math.max(20, y) }, type, color, ...initialContent }]);
     }, []);
 
