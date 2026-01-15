@@ -61,10 +61,11 @@ const App = () => {
         else if (type === 'SHIFT_OP') { initialContent.shiftType = 'Left'; initialContent.shiftAmount = 1; }
 
         // Track event in GA
+        // Track event in GA
         ReactGA.event({
             category: "Tools",
-            action: "Add Node",
-            label: label
+            action: label, // Action is now the Tool Name (e.g. "Caesar Cipher")
+            label: "Add Tool"
         });
 
         setNodes(prev => [...prev, { id: newId, label: def.label, position: { x: Math.max(20, x), y: Math.max(20, y) }, type, color, ...initialContent }]);
