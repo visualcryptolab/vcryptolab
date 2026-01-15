@@ -3,6 +3,15 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
+vi.mock('react-ga4', () => ({
+    default: { initialize: vi.fn(), event: vi.fn() }
+}));
+
+vi.mock('react-cookie-consent', () => ({
+    default: ({ children }) => <div>{children}</div>,
+    getCookieConsentValue: vi.fn().mockReturnValue('true')
+}));
+
 describe('App Component', () => {
     it('renders the main container without crashing', () => {
         // We mock scrollIntoView because it's not implemented in JSDOM
