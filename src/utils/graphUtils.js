@@ -15,7 +15,9 @@ import {
     concatenateData,
     generateSymmetricKey,
     symmetricEncrypt,
-    symmetricDecrypt
+    symmetricDecrypt,
+    generatePRNG,
+    isPrime
 } from './cryptoUtils';
 import { convertDataFormat } from './formatUtils';
 
@@ -56,30 +58,9 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                     });
                     processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
                 } else outputData = sourceNode.keyBase64;
-            } else if (sourceNode.type === 'SIMPLE_RSA_KEY_GEN' && sourceNode.generateKey) {
-                isProcessing = true;
-                const rawP = sourceNode.p; const rawQ = sourceNode.q; const rawE = sourceNode.e;
-                let p_val, q_val, e_val, d_val, n_val, phiN_val;
-                let error = null;
-                try {
-                    const userP = rawP && !isNaN(Number(rawP)) ? BigInt(rawP) : null;
-                    const userQ = rawQ && !isNaN(Number(rawQ)) ? BigInt(rawQ) : null;
-                    if (userP && userQ) { p_val = userP; q_val = userQ; } else { ({ p: p_val, q: q_val } = generateSmallPrimes()); }
-                    n_val = p_val * q_val;
-                    phiN_val = (p_val - BigInt(1)) * (q_val - BigInt(1));
-                    const userE = rawE && !isNaN(Number(rawE)) ? BigInt(rawE) : null;
-                    if (userE && userE > BigInt(1) && userE < phiN_val && gcd(userE, phiN_val) === BigInt(1)) e_val = userE;
-                    else e_val = generateSmallE(phiN_val);
-                    d_val = modInverse(e_val, phiN_val);
-                } catch (err) { error = `ERROR: Calculation failed.`; }
-                if (!error) {
-                    sourceNode.dataOutputPublic = `${n_val},${e_val}`; sourceNode.dataOutputPrivate = d_val.toString();
-                    sourceNode.n = n_val.toString(); sourceNode.phiN = phiN_val.toString(); sourceNode.d = d_val.toString();
-                    sourceNode.p = p_val.toString(); sourceNode.q = q_val.toString(); sourceNode.e = e_val.toString();
-                    outputData = sourceNode.dataOutputPrivate;
-                } else { outputData = error; sourceNode.dStatus = error; }
-                sourceNode.isProcessing = false; sourceNode.generateKey = false;
-                newNodesMap.set(sourceId, sourceNode); processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
+            } else if (sourceNode.type === 'PRNG_GEN') {
+                const res = generatePRNG(sourceNode.seed, sourceNode.prngType, sourceNode.min, sourceNode.max, sourceNode.precision, sourceNode.isPrime);
+                outputData = res;
             }
         } else {
             const incomingConns = currentConnections.filter(c => c.target === sourceId);
@@ -228,6 +209,49 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                         symmetricDecrypt(inputs['cipher'].data, inputs['key'].data, sourceNode.symAlgorithm || 'AES-GCM').then(res => setNodes(prev => prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false } : n)));
                         processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
                     } else outputData = 'Waiting...';
+                    break;
+                case 'SIMPLE_RSA_KEY_GEN':
+                    if (sourceNode.generateKey) {
+                        isProcessing = true;
+                        const incomingP = inputs['p']?.data;
+                        const incomingQ = inputs['q']?.data;
+                        const rawP = incomingP || sourceNode.p;
+                        const rawQ = incomingQ || sourceNode.q;
+                        const rawE = sourceNode.e;
+                        let p_val, q_val, e_val, d_val, n_val, phiN_val;
+                        let error = null;
+                        try {
+                            const userP = rawP && !isNaN(Number(rawP)) ? BigInt(rawP) : null;
+                            const userQ = rawQ && !isNaN(Number(rawQ)) ? BigInt(rawQ) : null;
+
+                            if (incomingP && !userP) throw new Error("ERROR: Input P is not a valid number");
+                            if (incomingQ && !userQ) throw new Error("ERROR: Input Q is not a valid number");
+
+                            if (userP && userQ) {
+                                if (!isPrime(Number(userP))) throw new Error(`ERROR: P (${userP}) is not prime`);
+                                if (!isPrime(Number(userQ))) throw new Error(`ERROR: Q (${userQ}) is not prime`);
+                                p_val = userP; q_val = userQ;
+                            } else { ({ p: p_val, q: q_val } = generateSmallPrimes()); }
+
+                            n_val = p_val * q_val;
+                            phiN_val = (p_val - BigInt(1)) * (q_val - BigInt(1));
+                            const userE = rawE && !isNaN(Number(rawE)) ? BigInt(rawE) : null;
+                            if (userE && userE > BigInt(1) && userE < phiN_val && gcd(userE, phiN_val) === BigInt(1)) e_val = userE;
+                            else e_val = generateSmallE(phiN_val);
+                            d_val = modInverse(e_val, phiN_val);
+                        } catch (err) { error = err.message.startsWith('ERROR') ? err.message : `ERROR: Calculation failed. ${err.message}`; }
+                        if (!error) {
+                            sourceNode.dataOutputPublic = `${n_val},${e_val}`; sourceNode.dataOutputPrivate = d_val.toString();
+                            sourceNode.n = n_val.toString(); sourceNode.phiN = phiN_val.toString(); sourceNode.d = d_val.toString();
+                            sourceNode.p = p_val.toString(); sourceNode.q = q_val.toString(); sourceNode.e = e_val.toString();
+                            outputData = sourceNode.dataOutputPrivate;
+                            sourceNode.dStatus = d_val.toString(); // Success message or key
+                        } else { outputData = error; sourceNode.dStatus = error; }
+                        sourceNode.isProcessing = false; sourceNode.generateKey = false;
+                        newNodesMap.set(sourceId, sourceNode); processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
+                    } else {
+                        outputData = sourceNode.dataOutputPrivate || '';
+                    }
                     break;
             }
         }

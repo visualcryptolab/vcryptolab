@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Clipboard, X, Key } from 'lucide-react';
+import { Clipboard, X, Key, Dices } from 'lucide-react';
 import {
     NODE_DEFINITIONS,
     TEXT_ICON_CLASSES,
@@ -42,6 +42,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     const isVigenereCipher = type === 'VIGENERE_CIPHER';
     const isDataSplit = type === 'DATA_SPLIT';
     const isDataConcat = type === 'DATA_CONCAT';
+    const isPRNG = type === 'PRNG_GEN';
 
     const FORMATS = ALL_FORMATS;
     const isPortSource = connectingPort?.sourceId === id;
@@ -303,11 +304,86 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                     </div>
                 )}
 
+
+                {isPRNG && (
+                    <div className="text-xs w-full flex flex-col items-center flex-grow space-y-2">
+                        <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
+                            <label className="block w-full">
+                                <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Seed</span>
+                                <div className="flex items-center space-x-1">
+                                    <input type="number" className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 outline-none" value={node.seed || ''} onChange={(e) => updateNodeContent(id, 'seed', parseInt(e.target.value))} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} />
+                                    <button onClick={(e) => { e.stopPropagation(); updateNodeContent(id, 'seed', Math.floor(Math.random() * 1000000)); }} className="p-1 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded shadow-sm transition" title="Random Seed"><Dices className="w-3 h-3" /></button>
+                                </div>
+                            </label>
+                            <label className="block"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Type</span>
+                                <select className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm bg-white outline-none" value={node.prngType || 'Integer'} onChange={(e) => updateNodeContent(id, 'prngType', e.target.value)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                                    <option value="Integer">Integer</option>
+                                    <option value="Float">Float</option>
+                                </select>
+                            </label>
+                        </div>
+                        {node.prngType !== 'Float' && (
+                            <label className="w-full flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" checked={node.isPrime || false} onChange={(e) => updateNodeContent(id, 'isPrime', e.target.checked)} className="form-checkbox h-3 w-3 text-orange-600" />
+                                <span className="text-[10px] text-gray-600 select-none">Generate Prime</span>
+                            </label>
+                        )}
+                        {node.prngType === 'Float' && (
+                            <label className="block w-full"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Decimal digits</span><input type="number" min="0" max="20" className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 outline-none" value={node.precision || 2} onChange={(e) => updateNodeContent(id, 'precision', parseInt(e.target.value))} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} /></label>
+                        )}
+                        <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
+                            <label className="block"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Min</span><input type="number" className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 outline-none" value={node.min !== undefined ? node.min : 0} onChange={(e) => updateNodeContent(id, 'min', e.target.value)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} /></label>
+                            <label className="block"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Max</span><input type="number" className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 outline-none" value={node.max !== undefined ? node.max : 100} onChange={(e) => updateNodeContent(id, 'max', e.target.value)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} /></label>
+                        </div>
+
+                        <div className="relative mt-1 text-gray-500 break-all w-full">
+                            <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                                {dataOutput || '...'}
+                            </p>
+                            <button onClick={(e) => handleCopyToClipboard(e, dataOutput)} disabled={!dataOutput} className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm bg-green-500 hover:bg-green-600`} title="Copy"><Clipboard className="w-3 h-3" /></button>
+                        </div>
+                    </div>
+                )}
+
                 {isSimpleRSAKeyGen && (
                     <div className="text-xs w-full flex flex-col items-center flex-grow space-y-2">
                         <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
-                            <label className="block"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">P (Prime 1)</span><input type="text" placeholder="Auto" className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition" value={p || ''} onChange={(e) => updateNodeContent(id, 'p', e.target.value.replace(/[^0-9]/g, ''))} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} /></label>
-                            <label className="block"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Q (Prime 2)</span><input type="text" placeholder="Auto" className="w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition" value={q || ''} onChange={(e) => updateNodeContent(id, 'q', e.target.value.replace(/[^0-9]/g, ''))} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} /></label>
+                            <label className="block">
+                                <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">P (Prime 1)</span>
+                                {(() => {
+                                    const connP = connections.find(c => c.target === id && c.targetPortId === 'p');
+                                    const srcP = connP ? nodes.find(n => n.id === connP.source)?.dataOutput : null;
+                                    return (
+                                        <input type="text"
+                                            placeholder={connP ? "Waiting..." : "Auto"}
+                                            disabled={!!connP}
+                                            className={`w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition ${connP ? 'bg-gray-100 cursor-not-allowed font-medium text-purple-700' : ''}`}
+                                            value={connP ? (srcP || '') : (p || '')}
+                                            onChange={(e) => updateNodeContent(id, 'p', e.target.value.replace(/[^0-9]/g, ''))}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    );
+                                })()}
+                            </label>
+                            <label className="block">
+                                <span className="block text-[10px] font-semibold text-gray-600 mb-0.5">Q (Prime 2)</span>
+                                {(() => {
+                                    const connQ = connections.find(c => c.target === id && c.targetPortId === 'q');
+                                    const srcQ = connQ ? nodes.find(n => n.id === connQ.source)?.dataOutput : null;
+                                    return (
+                                        <input type="text"
+                                            placeholder={connQ ? "Waiting..." : "Auto"}
+                                            disabled={!!connQ}
+                                            className={`w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition ${connQ ? 'bg-gray-100 cursor-not-allowed font-medium text-purple-700' : ''}`}
+                                            value={connQ ? (srcQ || '') : (q || '')}
+                                            onChange={(e) => updateNodeContent(id, 'q', e.target.value.replace(/[^0-9]/g, ''))}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    );
+                                })()}
+                            </label>
                         </div>
                         <div className="w-full grid grid-cols-2 gap-2 flex-shrink-0">
                             <label className="block"><span className="block text-[10px] font-semibold text-gray-600 mb-0.5">N (Modulus)</span><div className="text-[10px] p-1.5 border border-gray-200 rounded-lg bg-gray-100 overflow-hidden break-all h-6">{n || 'N/A'}</div></label>
@@ -329,7 +405,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                 )}
 
                 {/* Simplified renders for other nodes to save space in the component - core logic is identical to original app */}
-                {!isDataInput && !isOutputViewer && !isCaesarCipher && !isSimpleRSAKeyGen && (
+                {!isDataInput && !isOutputViewer && !isCaesarCipher && !isSimpleRSAKeyGen && !isPRNG && (
                     <div className="text-xs w-full text-center flex flex-col items-center flex-grow">
                         {/* Specific Controls per node type */}
                         {isVigenereCipher && (

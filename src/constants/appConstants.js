@@ -1,4 +1,4 @@
-import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut, Info, Split } from 'lucide-react';
+import { LayoutGrid, Cpu, Key, Zap, Settings, Lock, Unlock, Hash, Clipboard, X, ArrowLeft, ArrowRight, Download, Upload, Camera, ChevronDown, ChevronUp, CheckCheck, Fingerprint, Signature, ZoomIn, ZoomOut, Info, Split, Dices } from 'lucide-react';
 import { XORIcon } from '../components/icons/XORIcon';
 import { BitShiftIcon } from '../components/icons/BitShiftIcon';
 
@@ -53,10 +53,11 @@ export const NODE_DEFINITIONS = {
     SHIFT_OP: { label: 'Bit Shift', color: 'indigo', icon: BitShiftIcon, inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
     DATA_SPLIT: { label: 'Data Split', color: 'green', icon: Split, inputPorts: [{ name: 'Data Input', type: 'data', mandatory: true, id: 'data' }], outputPorts: [{ name: 'Chunk 1', type: 'data', keyField: 'chunk1' }, { name: 'Chunk 2', type: 'data', keyField: 'chunk2' }] },
     DATA_CONCAT: { label: 'Data Concatenate', color: 'teal', icon: Cpu, inputPorts: [{ name: 'Data A', type: 'data', mandatory: true, id: 'dataA' }, { name: 'Data B', type: 'data', mandatory: true, id: 'dataB' }], outputPorts: [{ name: 'Concatenated Output', type: 'data', keyField: 'dataOutput' }] },
+    PRNG_GEN: { label: 'PRNG', color: 'orange', icon: Dices, inputPorts: [], outputPorts: [{ name: 'Random Number', type: 'data', keyField: 'dataOutput' }] },
     CAESAR_CIPHER: { label: 'Caesar Cipher', color: 'amber', icon: Lock, inputPorts: [{ name: 'Plaintext', type: 'data', mandatory: true, id: 'plaintext' }], outputPorts: [{ name: 'Ciphertext', type: 'data', keyField: 'dataOutput' }] },
     VIGENERE_CIPHER: { label: 'Vigenère Cipher', color: 'yellow', icon: Lock, inputPorts: [{ name: 'Plaintext/Ciphertext', type: 'data', mandatory: true, id: 'data' }], outputPorts: [{ name: 'Result', type: 'data', keyField: 'dataOutput' }] },
     KEY_GEN: { label: 'Sym Key Generator', color: 'orange', icon: Key, inputPorts: [], outputPorts: [{ name: 'Key Output (AES)', type: 'key', keyField: 'dataOutput' }] },
-    SIMPLE_RSA_KEY_GEN: { label: 'Simple RSA PrivKey Gen', color: 'purple', icon: Key, inputPorts: [], outputPorts: [{ name: 'Private Key (d)', type: 'private', keyField: 'dataOutputPrivate' }] },
+    SIMPLE_RSA_KEY_GEN: { label: 'Simple RSA PrivKey Gen', color: 'purple', icon: Key, inputPorts: [{ name: 'Prime P', type: 'data', id: 'p', mandatory: false, requiresPrime: true }, { name: 'Prime Q', type: 'data', id: 'q', mandatory: false, requiresPrime: true }], outputPorts: [{ name: 'Private Key (d)', type: 'private', keyField: 'dataOutputPrivate' }] },
     SIMPLE_RSA_PUBKEY_GEN: { label: 'Simple RSA PubKey Gen', color: 'lime', icon: Unlock, inputPorts: [{ name: 'Private Key Source', type: 'private', mandatory: false, id: 'keySource' }], outputPorts: [{ name: 'Public Key (n, e)', type: 'public', keyField: 'dataOutputPublic' }] },
     SIMPLE_RSA_ENC: { label: 'Simple RSA Encrypt', color: 'maroon', icon: Lock, inputPorts: [{ name: 'Message (m)', type: 'data', mandatory: true, id: 'message' }, { name: 'Public Key (n, e)', type: 'public', mandatory: true, id: 'publicKey' }], outputPorts: [{ name: 'Ciphertext (c)', type: 'data', keyField: 'dataOutput' }] },
     SIMPLE_RSA_DEC: { label: 'Simple RSA Decrypt', color: 'rose', icon: Unlock, inputPorts: [{ name: 'Ciphertext (c)', type: 'data', mandatory: true, id: 'cipher' }, { name: 'Private Key (d)', type: 'private', mandatory: true, id: 'privateKey' }], outputPorts: [{ name: 'Plaintext (m)', type: 'data', keyField: 'dataOutput' }] },
@@ -69,7 +70,7 @@ export const NODE_DEFINITIONS = {
 };
 
 export const ORDERED_NODE_GROUPS = [
-    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP', 'DATA_SPLIT', 'DATA_CONCAT'] },
+    { name: 'CORE TOOLS', types: ['DATA_INPUT', 'OUTPUT_VIEWER', 'HASH_FN', 'XOR_OP', 'SHIFT_OP', 'DATA_SPLIT', 'DATA_CONCAT', 'PRNG_GEN'] },
     { name: 'CLASSIC CIPHERS', types: ['CAESAR_CIPHER', 'VIGENERE_CIPHER'] },
     { name: 'SIMPLE RSA', types: ['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN', 'SIMPLE_RSA_ENC', 'SIMPLE_RSA_DEC', 'SIMPLE_RSA_SIGN', 'SIMPLE_RSA_VERIFY'] },
     { name: 'SYMMETRIC CRYPTO (AES)', types: ['KEY_GEN', 'SYM_ENC', 'SYM_DEC'] },

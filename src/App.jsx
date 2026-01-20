@@ -10,7 +10,7 @@ import { globalStyles } from './styles/globalStyles';
 import { migrateProjectData, downloadFile } from './utils/projectUtils';
 import { getLinePath } from './utils/canvasUtils';
 import { recalculateGraph } from './utils/graphUtils';
-import { getOutputFormat } from './utils/cryptoUtils';
+import { getOutputFormat, generatePRNG } from './utils/cryptoUtils';
 import Toolbar from './components/Toolbar';
 import DraggableBox from './components/DraggableBox';
 import StatusNotification from './components/ui/StatusNotification';
@@ -59,6 +59,9 @@ const App = () => {
         } else if (['SIMPLE_RSA_KEY_GEN', 'SIMPLE_RSA_PUBKEY_GEN'].includes(type)) {
             initialWidth = 350;
             initialHeight = 450;
+        } else if (type === 'PRNG_GEN') {
+            initialWidth = 300;
+            initialHeight = 280;
         }
 
         const initialContent = {
@@ -78,6 +81,15 @@ const App = () => {
         else if (type === 'VIGENERE_CIPHER') { initialContent.keyword = 'HELLO'; initialContent.vigenereMode = 'ENCRYPT'; }
         else if (type === 'SIMPLE_RSA_KEY_GEN') { initialContent.generateKey = true; initialContent.modulusLength = 0; }
         else if (type === 'SHIFT_OP') { initialContent.shiftType = 'Left'; initialContent.shiftAmount = 1; }
+        else if (type === 'PRNG_GEN') {
+            initialContent.seed = Math.floor(Math.random() * 1000000);
+            initialContent.prngType = 'Integer';
+            initialContent.min = 0;
+            initialContent.max = 100;
+            initialContent.precision = 2;
+            initialContent.isPrime = false;
+            initialContent.dataOutput = generatePRNG(initialContent.seed, initialContent.prngType, initialContent.min, initialContent.max, initialContent.precision, initialContent.isPrime);
+        }
 
         // Track event in GA
         // Track event in GA

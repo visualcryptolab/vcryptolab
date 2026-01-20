@@ -388,3 +388,65 @@ export const isContentCompatible = (content, targetFormat) => {
     if (targetFormat === 'Base64') return /^[A-Za-z0-9+/=]*$/.test(cleanedContent);
     return true;
 };
+
+export class SeededRandom {
+    constructor(seed) {
+        this.m = 0x80000000;
+        this.a = 1103515245;
+        this.c = 12345;
+        this.state = seed ? seed : Math.floor(Math.random() * (this.m - 1));
+    }
+
+    nextInt() {
+        this.state = (this.a * this.state + this.c) % this.m;
+        return this.state;
+    }
+
+    nextFloat() {
+        return Math.abs(this.nextInt() / (this.m - 1));
+    }
+}
+
+export const isPrime = (num) => {
+    if (num <= 1) return false;
+    if (num <= 3) return true;
+    if (num % 2 === 0 || num % 3 === 0) return false;
+    for (let i = 5; i * i <= num; i += 6) {
+        if (num % i === 0 || num % (i + 2) === 0) return false;
+    }
+    return true;
+};
+
+export const generatePRNG = (seed, type, min, max, precision, isPrimeToggle) => {
+    const rng = new SeededRandom(parseInt(seed, 10));
+    const minVal = parseFloat(min);
+    const maxVal = parseFloat(max);
+
+    if (isNaN(minVal) || isNaN(maxVal) || minVal >= maxVal) {
+        return "ERROR: Invalid Range (Min >= Max or non-numeric)";
+    }
+
+    if (type === 'Float') {
+        const val = rng.nextFloat() * (maxVal - minVal) + minVal;
+        const prec = parseInt(precision, 10) || 0;
+        return val.toFixed(prec);
+    } else {
+        if (isPrimeToggle) {
+            let attempts = 0;
+            const maxAttempts = 1000;
+            while (attempts < maxAttempts) {
+                const r = rng.nextFloat();
+                const val = Math.floor(r * (maxVal - minVal + 1)) + minVal;
+                if (isPrime(val)) {
+                    return val.toString();
+                }
+                attempts++;
+            }
+            return "ERROR: No prime found in 1000 attempts";
+        } else {
+            const r = rng.nextFloat();
+            const val = Math.floor(r * (maxVal - minVal + 1)) + minVal;
+            return Math.floor(val).toString();
+        }
+    }
+};
