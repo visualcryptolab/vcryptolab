@@ -100,8 +100,15 @@ export const convertToUint8Array = (dataStr, sourceFormat) => {
             return new Uint8Array(validBytes);
         }
         if (sourceFormat === 'Decimal') {
-            const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
-            const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b >= 255);
+            if (!dataStr.trim().includes(' ')) {
+                try {
+                    const bigIntVal = BigInt(dataStr.trim());
+                    let hexStr = bigIntVal.toString(16);
+                    return new Uint8Array(hexToArrayBuffer(hexStr));
+                } catch(e) {}
+            }
+            const decimalArray = dataStr.trim().split(/\s+/).map(s => parseInt(s, 10));
+            const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
             return new Uint8Array(validBytes);
         }
         return new TextEncoder().encode(dataStr);
@@ -124,9 +131,18 @@ export const convertDataFormat = (dataStr, sourceFormat, targetFormat, toSingleN
             const validBytes = binaryArray.map(s => parseInt(s, 2)).filter(b => !isNaN(b) && b >= 0 && b <= 255);
             buffer = new Uint8Array(validBytes).buffer;
         } else if (sourceFormat === 'Decimal') {
-            const decimalArray = dataStr.split(/\s+/).map(s => parseInt(s, 10));
-            const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
-            buffer = new Uint8Array(validBytes).buffer;
+            if (!dataStr.trim().includes(' ')) {
+                try {
+                    const bigIntVal = BigInt(dataStr.trim());
+                    let hexStr = bigIntVal.toString(16);
+                    buffer = hexToArrayBuffer(hexStr);
+                } catch(e) {}
+            }
+            if (!buffer) {
+                const decimalArray = dataStr.trim().split(/\s+/).map(s => parseInt(s, 10));
+                const validBytes = decimalArray.filter(b => !isNaN(b) && b >= 0 && b <= 255);
+                buffer = new Uint8Array(validBytes).buffer;
+            }
         } else buffer = new TextEncoder().encode(dataStr).buffer;
     } catch (e) { return `DECODING ERROR: Failed source format (${sourceFormat}).`; }
 
