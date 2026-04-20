@@ -2,28 +2,28 @@
   "schemaVersion": "1.2",
   "nodes": [
     {
-      "id": "DATA_INPUT_1776174227791",
+      "id": "DATA_INPUT_1776420883819",
       "label": "Data Input",
       "position": {
-        "x": 237.6553815223141,
-        "y": 372.02199375223415
+        "x": 47.21273742642302,
+        "y": 25.11692261001508
       },
       "type": "DATA_INPUT",
       "color": "blue",
-      "dataOutput": "1234",
+      "dataOutput": "2000",
       "isProcessing": false,
       "outputFormat": "Text (UTF-8)",
       "width": 300,
       "height": 280,
-      "content": "1234",
+      "content": "2000",
       "format": "Decimal"
     },
     {
-      "id": "DATA_INPUT_1776174228362",
+      "id": "DATA_INPUT_1776424644936",
       "label": "Data Input",
       "position": {
-        "x": 247.37453078659325,
-        "y": 42.26858832619803
+        "x": 53.83761678569715,
+        "y": 604.3787985320145
       },
       "type": "DATA_INPUT",
       "color": "blue",
@@ -36,97 +36,97 @@
       "format": "Decimal"
     },
     {
-      "id": "XOR_OP_1776174250492",
+      "id": "XOR_OP_1776424672252",
       "label": "XOR Operation",
       "position": {
-        "x": 658.9643041540331,
-        "y": 183.6128159696597
+        "x": 734.4867422583372,
+        "y": 541.5503136680873
       },
       "type": "XOR_OP",
       "color": "lime",
-      "dataOutput": "ag==",
+      "dataOutput": "EbI=",
       "isProcessing": false,
       "outputFormat": "Base64",
       "width": 300,
       "height": 300
     },
     {
-      "id": "XOR_OP_1776174283533",
-      "label": "XOR Operation",
-      "position": {
-        "x": 1070.985248091236,
-        "y": 117.26247808252583
-      },
-      "type": "XOR_OP",
-      "color": "lime",
-      "dataOutput": "0g==",
-      "isProcessing": false,
-      "outputFormat": "Base64",
-      "width": 300,
-      "height": 300
-    },
-    {
-      "id": "XOR_OP_1776174301489",
-      "label": "XOR Operation",
-      "position": {
-        "x": 1018.5067795791388,
-        "y": 474.9917395358258
-      },
-      "type": "XOR_OP",
-      "color": "lime",
-      "dataOutput": "Fg==",
-      "isProcessing": false,
-      "outputFormat": "Base64",
-      "width": 300,
-      "height": 300
-    },
-    {
-      "id": "DATA_INPUT_1776174308722",
+      "id": "DATA_INPUT_1776425325642",
       "label": "Data Input",
       "position": {
-        "x": 638.63428440526,
-        "y": 597.0828952674615
+        "x": 60.127626660389524,
+        "y": 308.0445706407011
       },
       "type": "DATA_INPUT",
       "color": "blue",
-      "dataOutput": "2500",
+      "dataOutput": "6666",
       "isProcessing": false,
       "outputFormat": "Text (UTF-8)",
       "width": 300,
       "height": 280,
-      "content": "2500",
+      "content": "6666",
       "format": "Decimal"
     },
     {
-      "id": "OUTPUT_VIEWER_1776174318656",
+      "id": "XOR_OP_1776425354149",
+      "label": "XOR Operation",
+      "position": {
+        "x": 441.29836290133255,
+        "y": 322.1082700209515
+      },
+      "type": "XOR_OP",
+      "color": "lime",
+      "dataOutput": "Hdo=",
+      "isProcessing": false,
+      "outputFormat": "Base64",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "XOR_OP_1776425394109",
+      "label": "XOR Operation",
+      "position": {
+        "x": 823.8578675721106,
+        "y": 163.03163764801127
+      },
+      "type": "XOR_OP",
+      "color": "lime",
+      "dataOutput": "Ggo=",
+      "isProcessing": false,
+      "outputFormat": "Base64",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "OUTPUT_VIEWER_1776425415124",
       "label": "Output Viewer",
       "position": {
-        "x": 1485.711304474967,
-        "y": 143.9179923876968
+        "x": 1593.1441521061547,
+        "y": 129.4378656746352
       },
       "type": "OUTPUT_VIEWER",
       "color": "red",
-      "dataOutput": "196",
+      "dataOutput": "3000",
       "isProcessing": false,
       "outputFormat": "Decimal",
       "width": 300,
       "height": 550,
       "isConversionExpanded": true,
       "convertedFormat": "Decimal",
-      "convertedData": "196",
+      "convertedData": "3000",
       "sourceFormat": "Base64",
-      "rawInputData": "xA=="
+      "rawInputData": "C7g="
     },
     {
-      "id": "XOR_OP_1776174392749",
+      "id": "XOR_OP_1776425555604",
       "label": "XOR Operation",
       "position": {
-        "x": 1417.4278061576156,
-        "y": 760.3361059147758
+        "x": 1244.7660646007541,
+        "y": 672.377348307479
       },
       "type": "XOR_OP",
       "color": "lime",
-      "dataOutput": "xA==",
+      "dataOutput": "C7g=",
       "isProcessing": false,
       "outputFormat": "Base64",
       "width": 300,
@@ -135,58 +135,58 @@
   ],
   "connections": [
     {
-      "source": "DATA_INPUT_1776174228362",
+      "source": "DATA_INPUT_1776424644936",
       "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174250492",
-      "targetPortId": "dataA"
-    },
-    {
-      "source": "DATA_INPUT_1776174227791",
-      "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174250492",
+      "target": "XOR_OP_1776424672252",
       "targetPortId": "dataB"
     },
     {
-      "source": "XOR_OP_1776174250492",
+      "source": "DATA_INPUT_1776420883819",
       "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174283533",
+      "target": "XOR_OP_1776425354149",
       "targetPortId": "dataA"
     },
     {
-      "source": "DATA_INPUT_1776174228362",
+      "source": "DATA_INPUT_1776425325642",
       "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174283533",
+      "target": "XOR_OP_1776425354149",
       "targetPortId": "dataB"
     },
     {
-      "source": "XOR_OP_1776174283533",
+      "source": "XOR_OP_1776425354149",
       "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174301489",
+      "target": "XOR_OP_1776425394109",
+      "targetPortId": "dataB"
+    },
+    {
+      "source": "DATA_INPUT_1776420883819",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1776425394109",
       "targetPortId": "dataA"
     },
     {
-      "source": "DATA_INPUT_1776174308722",
+      "source": "XOR_OP_1776425394109",
       "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174301489",
-      "targetPortId": "dataB"
-    },
-    {
-      "source": "XOR_OP_1776174301489",
-      "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174392749",
+      "target": "XOR_OP_1776424672252",
       "targetPortId": "dataA"
     },
     {
-      "source": "DATA_INPUT_1776174227791",
+      "source": "XOR_OP_1776425555604",
       "sourcePortIndex": 0,
-      "target": "XOR_OP_1776174392749",
-      "targetPortId": "dataB"
-    },
-    {
-      "source": "XOR_OP_1776174392749",
-      "sourcePortIndex": 0,
-      "target": "OUTPUT_VIEWER_1776174318656",
+      "target": "OUTPUT_VIEWER_1776425415124",
       "targetPortId": "data"
+    },
+    {
+      "source": "XOR_OP_1776424672252",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1776425555604",
+      "targetPortId": "dataA"
+    },
+    {
+      "source": "DATA_INPUT_1776425325642",
+      "sourcePortIndex": 0,
+      "target": "XOR_OP_1776425555604",
+      "targetPortId": "dataB"
     }
   ]
 }

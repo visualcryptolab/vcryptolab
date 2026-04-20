@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Clipboard, X, Key, Dices } from 'lucide-react';
+import { Clipboard, X, Key, Dices, Pencil } from 'lucide-react';
 import {
     NODE_DEFINITIONS,
     TEXT_ICON_CLASSES,
@@ -17,6 +17,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     const definition = NODE_DEFINITIONS[type];
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
+    const [isEditingContent, setIsEditingContent] = useState(false);
     const boxRef = useRef(null);
     const offset = useRef({ x: 0, y: 0 });
     const resizeOffset = useRef({ x: 0, y: 0 });
@@ -56,8 +57,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
     if (isOutputViewer) requiredMinHeight = isConversionExpanded ? 280 : 250;
     if (isBitShift || type === 'XOR_OP' || isDataSplit || isDataConcat) requiredMinHeight = 300;
     const effectiveMinHeight = requiredMinHeight;
-    const baseClasses = `h-auto flex flex-col justify-start items-center p-3 bg-white shadow-xl rounded-xl border-4 transition duration-150 ease-in-out hover:shadow-2xl absolute select-none z-10`;
-    const boxStyle = { left: `${position.x}px`, top: `${position.y}px`, width: `${width}px`, minHeight: `${effectiveMinHeight}px`, height: `${height}px` };
+    const baseClasses = `h-auto flex flex-col justify-start items-center p-3 shadow-xl rounded-xl border-4 transition duration-150 ease-in-out hover:shadow-2xl absolute select-none z-10`;
+    const boxStyle = { left: `${position.x}px`, top: `${position.y}px`, width: `${width}px`, minHeight: `${effectiveMinHeight}px`, height: `${height}px`, backgroundColor: node.backgroundColor || '#ffffff' };
     const contentHeightExcludingHeader = height - 50;
 
     const handleDragStart = useCallback((e) => {
@@ -195,12 +196,26 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
             <div className="absolute bottom-0 right-0 w-4 h-4 rounded-tl-lg bg-gray-200 opacity-60 hover:opacity-100 transition duration-150 cursor-nwse-resize z-30" onMouseDown={handleResizeStart} onTouchStart={handleResizeStart} onClick={(e) => e.stopPropagation()} title="Resize">
                 <div className="w-1 h-1 bg-gray-600 absolute bottom-1 right-1"></div>
             </div>
+            <button className="absolute top-1 left-1 p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 z-30 transition duration-150" onClick={(e) => { e.stopPropagation(); setIsEditingContent(!isEditingContent); }} title="Edit Node"><Pencil className="w-3 h-3" /></button>
             <button className="absolute top-1 right-1 p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 z-30 transition duration-150" onClick={(e) => { e.stopPropagation(); handleDeleteNode(id); }} title="Delete Node"><X className="w-3 h-3" /></button>
             {renderInputPorts()} {renderOutputPorts()}
             <div className="flex flex-col w-full justify-start items-center overflow-hidden" style={{ height: `${contentHeightExcludingHeader}px` }}>
-                <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2">
+                <div className="flex flex-col justify-start items-center w-full flex-shrink-0 mb-2 mt-2">
                     {definition.icon && (<definition.icon className={`w-6 h-6 ${iconTextColorClass} mb-1`} />)}
-                    <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
+                    {isEditingContent ? (
+                        <div className="flex flex-col items-center w-[95%] mb-2 bg-white/80 backdrop-blur-sm p-3 rounded-lg border border-gray-200 shadow-sm z-40" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+                            <label className="text-[10px] font-semibold text-gray-600 w-full text-left mb-1 uppercase tracking-wider">Node Name</label>
+                            <input type="text" className="w-full text-xs p-1.5 border border-gray-300 rounded mb-3 text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 transition" value={label} onChange={(e) => updateNodeContent(id, 'label', e.target.value)} />
+                            <label className="text-[10px] font-semibold text-gray-600 w-full text-left mb-1 uppercase tracking-wider">Background Color</label>
+                            <div className="w-full flex items-center">
+                                <input type="color" className="w-8 h-8 p-0 border-0 rounded cursor-pointer mr-2 shadow-[0_0_0_1px_rgba(0,0,0,0.1)]" value={node.backgroundColor || '#ffffff'} onChange={(e) => updateNodeContent(id, 'backgroundColor', e.target.value)} />
+                                <span className="text-xs text-gray-500 font-mono flex-grow">{node.backgroundColor || '#ffffff'}</span>
+                                <button className="ml-auto text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium transition" onClick={() => updateNodeContent(id, 'backgroundColor', '#ffffff')}>Reset</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <span className={`text-${isDataInput ? 'base' : 'lg'} font-bold text-gray-800 text-center leading-tight`}>{label}</span>
+                    )}
                     {isCaesarCipher && <span className={`text-xs text-gray-500 mt-1`}>k = {node.shiftKey || 0}</span>}
                     {isVigenereCipher && <span className={`text-xs text-gray-500 mt-1`}>Keyword: {node.keyword || 'None'}</span>}
                     {isSimpleRSASign && <span className={`text-xs text-gray-500 mt-1`}>Signing (m^d mod n)</span>}
