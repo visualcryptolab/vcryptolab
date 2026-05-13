@@ -5,7 +5,7 @@ This directory contains example projects that demonstrate various cryptographic 
 ## Available Examples
 
 ### Block Cipher Modes
-- ****ECB.json**: A simplified educational mockup designed to illustrate how the [Electronic Codebook (ECB)](https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Electronic_codebook_(ECB)) encryption mode works.
+- **ECB.json**: A simplified educational mockup designed to illustrate how the [Electronic Codebook (ECB)](https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Electronic_codebook_(ECB)) encryption mode works.
 - **CBC.json**: A simplified educational mockup designed to illustrate how the [Cipher Block Chaining (CBC)](https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher_block_chaining_(CBC)) encryption mode works.
 - **CFB.json**: A simplified educational mockup designed to illustrate how the [Cipher Feedback (CFB)](https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher_feedback_(CFB)) encryption mode works.
 
