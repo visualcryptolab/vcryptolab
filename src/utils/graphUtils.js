@@ -54,7 +54,10 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                 if (sourceNode.generateKey || !sourceNode.keyBase64) {
                     isProcessing = true;
                     generateSymmetricKey(sourceNode.keyAlgorithm || 'AES-GCM').then(({ keyBase64 }) => {
-                        setNodes(prevNodes => prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: keyBase64, keyBase64: keyBase64, isProcessing: false, generateKey: false } : n));
+                        setNodes(prevNodes => {
+                            const nextNodes = prevNodes.map(n => n.id === sourceId ? { ...n, dataOutput: keyBase64, keyBase64: keyBase64, isProcessing: false, generateKey: false } : n);
+                            return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
+                        });
                     });
                     processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
                 } else outputData = sourceNode.keyBase64;
@@ -106,9 +109,21 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                     } else outputData = 'Waiting for data.';
                     break;
                 case 'HASH_FN':
-                    if (inputs['data']?.data && !inputs['data'].data.startsWith('ERROR')) {
+                    const hashData = inputs['data']?.data;
+                    const hashAlgo = sourceNode.hashAlgorithm || 'SHA-256';
+                    if (hashData && !hashData.startsWith('ERROR')) {
+                        const inputsKey = `${hashData}|${hashAlgo}`;
+                        if (sourceNode.lastProcessedInputs === inputsKey && sourceNode.dataOutput && !sourceNode.isProcessing) {
+                            outputData = sourceNode.dataOutput;
+                            break;
+                        }
                         isProcessing = true;
-                        calculateHash(inputs['data'].data, inputs['data'].format, sourceNode.hashAlgorithm || 'SHA-256').then(res => setNodes(prev => prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false } : n)));
+                        calculateHash(hashData, inputs['data'].format, hashAlgo).then(res => {
+                            setNodes(prev => {
+                                const nextNodes = prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false, lastProcessedInputs: inputsKey } : n);
+                                return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
+                            });
+                        });
                         processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
                     } else outputData = 'Waiting for data.';
                     break;
@@ -197,16 +212,42 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                     } catch (err) { outputData = "ERROR"; }
                     break;
                 case 'SYM_ENC':
-                    if (inputs['data']?.data && inputs['key']?.data && !inputs['data'].data.startsWith('ERROR')) {
+                    const encData = inputs['data']?.data;
+                    const encKey = inputs['key']?.data;
+                    const encAlgo = sourceNode.symAlgorithm || 'AES-GCM';
+                    if (encData && encKey && !encData.startsWith('ERROR')) {
+                        const inputsKey = `${encData}|${encKey}|${encAlgo}`;
+                        if (sourceNode.lastProcessedInputs === inputsKey && sourceNode.dataOutput && !sourceNode.isProcessing) {
+                            outputData = sourceNode.dataOutput;
+                            break;
+                        }
                         isProcessing = true;
-                        symmetricEncrypt(inputs['data'].data, inputs['key'].data, sourceNode.symAlgorithm || 'AES-GCM').then(res => setNodes(prev => prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false } : n)));
+                        symmetricEncrypt(encData, encKey, encAlgo).then(res => {
+                            setNodes(prev => {
+                                const nextNodes = prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false, lastProcessedInputs: inputsKey } : n);
+                                return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
+                            });
+                        });
                         processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
                     } else outputData = 'Waiting...';
                     break;
                 case 'SYM_DEC':
-                    if (inputs['cipher']?.data && inputs['key']?.data && !inputs['cipher'].data.startsWith('ERROR')) {
+                    const decCipher = inputs['cipher']?.data;
+                    const decKey = inputs['key']?.data;
+                    const decAlgo = sourceNode.symAlgorithm || 'AES-GCM';
+                    if (decCipher && decKey && !decCipher.startsWith('ERROR')) {
+                        const inputsKey = `${decCipher}|${decKey}|${decAlgo}`;
+                        if (sourceNode.lastProcessedInputs === inputsKey && sourceNode.dataOutput && !sourceNode.isProcessing) {
+                            outputData = sourceNode.dataOutput;
+                            break;
+                        }
                         isProcessing = true;
-                        symmetricDecrypt(inputs['cipher'].data, inputs['key'].data, sourceNode.symAlgorithm || 'AES-GCM').then(res => setNodes(prev => prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false } : n)));
+                        symmetricDecrypt(decCipher, decKey, decAlgo).then(res => {
+                            setNodes(prev => {
+                                const nextNodes = prev.map(n => n.id === sourceId ? { ...n, dataOutput: res, isProcessing: false, lastProcessedInputs: inputsKey } : n);
+                                return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
+                            });
+                        });
                         processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
                     } else outputData = 'Waiting...';
                     break;

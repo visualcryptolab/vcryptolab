@@ -1,0 +1,220 @@
+{
+  "schemaVersion": "1.2",
+  "nodes": [
+    {
+      "id": "DATA_INPUT_1764163870374",
+      "label": "M1",
+      "position": {
+        "x": 375,
+        "y": 10
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "1100",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 256,
+      "height": 256,
+      "content": "1100",
+      "format": "Binary",
+      "backgroundColor": "#86fdc0"
+    },
+    {
+      "id": "SHIFT_OP_1764163900476",
+      "label": "Encrypt 1",
+      "position": {
+        "x": 366.5,
+        "y": 304
+      },
+      "type": "SHIFT_OP",
+      "color": "indigo",
+      "dataOutput": "0110",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 280,
+      "height": 297,
+      "shiftType": "Right",
+      "shiftAmount": 1,
+      "shiftDescription": "Rotational Right Shift (ROR) (1 bits)",
+      "backgroundColor": "#4d82ff"
+    },
+    {
+      "id": "OUTPUT_VIEWER_1764163919859",
+      "label": "C1",
+      "position": {
+        "x": 377.1666666666667,
+        "y": 647.3333333333335
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "0110",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 263.5,
+      "height": 286,
+      "rawInputData": "0110",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Binary",
+      "backgroundColor": "#f17979"
+    },
+    {
+      "id": "DATA_INPUT_1764163991509",
+      "label": "M2",
+      "position": {
+        "x": 764.3333333333333,
+        "y": 15.3333333333334
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "1100",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 256,
+      "height": 256,
+      "content": "1100",
+      "format": "Binary",
+      "backgroundColor": "#86fdc0"
+    },
+    {
+      "id": "SHIFT_OP_1764164018857",
+      "label": "Encrypt 2",
+      "position": {
+        "x": 761,
+        "y": 300
+      },
+      "type": "SHIFT_OP",
+      "color": "indigo",
+      "dataOutput": "0110",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 267,
+      "height": 311,
+      "shiftType": "Right",
+      "shiftAmount": 1,
+      "shiftDescription": "Rotational Right Shift (ROR) (1 bits)",
+      "backgroundColor": "#4d82ff"
+    },
+    {
+      "id": "OUTPUT_VIEWER_1764164031324",
+      "label": "C2",
+      "position": {
+        "x": 773.9999999999999,
+        "y": 642.6666666666665
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "0110",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 256.0000000000001,
+      "height": 286,
+      "rawInputData": "0110",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Binary",
+      "backgroundColor": "#f17979"
+    },
+    {
+      "id": "DATA_INPUT_1764164049066",
+      "label": "M3",
+      "position": {
+        "x": 1125.333333333333,
+        "y": 16.66666666666667
+      },
+      "type": "DATA_INPUT",
+      "color": "blue",
+      "dataOutput": "0111",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 256,
+      "height": 256,
+      "content": "0111",
+      "format": "Binary",
+      "backgroundColor": "#86fdc0"
+    },
+    {
+      "id": "SHIFT_OP_1764164090344",
+      "label": "Encrypt 3",
+      "position": {
+        "x": 1116.3333333333333,
+        "y": 300.33333333333326
+      },
+      "type": "SHIFT_OP",
+      "color": "indigo",
+      "dataOutput": "1011",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 278,
+      "height": 308,
+      "shiftType": "Right",
+      "shiftAmount": 1,
+      "shiftDescription": "Rotational Right Shift (ROR) (1 bits)",
+      "backgroundColor": "#4d82ff"
+    },
+    {
+      "id": "OUTPUT_VIEWER_1764164106385",
+      "label": "C3",
+      "position": {
+        "x": 1142.6666666666665,
+        "y": 645
+      },
+      "type": "OUTPUT_VIEWER",
+      "color": "red",
+      "dataOutput": "1011",
+      "isProcessing": false,
+      "outputFormat": "Binary",
+      "width": 257.66666666666674,
+      "height": 286,
+      "rawInputData": "1011",
+      "viewFormat": "Text (UTF-8)",
+      "isConversionExpanded": false,
+      "convertedData": "",
+      "convertedFormat": "Base64",
+      "sourceFormat": "Binary",
+      "backgroundColor": "#f17979"
+    }
+  ],
+  "connections": [
+    {
+      "source": "SHIFT_OP_1764163900476",
+      "sourcePortIndex": 0,
+      "target": "OUTPUT_VIEWER_1764163919859",
+      "targetPortId": "data"
+    },
+    {
+      "source": "SHIFT_OP_1764164018857",
+      "sourcePortIndex": 0,
+      "target": "OUTPUT_VIEWER_1764164031324",
+      "targetPortId": "data"
+    },
+    {
+      "source": "SHIFT_OP_1764164090344",
+      "sourcePortIndex": 0,
+      "target": "OUTPUT_VIEWER_1764164106385",
+      "targetPortId": "data"
+    },
+    {
+      "source": "DATA_INPUT_1764163870374",
+      "sourcePortIndex": 0,
+      "target": "SHIFT_OP_1764163900476",
+      "targetPortId": "data"
+    },
+    {
+      "source": "DATA_INPUT_1764163991509",
+      "sourcePortIndex": 0,
+      "target": "SHIFT_OP_1764164018857",
+      "targetPortId": "data"
+    },
+    {
+      "source": "DATA_INPUT_1764164049066",
+      "sourcePortIndex": 0,
+      "target": "SHIFT_OP_1764164090344",
+      "targetPortId": "data"
+    }
+  ]
+}
