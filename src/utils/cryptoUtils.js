@@ -129,8 +129,8 @@ export const vigenereEncryptDecrypt = (inputData, keyWord, mode = 'ENCRYPT') => 
 export const getOutputFormat = (nodeType) => {
     switch (nodeType) {
         case 'DATA_INPUT': case 'CAESAR_CIPHER': case 'VIGENERE_CIPHER': return 'Text (UTF-8)';
-        case 'KEY_GEN': case 'SYM_ENC': case 'DATA_SPLIT': case 'DATA_CONCAT': return 'Binary';
-        case 'ASYM_ENC': case 'SIMPLE_RSA_KEY_GEN': case 'RSA_KEY_GEN': case 'SIMPLE_RSA_PUBKEY_GEN': return 'Base64';
+        case 'DATA_SPLIT': case 'DATA_CONCAT': return 'Binary';
+        case 'KEY_GEN': case 'SYM_ENC': case 'ASYM_ENC': case 'SIMPLE_RSA_KEY_GEN': case 'RSA_KEY_GEN': case 'SIMPLE_RSA_PUBKEY_GEN': return 'Base64';
         case 'HASH_FN': return 'Hexadecimal';
         case 'SYM_DEC': case 'ASYM_DEC': return 'Text (UTF-8)';
         case 'SIMPLE_RSA_ENC': case 'SIMPLE_RSA_DEC': case 'SIMPLE_RSA_SIGN': return 'Decimal';
