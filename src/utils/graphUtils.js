@@ -34,16 +34,43 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
         return [n.id, newNode];
     }));
 
-    let initialQueue = new Set(currentNodes.filter(n => NODE_DEFINITIONS[n.type]?.inputPorts.length === 0).map(n => n.id));
-    if (changedNodeId) initialQueue.add(changedNodeId);
-    let nodesToProcess = Array.from(initialQueue);
-    const processed = new Set();
-    const findAllTargets = (sourceId) => currentConnections.filter(c => c.source === sourceId).map(c => c.target).filter(targetId => !processed.has(targetId));
+    const inDegree = new Map();
+    const adjList = new Map();
+    currentNodes.forEach(n => {
+        inDegree.set(n.id, 0);
+        adjList.set(n.id, []);
+    });
 
-    while (nodesToProcess.length > 0) {
-        const sourceId = nodesToProcess.shift();
-        if (processed.has(sourceId) || !newNodesMap.has(sourceId)) continue;
+    currentConnections.forEach(c => {
+        if (inDegree.has(c.target) && adjList.has(c.source)) {
+            inDegree.set(c.target, inDegree.get(c.target) + 1);
+            adjList.get(c.source).push(c.target);
+        }
+    });
+
+    const queue = [];
+    currentNodes.forEach(n => {
+        if (inDegree.get(n.id) === 0) queue.push(n.id);
+    });
+
+    const sortedNodes = [];
+    while (queue.length > 0) {
+        const sourceId = queue.shift();
+        sortedNodes.push(sourceId);
+        adjList.get(sourceId).forEach(targetId => {
+            const currentInDegree = inDegree.get(targetId) - 1;
+            inDegree.set(targetId, currentInDegree);
+            if (currentInDegree === 0) queue.push(targetId);
+        });
+    }
+
+    currentNodes.forEach(n => {
+        if (!sortedNodes.includes(n.id)) sortedNodes.push(n.id);
+    });
+
+    for (const sourceId of sortedNodes) {
         const sourceNode = newNodesMap.get(sourceId);
+        if (!sourceNode) continue;
         const sourceNodeDef = NODE_DEFINITIONS[sourceNode.type];
         let outputData = sourceNode.dataOutput || '';
         let isProcessing = false;
@@ -59,7 +86,7 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                             return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
                         });
                     });
-                    processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
+                    continue;
                 } else outputData = sourceNode.keyBase64;
             } else if (sourceNode.type === 'PRNG_GEN') {
                 const res = generatePRNG(sourceNode.seed, sourceNode.prngType, sourceNode.min, sourceNode.max, sourceNode.precision, sourceNode.isPrime);
@@ -99,14 +126,14 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                     if (plain) {
                         const { output, format } = caesarEncrypt(plain, inputs['plaintext']?.format, parseInt(sourceNode.shiftKey) || 0);
                         outputData = output; sourceNode.outputFormat = format;
-                    } else outputData = 'Waiting for plaintext input.';
+                    } else outputData = 'Waiting for inputs:\n• Plaintext';
                     break;
                 case 'VIGENERE_CIPHER':
                     const vInput = inputs['data']?.data;
                     if (vInput) {
                         if (inputs['data']?.format !== 'Text (UTF-8)') outputData = "ERROR: Needs Text (UTF-8)";
                         else { const { output, format } = vigenereEncryptDecrypt(vInput, sourceNode.keyword, sourceNode.vigenereMode); outputData = output; sourceNode.outputFormat = format; }
-                    } else outputData = 'Waiting for data.';
+                    } else outputData = 'Waiting for inputs:\n• Plaintext / Ciphertext';
                     break;
                 case 'HASH_FN':
                     const hashData = inputs['data']?.data;
@@ -124,15 +151,20 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                                 return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
                             });
                         });
-                        processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
-                    } else outputData = 'Waiting for data.';
+                        continue;
+                    } else outputData = 'Waiting for inputs:\n• Data to hash';
                     break;
                 case 'XOR_OP':
                     const xA = inputs['dataA']?.data; const xB = inputs['dataB']?.data;
-                    if (xA && xB && !xA.startsWith('ERROR') && !xB.startsWith('ERROR')) {
+                    const missingXOR = [];
+                    if (!xA || xA.startsWith('ERROR') || xA.startsWith('Waiting')) missingXOR.push('Input A');
+                    if (!xB || xB.startsWith('ERROR') || xB.startsWith('Waiting')) missingXOR.push('Input B');
+                    if (missingXOR.length === 0) {
                         const res = performBitwiseXor(xA, inputs['dataA'].format, xB, inputs['dataB'].format);
                         outputData = res.output; sourceNode.outputFormat = res.format;
-                    } else outputData = 'Waiting for inputs.';
+                    } else {
+                        outputData = 'Waiting for inputs:\n' + missingXOR.map(m => `• ${m}`).join('\n');
+                    }
                     break;
                 case 'SIMPLE_RSA_ENC':
                     try {
@@ -141,45 +173,68 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                         const pkSourceConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'publicKey');
                         const sourceNodeKeyGen = newNodesMap.get(pkSourceConn?.source);
                         if (sourceNodeKeyGen?.n_pub) { n = BigInt(sourceNodeKeyGen.n_pub); e = BigInt(sourceNodeKeyGen.e_pub); }
-                        else if (pkStr) { const [nStr, eStr] = pkStr.split(','); n = BigInt(nStr); e = BigInt(eStr); }
-                        if (mStr && n) {
+                        else if (sourceNodeKeyGen?.n) { n = BigInt(sourceNodeKeyGen.n); e = BigInt(sourceNodeKeyGen.e); }
+                        else if (pkStr && pkStr !== 'N/A' && !pkStr.startsWith('Waiting')) { 
+                            const parts = pkStr.split(',');
+                            if (parts.length >= 2) { n = BigInt(parts[0]); e = BigInt(parts[1]); }
+                        }
+                        const missing = [];
+                        if (!mStr || mStr.startsWith('Waiting') || mStr.startsWith('ERROR')) missing.push('Plaintext Message');
+                        if (!n) missing.push('Public Key');
+                        if (missing.length === 0) {
                             const m = BigInt(mStr.replace(/\s+/g, ''));
                             outputData = (m >= n) ? "ERROR: m >= n" : modPow(m, e, n).toString();
-                        } else outputData = 'Waiting for input.';
-                    } catch (err) { outputData = "ERROR"; }
+                        } else {
+                            outputData = 'Waiting for inputs:\n' + missing.map(m => `• ${m}`).join('\n');
+                        }
+                    } catch (err) { outputData = "ERROR: Invalid Input"; }
                     break;
                 case 'SIMPLE_RSA_DEC':
                     try {
                         const cStr = inputs['cipher']?.data; const dStr = inputs['privateKey']?.data;
                         const privConn = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'privateKey');
                         const privSource = newNodesMap.get(privConn?.source);
-                        if (cStr && dStr && privSource?.n) {
-                            outputData = modPow(BigInt(cStr), BigInt(dStr), BigInt(privSource.n)).toString();
-                        } else outputData = 'Waiting for input.';
-                    } catch (err) { outputData = "ERROR"; }
+                        let n, d;
+                        if (privSource?.n) { n = BigInt(privSource.n); d = BigInt(privSource.d || dStr); }
+                        else if (dStr && dStr !== 'N/A' && !dStr.startsWith('Waiting')) { 
+                            d = BigInt(dStr); 
+                            if (privSource?.n_pub) n = BigInt(privSource.n_pub);
+                        }
+                        const missing = [];
+                        if (!cStr || cStr.startsWith('Waiting') || cStr.startsWith('ERROR')) missing.push('Ciphertext');
+                        if (!d || !n) missing.push('Private Key (needs N and D)');
+                        if (missing.length === 0) {
+                            outputData = modPow(BigInt(cStr), d, n).toString();
+                        } else {
+                            outputData = 'Waiting for inputs:\n' + missing.map(m => `• ${m}`).join('\n');
+                        }
+                    } catch (err) { outputData = "ERROR: Invalid Input"; }
                     break;
                 case 'SHIFT_OP':
                     if (inputs['data']?.data && !inputs['data'].data.startsWith('ERROR')) {
                         const res = performBitShiftOperation(inputs['data'].data, sourceNode.shiftType, sourceNode.shiftAmount, inputs['data'].format);
                         outputData = res.output; sourceNode.shiftDescription = res.description; sourceNode.outputFormat = inputs['data'].format;
-                    } else outputData = 'Waiting for input.';
+                    } else outputData = 'Waiting for inputs:\n• Data to shift';
                     break;
                 case 'DATA_SPLIT':
                     if (inputs['data']?.data && !inputs['data'].data.startsWith('ERROR')) {
                         const splitRes = splitDataIntoChunks(inputs['data'].data, inputs['data'].format);
                         sourceNode.chunk1 = splitRes.chunk1; sourceNode.chunk2 = splitRes.chunk2; sourceNode.outputFormat = splitRes.outputFormat;
-                    } else { sourceNode.chunk1 = 'Waiting...'; sourceNode.chunk2 = 'Waiting...'; }
+                    } else { sourceNode.chunk1 = 'Waiting for inputs:\n• Data'; sourceNode.chunk2 = 'Waiting for inputs:\n• Data'; }
                     outputData = '';
                     break;
                 case 'DATA_CONCAT':
                     const inputsA = inputs['dataA'];
                     const inputsB = inputs['dataB'];
-                    if (inputsA && inputsB) {
+                    const missingConcat = [];
+                    if (!inputsA || inputsA.data?.startsWith('Waiting') || inputsA.data?.startsWith('ERROR')) missingConcat.push('Data A');
+                    if (!inputsB || inputsB.data?.startsWith('Waiting') || inputsB.data?.startsWith('ERROR')) missingConcat.push('Data B');
+                    if (missingConcat.length === 0) {
                         const concatRes = concatenateData(inputsA.data, inputsA.format, inputsB.data, inputsB.format, sourceNode.interpretAsText);
                         outputData = concatRes.output;
                         sourceNode.outputFormat = concatRes.format;
                     } else {
-                        outputData = 'Waiting for inputs.';
+                        outputData = 'Waiting for inputs:\n' + missingConcat.map(m => `• ${m}`).join('\n');
                     }
                     break;
                 case 'SIMPLE_RSA_PUBKEY_GEN':
@@ -194,9 +249,17 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                         const mS = inputs['message']?.data; const dS = inputs['privateKey']?.data;
                         const pC = currentConnections.find(c => c.target === sourceId && c.targetPortId === 'privateKey');
                         const pS = newNodesMap.get(pC?.source);
-                        if (mS && dS && pS?.n) outputData = modPow(BigInt(mS.replace(/\s+/g, '')), BigInt(dS), BigInt(pS.n)).toString();
-                        else outputData = 'Waiting...';
-                    } catch (err) { outputData = "ERROR"; }
+                        let n, d;
+                        if (pS?.n) { n = BigInt(pS.n); d = BigInt(pS.d || dS); }
+                        const missing = [];
+                        if (!mS || mS.startsWith('Waiting') || mS.startsWith('ERROR')) missing.push('Message');
+                        if (!n || !d) missing.push('Private Key');
+                        if (missing.length === 0) {
+                            outputData = modPow(BigInt(mS.replace(/\s+/g, '')), d, n).toString();
+                        } else {
+                            outputData = 'Waiting for inputs:\n' + missing.map(m => `• ${m}`).join('\n');
+                        }
+                    } catch (err) { outputData = "ERROR: Invalid Input"; }
                     break;
                 case 'SIMPLE_RSA_VERIFY':
                     try {
@@ -205,17 +268,31 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                         const pkS = newNodesMap.get(pkC?.source);
                         let nV, eV;
                         if (pkS?.n_pub) { nV = BigInt(pkS.n_pub); eV = BigInt(pkS.e_pub); }
-                        if (mV && sV && nV) {
+                        else if (pkS?.n) { nV = BigInt(pkS.n); eV = BigInt(pkS.e); }
+                        else if (inputs['publicKey']?.data && inputs['publicKey'].data !== 'N/A' && !inputs['publicKey'].data.startsWith('Waiting')) {
+                            const parts = inputs['publicKey'].data.split(',');
+                            if (parts.length >= 2) { nV = BigInt(parts[0]); eV = BigInt(parts[1]); }
+                        }
+                        const missing = [];
+                        if (!mV || mV.startsWith('Waiting') || mV.startsWith('ERROR')) missing.push('Message');
+                        if (!sV || sV.startsWith('Waiting') || sV.startsWith('ERROR')) missing.push('Signature');
+                        if (!nV || !eV) missing.push('Public Key');
+                        if (missing.length === 0) {
                             const dec = modPow(BigInt(sV.replace(/\s+/g, '')), eV, nV);
                             outputData = (dec === BigInt(mV.replace(/\s+/g, ''))) ? "SUCCESS: Signature Valid" : "FAILURE: Signature Invalid";
-                        } else outputData = 'Waiting...';
-                    } catch (err) { outputData = "ERROR"; }
+                        } else {
+                            outputData = 'Waiting for inputs:\n' + missing.map(m => `• ${m}`).join('\n');
+                        }
+                    } catch (err) { outputData = "ERROR: Invalid Input"; }
                     break;
                 case 'SYM_ENC':
                     const encData = inputs['data']?.data;
                     const encKey = inputs['key']?.data;
                     const encAlgo = sourceNode.symAlgorithm || 'AES-GCM';
-                    if (encData && encKey && !encData.startsWith('ERROR')) {
+                    const missingSymEnc = [];
+                    if (!encData || encData.startsWith('ERROR') || encData.startsWith('Waiting')) missingSymEnc.push('Plaintext Data');
+                    if (!encKey || encKey.startsWith('Waiting')) missingSymEnc.push('Symmetric Key');
+                    if (missingSymEnc.length === 0) {
                         const inputsKey = `${encData}|${encKey}|${encAlgo}`;
                         if (sourceNode.lastProcessedInputs === inputsKey && sourceNode.dataOutput && !sourceNode.isProcessing) {
                             outputData = sourceNode.dataOutput;
@@ -228,14 +305,19 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                                 return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
                             });
                         });
-                        processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
-                    } else outputData = 'Waiting...';
+                        continue;
+                    } else {
+                        outputData = 'Waiting for inputs:\n' + missingSymEnc.map(m => `• ${m}`).join('\n');
+                    }
                     break;
                 case 'SYM_DEC':
                     const decCipher = inputs['cipher']?.data;
                     const decKey = inputs['key']?.data;
                     const decAlgo = sourceNode.symAlgorithm || 'AES-GCM';
-                    if (decCipher && decKey && !decCipher.startsWith('ERROR')) {
+                    const missingSymDec = [];
+                    if (!decCipher || decCipher.startsWith('ERROR') || decCipher.startsWith('Waiting')) missingSymDec.push('Ciphertext Data');
+                    if (!decKey || decKey.startsWith('Waiting')) missingSymDec.push('Symmetric Key');
+                    if (missingSymDec.length === 0) {
                         const inputsKey = `${decCipher}|${decKey}|${decAlgo}`;
                         if (sourceNode.lastProcessedInputs === inputsKey && sourceNode.dataOutput && !sourceNode.isProcessing) {
                             outputData = sourceNode.dataOutput;
@@ -248,8 +330,10 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                                 return recalculateGraph(nextNodes, currentConnections, sourceId, setNodes);
                             });
                         });
-                        processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
-                    } else outputData = 'Waiting...';
+                        continue;
+                    } else {
+                        outputData = 'Waiting for inputs:\n' + missingSymDec.map(m => `• ${m}`).join('\n');
+                    }
                     break;
                 case 'SIMPLE_RSA_KEY_GEN':
                     if (sourceNode.generateKey) {
@@ -289,7 +373,7 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
                             sourceNode.dStatus = d_val.toString(); // Success message or key
                         } else { outputData = error; sourceNode.dStatus = error; }
                         sourceNode.isProcessing = false; sourceNode.generateKey = false;
-                        newNodesMap.set(sourceId, sourceNode); processed.add(sourceId); nodesToProcess.push(...findAllTargets(sourceId)); continue;
+                        newNodesMap.set(sourceId, sourceNode); continue;
                     } else {
                         outputData = sourceNode.dataOutputPrivate || '';
                     }
@@ -304,8 +388,6 @@ export const recalculateGraph = (currentNodes, currentConnections, changedNodeId
         }
         sourceNode.isProcessing = isProcessing;
         newNodesMap.set(sourceId, sourceNode);
-        processed.add(sourceId);
-        nodesToProcess.push(...findAllTargets(sourceId));
     }
     return Array.from(newNodesMap.values());
 };

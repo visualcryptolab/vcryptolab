@@ -12,6 +12,26 @@ import {
 import { isContentCompatible } from '../utils/cryptoUtils';
 import Port from './Port';
 
+const getDefaultWaitMessage = (type) => {
+    switch (type) {
+        case 'CAESAR_CIPHER': return 'Waiting for inputs:\n• Plaintext';
+        case 'VIGENERE_CIPHER': return 'Waiting for inputs:\n• Plaintext / Ciphertext';
+        case 'HASH_FN': return 'Waiting for inputs:\n• Data to hash';
+        case 'XOR_OP': return 'Waiting for inputs:\n• Input A\n• Input B';
+        case 'SIMPLE_RSA_ENC': return 'Waiting for inputs:\n• Plaintext Message\n• Public Key';
+        case 'SIMPLE_RSA_DEC': return 'Waiting for inputs:\n• Ciphertext\n• Private Key';
+        case 'SHIFT_OP': return 'Waiting for inputs:\n• Data to shift';
+        case 'DATA_SPLIT': return 'Waiting for inputs:\n• Data';
+        case 'DATA_CONCAT': return 'Waiting for inputs:\n• Data A\n• Data B';
+        case 'SIMPLE_RSA_SIGN': return 'Waiting for inputs:\n• Message\n• Private Key';
+        case 'SIMPLE_RSA_VERIFY': return 'Waiting for inputs:\n• Message\n• Signature\n• Public Key';
+        case 'SYM_ENC': return 'Waiting for inputs:\n• Plaintext Data\n• Symmetric Key';
+        case 'SYM_DEC': return 'Waiting for inputs:\n• Ciphertext Data\n• Symmetric Key';
+        default: return 'Waiting for input...';
+    }
+};
+
+
 const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handleConnectEnd, connectingPort, updateNodeContent, connections, handleDeleteNode, nodes, scale, handleResize }) => {
     const { id, label, position, type, color, content, format, dataOutput, dataOutputPublic, dataOutputPrivate, isProcessing, hashAlgorithm, keyAlgorithm, symAlgorithm, modulusLength, publicExponent, sourceFormat, rawInputData, p, q, e, d, n, phiN, shiftKey, keyword, vigenereMode, dStatus, n_pub, e_pub, isReadOnly, width, height, keyBase64, shiftDescription, chunk1, chunk2, convertedData, convertedFormat, isConversionExpanded, interpretAsText } = node;
     const definition = NODE_DEFINITIONS[type];
@@ -313,7 +333,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         <input type="number" min="0" max="25" step="1" className="w-full text-xs p-1.5 border border-gray-200 rounded-lg shadow-sm mb-2 flex-shrink-0 text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition duration-200" value={node.shiftKey || 0} onChange={(e) => updateNodeContent(id, 'shiftKey', parseInt(e.target.value) || 0)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} />
                         <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-amber-600'} flex-shrink-0`}>{isProcessing ? 'Encrypting...' : 'Active'}</span>
                         <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
-                            <p className={`text-left text-[10px] break-all p-2 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>{dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext...'}</p>
+                            <p className={`text-left whitespace-pre-wrap text-[10px] break-all p-2 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>{dataOutput ? `Result (${node.outputFormat}): ${dataOutput}` : 'Waiting for Plaintext input...'}</p>
                             <button onClick={(e) => handleCopyToClipboard(e, dataOutput)} disabled={!dataOutput || dataOutput.startsWith('ERROR')} className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm ${dataOutput && !dataOutput.startsWith('ERROR') ? copyStatus === 'Copied!' ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500' : 'bg-gray-300 cursor-not-allowed'}`} title="Copy to Clipboard"><Clipboard className="w-3 h-3" /></button>
                         </div>
                     </div>
@@ -352,7 +372,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                         </div>
 
                         <div className="relative mt-1 text-gray-500 break-all w-full">
-                            <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                            <p className={`text-left whitespace-pre-wrap text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
                                 {dataOutput || '...'}
                             </p>
                             <button onClick={(e) => handleCopyToClipboard(e, dataOutput)} disabled={!dataOutput} className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm bg-green-500 hover:bg-green-600`} title="Copy"><Clipboard className="w-3 h-3" /></button>
@@ -370,7 +390,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                                     const srcP = connP ? nodes.find(n => n.id === connP.source)?.dataOutput : null;
                                     return (
                                         <input type="text"
-                                            placeholder={connP ? "Waiting..." : "Auto"}
+                                            placeholder={connP ? "Waiting for P..." : "Auto"}
                                             disabled={!!connP}
                                             className={`w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition ${connP ? 'bg-gray-100 cursor-not-allowed font-medium text-purple-700' : ''}`}
                                             value={connP ? (srcP || '') : (p || '')}
@@ -388,7 +408,7 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                                     const srcQ = connQ ? nodes.find(n => n.id === connQ.source)?.dataOutput : null;
                                     return (
                                         <input type="text"
-                                            placeholder={connQ ? "Waiting..." : "Auto"}
+                                            placeholder={connQ ? "Waiting for Q..." : "Auto"}
                                             disabled={!!connQ}
                                             className={`w-full text-[10px] p-1 border border-gray-200 rounded-lg shadow-sm text-gray-700 focus:ring-2 focus:ring-purple-500 outline-none transition ${connQ ? 'bg-gray-100 cursor-not-allowed font-medium text-purple-700' : ''}`}
                                             value={connQ ? (srcQ || '') : (q || '')}
@@ -481,8 +501,8 @@ const DraggableBox = ({ node, setPosition, canvasRef, handleConnectStart, handle
                             <>
                                 <span className={`font-semibold mt-2 ${isProcessing ? 'text-yellow-600' : 'text-gray-600'} flex-shrink-0`}>{isProcessing ? 'Processing...' : 'Active'}</span>
                                 <div className="relative mt-1 text-gray-500 break-all w-full flex-grow">
-                                    <p className={`text-left text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
-                                        {dataOutput ? (dataOutput.length > 200 ? dataOutput.substring(0, 200) + '...' : dataOutput) : (chunk1 ? `Chunk 1: ${chunk1}\nChunk 2: ${chunk2}` : 'Waiting for input...')}
+                                    <p className={`text-left whitespace-pre-wrap text-[10px] break-all p-1 bg-gray-100 rounded overflow-auto h-full ${dataOutput?.startsWith('ERROR') ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+                                        {dataOutput ? (dataOutput.length > 200 ? dataOutput.substring(0, 200) + '...' : dataOutput) : (chunk1 ? `Chunk 1: ${chunk1}\nChunk 2: ${chunk2}` : getDefaultWaitMessage(type))}
                                     </p>
                                     <button onClick={(e) => handleCopyToClipboard(e, dataOutput || chunk1)} disabled={!dataOutput && !chunk1} className={`absolute top-1 right-1 p-1 rounded-full text-white font-semibold transition duration-150 text-xs shadow-sm bg-gray-400 hover:bg-gray-500`} title="Copy"><Clipboard className="w-3 h-3" /></button>
                                 </div>
